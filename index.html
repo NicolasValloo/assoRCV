@@ -1,0 +1,1798 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Ovalie Gestion</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --surface-2: #eef1ed;
+  --ink: #182019;
+  --ink-2: #5a635c;
+  --ink-3: #8b938d;
+  --line: #e2e6e1;
+  --line-strong: #c9cfc9;
+  --accent: #1e5c42;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3efe8;
+  --side-bg: #14241c;
+  --side-ink: #cfdad2;
+  --side-ink-strong: #ffffff;
+  --good: #0ca30c;
+  --good-text: #006300;
+  --warning: #fab219;
+  --warning-text: #8a5b00;
+  --serious: #ec835a;
+  --serious-text: #a34312;
+  --critical: #d03b3b;
+  --critical-text: #b02a2a;
+  --chart-s1: #2a78d6;
+  --chart-s2: #eb6834;
+  --chart-s3: #1baf7a;
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
+  --shadow: 0 1px 2px rgba(20,30,24,.06), 0 4px 14px rgba(20,30,24,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101412;
+    --surface: #191f1b;
+    --surface-2: #212823;
+    --ink: #e7ece8;
+    --ink-2: #a6afa8;
+    --ink-3: #79827b;
+    --line: #2a322c;
+    --line-strong: #3b453e;
+    --accent: #4fae83;
+    --accent-ink: #0c1810;
+    --accent-soft: #1d2f26;
+    --side-bg: #0c120e;
+    --side-ink: #9fada4;
+    --side-ink-strong: #ffffff;
+    --good: #0ca30c;
+    --good-text: #4cc06a;
+    --warning: #fab219;
+    --warning-text: #e3b95c;
+    --serious: #ec835a;
+    --serious-text: #eb9a78;
+    --critical: #d03b3b;
+    --critical-text: #e66767;
+    --chart-s1: #3987e5;
+    --chart-s2: #d95926;
+    --chart-s3: #199e70;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101412;
+  --surface: #191f1b;
+  --surface-2: #212823;
+  --ink: #e7ece8;
+  --ink-2: #a6afa8;
+  --ink-3: #79827b;
+  --line: #2a322c;
+  --line-strong: #3b453e;
+  --accent: #4fae83;
+  --accent-ink: #0c1810;
+  --accent-soft: #1d2f26;
+  --side-bg: #0c120e;
+  --side-ink: #9fada4;
+  --side-ink-strong: #ffffff;
+  --good: #0ca30c;
+  --good-text: #4cc06a;
+  --warning: #fab219;
+  --warning-text: #e3b95c;
+  --serious: #ec835a;
+  --serious-text: #eb9a78;
+  --critical: #d03b3b;
+  --critical-text: #e66767;
+  --chart-s1: #3987e5;
+  --chart-s2: #d95926;
+  --chart-s3: #199e70;
+  --chart-grid: #2c2c2a;
+  --chart-axis: #383835;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+h1,h2,h3,h4 { text-wrap: balance; }
+
+.app { display: flex; min-height: 100%; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: 216px; flex: none;
+  background: var(--side-bg); color: var(--side-ink);
+  display: flex; flex-direction: column;
+  padding: 18px 12px calc(14px + env(safe-area-inset-bottom, 0px));
+  position: sticky; top: 0; height: 100vh;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
+.brand-badge {
+  width: 34px; height: 34px; flex: none; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center;
+}
+.brand-name {
+  font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  font-weight: 700; font-size: 20px; letter-spacing: .4px; color: var(--side-ink-strong);
+  line-height: 1.05;
+}
+.brand-sub { font-size: 11px; color: var(--side-ink); letter-spacing: .3px; }
+.nav { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.nav button {
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: 0; color: var(--side-ink);
+  font: 500 14px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer; text-align: left; width: 100%;
+}
+.nav button:hover { background: rgba(255,255,255,.07); color: var(--side-ink-strong); }
+.nav button.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.nav button:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.nav .ico { width: 18px; flex: none; text-align: center; }
+.side-note {
+  margin-top: auto; font-size: 11px; line-height: 1.45; color: var(--side-ink);
+  border-top: 1px solid rgba(255,255,255,.12); padding: 12px 8px 0;
+}
+
+/* ---------- Main ---------- */
+.main { flex: 1; min-width: 0; padding: 0 24px 40px; }
+.demo-banner {
+  background: var(--warning); color: #221800;
+  font-size: 12.5px; font-weight: 600; letter-spacing: .2px;
+  padding: 6px 24px; margin: 0 -24px;
+  display: flex; gap: 8px; align-items: center;
+}
+.page-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 22px 0 6px; }
+.page-title {
+  font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  font-weight: 700; font-size: 30px; letter-spacing: .3px; margin: 0; line-height: 1;
+}
+.page-sub { color: var(--ink-2); margin: 4px 0 0; font-size: 13px; }
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Cards & grids ---------- */
+.grid { display: grid; gap: 14px; }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 12px; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.card h3 {
+  margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--ink-2); font-weight: 600;
+}
+.kpi-value {
+  font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  font-size: 32px; font-weight: 600; line-height: 1;
+}
+.kpi-note { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.two-col { grid-template-columns: 3fr 2fr; margin-top: 14px; align-items: start; }
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ---------- Tables ---------- */
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .7px;
+  color: var(--ink-3); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr.rowlink { cursor: pointer; }
+tr.rowlink:hover td { background: var(--surface-2); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.empty { color: var(--ink-3); font-style: italic; padding: 18px 10px; }
+
+/* ---------- Badges & status ---------- */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .2px;
+  padding: 2px 8px; border-radius: 20px; white-space: nowrap;
+  background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line);
+}
+.badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.b-good { color: var(--good-text); background: color-mix(in srgb, var(--good) 12%, var(--surface)); border-color: color-mix(in srgb, var(--good) 30%, var(--line)); }
+.b-warn { color: var(--warning-text); background: color-mix(in srgb, var(--warning) 14%, var(--surface)); border-color: color-mix(in srgb, var(--warning) 35%, var(--line)); }
+.b-serious { color: var(--serious-text); background: color-mix(in srgb, var(--serious) 13%, var(--surface)); border-color: color-mix(in srgb, var(--serious) 32%, var(--line)); }
+.b-crit { color: var(--critical-text); background: color-mix(in srgb, var(--critical) 11%, var(--surface)); border-color: color-mix(in srgb, var(--critical) 30%, var(--line)); }
+.b-info { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+
+/* ---------- Buttons & forms ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 600 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: 8px 13px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+}
+.btn:hover { background: var(--surface-2); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+.btn-sm { padding: 5px 9px; font-size: 12px; }
+.btn-danger { color: var(--critical-text); border-color: color-mix(in srgb, var(--critical) 40%, var(--line-strong)); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+input, select, textarea {
+  font: 13.5px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px;
+}
+input::placeholder { color: var(--ink-3); }
+label { font-size: 12px; font-weight: 600; color: var(--ink-2); display: block; margin-bottom: 4px; }
+.field { display: flex; flex-direction: column; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Toolbar / filters ---------- */
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0 12px; }
+.toolbar input[type="search"] { min-width: 200px; flex: 1 1 200px; max-width: 320px; }
+.count-note { color: var(--ink-2); font-size: 12.5px; margin-left: auto; white-space: nowrap; }
+
+/* ---------- Tabs ---------- */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line-strong); margin: 14px 0 0; overflow-x: auto; }
+.tabs button {
+  border: 0; background: none; cursor: pointer;
+  font: 600 13.5px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink-2); padding: 10px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  white-space: nowrap;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-body { padding-top: 14px; }
+
+/* ---------- Modal ---------- */
+.modal-back {
+  position: fixed; inset: 0; background: rgba(10,14,11,.55);
+  display: grid; place-items: center; padding: 20px; z-index: 50;
+}
+.modal {
+  background: var(--surface); color: var(--ink);
+  border-radius: 12px; border: 1px solid var(--line);
+  width: min(720px, 100%); max-height: min(86vh, 100%); overflow: auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,.3);
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; background: var(--surface); z-index: 2;
+}
+.modal-head h2 {
+  margin: 0; font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  font-size: 22px; font-weight: 700; letter-spacing: .3px;
+}
+.modal-body { padding: 16px 18px; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px 16px; border-top: 1px solid var(--line); }
+.x-btn { border: 0; background: none; color: var(--ink-2); font-size: 20px; cursor: pointer; line-height: 1; padding: 4px 8px; }
+.x-btn:hover { color: var(--ink); }
+
+/* ---------- Toast ---------- */
+.toast-zone { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 90; display: flex; flex-direction: column; gap: 8px; align-items: center; width: min(420px, calc(100% - 32px)); }
+.toast {
+  background: var(--ink); color: var(--bg);
+  padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  box-shadow: var(--shadow); max-width: 100%;
+  animation: toast-in .18s ease-out;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* ---------- Charts ---------- */
+.chart-tip {
+  position: fixed; z-index: 80; pointer-events: none;
+  background: var(--ink); color: var(--bg);
+  font-size: 12px; padding: 6px 9px; border-radius: 6px; line-height: 1.45;
+  max-width: 240px;
+}
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.hbar-row { display: grid; grid-template-columns: 130px 1fr 70px; gap: 10px; align-items: center; font-size: 13px; padding: 4px 0; }
+.hbar-track { background: var(--surface-2); border-radius: 4px; height: 14px; overflow: hidden; }
+.hbar-fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--chart-s1); }
+.hbar-val { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+/* ---------- Alerts list ---------- */
+.alert-line { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.alert-line:last-child { border-bottom: 0; }
+.alert-line .when { margin-left: auto; color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+
+/* ---------- Stock gauge ---------- */
+.gauge { background: var(--surface-2); border-radius: 4px; height: 10px; min-width: 90px; overflow: hidden; position: relative; }
+.gauge > i { display: block; height: 100%; background: var(--good); }
+.gauge.low > i { background: var(--critical); }
+.gauge.mid > i { background: var(--warning); }
+
+/* ---------- Vote bars ---------- */
+.vote-bar { display: flex; height: 16px; border-radius: 5px; overflow: hidden; background: var(--surface-2); }
+.vote-bar > i { display: block; height: 100%; }
+.vote-bar > i + i { margin-left: 2px; }
+.vote-pour { background: var(--good); }
+.vote-contre { background: var(--critical); }
+.vote-abst { background: var(--chart-axis); }
+
+/* ---------- Meeting layout ---------- */
+.odj-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: flex-start; }
+.odj-item:last-child { border-bottom: 0; }
+.odj-num {
+  font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  font-weight: 700; font-size: 16px; color: var(--accent); flex: none; width: 24px; padding-top: 1px;
+}
+.presence-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
+.presence-grid label {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; cursor: pointer; margin: 0;
+}
+.presence-grid label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 760px) {
+  .app { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 4px; padding: 10px 12px; }
+  .brand { padding: 0 6px 0 0; }
+  .nav { flex-direction: row; flex-wrap: wrap; margin: 0; }
+  .nav button { padding: 7px 9px; }
+  .side-note { display: none; }
+  .main { padding: 0 16px 32px; }
+  .demo-banner { margin: 0 -16px; padding: 6px 16px; }
+  .hbar-row { grid-template-columns: 96px 1fr 60px; }
+}
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-badge" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><ellipse cx="10" cy="10" rx="8.5" ry="5.6" transform="rotate(-32 10 10)" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M6.5 12.5 L13.5 7.5 M9 12.8 L9.6 11 M11 11.4 L11.6 9.6 M8 10.4 L8.6 8.6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">Ovalie Gestion</div>
+        <div class="brand-sub">RC Val d'Adret · Rugby</div>
+      </div>
+    </div>
+    <nav class="nav" id="mainNav" aria-label="Modules"></nav>
+    <div class="side-note">
+      Maquette de démonstration.<br>
+      Données fictives générées — aucune donnée réelle. Saison 2026-2027.
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="demo-banner">⚠ Maquette — toutes les données sont fictives et générées pour test. Les modifications vivent le temps de la session.</div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div id="modalRoot" hidden></div>
+<div class="toast-zone" id="toastZone" aria-live="polite"></div>
+<div class="chart-tip" id="chartTip" hidden></div>
+
+<script>
+/* ================= UTILITAIRES ================= */
+'use strict';
+const $ = (sel, el=document) => el.querySelector(sel);
+const $$ = (sel, el=document) => [...el.querySelectorAll(sel)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const eur = n => n.toLocaleString('fr-FR', {style:'currency', currency:'EUR', maximumFractionDigits: Number.isInteger(n) ? 0 : 2});
+const dfr = iso => { const d = new Date(iso + 'T12:00:00'); return d.toLocaleDateString('fr-FR', {day:'numeric', month:'short', year:'numeric'}); };
+const dfrShort = iso => { const d = new Date(iso + 'T12:00:00'); return d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'}); };
+const TODAY = '2026-09-18';
+const daysUntil = iso => Math.round((new Date(iso) - new Date(TODAY)) / 86400000);
+const addDaysIso = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0,10); };
+
+/* RNG déterministe : mêmes données à chaque ouverture */
+let _seed = 20262027;
+function rnd() { _seed = (_seed * 1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; }
+const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+const pick = arr => arr[Math.floor(rnd() * arr.length)];
+
+function toast(msg) {
+  const z = $('#toastZone');
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  z.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+function openModal(title, bodyHtml, footHtml) {
+  const root = $('#modalRoot');
+  root.hidden = false;
+  root.innerHTML = `<div class="modal-back" id="modalBack">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+      <div class="modal-head"><h2>${esc(title)}</h2><button class="x-btn" id="modalClose" aria-label="Fermer">✕</button></div>
+      <div class="modal-body">${bodyHtml}</div>
+      ${footHtml ? `<div class="modal-foot">${footHtml}</div>` : ''}
+    </div></div>`;
+  $('#modalClose').onclick = closeModal;
+  $('#modalBack').addEventListener('mousedown', e => { if (e.target.id === 'modalBack') closeModal(); });
+}
+function closeModal() { const r = $('#modalRoot'); r.hidden = true; r.innerHTML = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+/* Tooltip graphiques */
+const tip = $('#chartTip');
+function showTip(html, x, y) {
+  tip.innerHTML = html; tip.hidden = false;
+  const pad = 12;
+  requestAnimationFrame(() => {
+    const r = tip.getBoundingClientRect();
+    let left = x + pad, top = y - r.height - pad;
+    if (left + r.width > innerWidth - 8) left = x - r.width - pad;
+    if (top < 8) top = y + pad;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  });
+}
+function hideTip() { tip.hidden = true; }
+</script>
+<script>
+/* ================= DONNÉES DE TEST GÉNÉRÉES ================= */
+
+const PRENOMS_M = ['Lucas','Hugo','Théo','Mathis','Nathan','Enzo','Léo','Gabriel','Louis','Jules','Raphaël','Arthur','Tom','Noah','Ethan','Maël','Paul','Antoine','Baptiste','Clément','Romain','Maxime','Quentin','Julien','Nicolas','Thomas','Pierre','Florian','Damien','Sébastien','Kévin','Alexandre','Vincent','Olivier','Fabien','Jérôme','Cédric','Mickaël','Loïc','Yanis'];
+const PRENOMS_F = ['Emma','Léa','Chloé','Manon','Camille','Sarah','Inès','Jade','Louise','Zoé','Lina','Clara','Juliette','Margaux','Élise','Marion','Pauline','Amandine','Sophie','Céline','Nathalie','Isabelle'];
+const NOMS = ['Martin','Bernard','Thomas','Petit','Robert','Richard','Durand','Dubois','Moreau','Laurent','Simon','Michel','Lefebvre','Leroy','Roux','David','Bertrand','Morel','Fournier','Girard','Bonnet','Dupont','Lambert','Fontaine','Rousseau','Vincent','Muller','Lefevre','Faure','André','Mercier','Blanc','Guérin','Boyer','Garnier','Chevalier','François','Legrand','Gauthier','Garcia','Perrin','Robin','Clément','Morin','Nicolas','Henry','Roussel','Mathieu','Gautier','Masson','Marchand','Duval','Denis','Dumont','Marie','Lemaire','Noël','Meyer','Dufour','Meunier','Brun','Blanchard','Giraud','Joly','Rivière','Lucas','Brunet','Gaillard','Barbier','Arnaud','Gérard','Vidal','Roche','Renard','Schmitt','Roy','Leroux','Colin','Vasseur'];
+const VILLES = ['Val d\'Adret','Saint-Julien-du-Pré','Montclar','Les Arnauds','Rochebrune','Villeneuve-d\'Aval','Le Pontet-Vieux'];
+
+const CATEGORIES = [
+  { code:'M6',  label:'M6 – Éveil',            nmin:2020, nmax:2021, n:7,  cot:130, mixte:true },
+  { code:'M8',  label:'M8 – École de rugby',   nmin:2018, nmax:2019, n:10, cot:140, mixte:true },
+  { code:'M10', label:'M10 – École de rugby',  nmin:2016, nmax:2017, n:12, cot:140, mixte:true },
+  { code:'M12', label:'M12 – École de rugby',  nmin:2014, nmax:2015, n:12, cot:150, mixte:true },
+  { code:'M14', label:'M14 – Minimes',         nmin:2012, nmax:2013, n:11, cot:160, mixte:true },
+  { code:'M16', label:'M16 – Cadets',          nmin:2010, nmax:2011, n:12, cot:175, mixte:false },
+  { code:'M19', label:'M19 – Juniors',         nmin:2007, nmax:2009, n:10, cot:190, mixte:false },
+  { code:'SEN', label:'Seniors',               nmin:1988, nmax:2006, n:23, cot:220, mixte:false },
+  { code:'LOI', label:'Rugby loisir / Touch',  nmin:1975, nmax:2000, n:8,  cot:120, mixte:true },
+  { code:'DIR', label:'Dirigeants & éducateurs', nmin:1962, nmax:1995, n:8, cot:0,  mixte:true },
+];
+
+const state = {
+  view: 'dashboard',
+  licencies: [],
+  bank: [],          // transactions bancaires importées
+  ecritures: [],     // journal comptable
+  paiements: [],     // demandes de paiement en ligne
+  stock: [],
+  mouvements: [],
+  reunions: [],
+  bureau: [],
+  filtres: { lic: { q:'', cat:'', cot:'', cert:'' }, stock: { pole:'', alerte:false }, banque: { statut:'' } },
+  soldeInitial: 8420,
+};
+
+/* ---- Licenciés ---- */
+(function genLicencies() {
+  let id = 1;
+  for (const cat of CATEGORIES) {
+    for (let i = 0; i < cat.n; i++) {
+      const estF = cat.mixte ? rnd() < 0.3 : rnd() < 0.06;
+      const prenom = estF ? pick(PRENOMS_F) : pick(PRENOMS_M);
+      const nom = pick(NOMS);
+      const annee = ri(cat.nmin, cat.nmax);
+      const naissance = `${annee}-${String(ri(1,12)).padStart(2,'0')}-${String(ri(1,28)).padStart(2,'0')}`;
+      // Certificat médical / attestation : validité 3 ans, certains expirés ou proches
+      const r = rnd();
+      let certFin;
+      if (r < 0.08) certFin = addDaysIso(TODAY, -ri(10, 120));        // expiré
+      else if (r < 0.20) certFin = addDaysIso(TODAY, ri(5, 60));      // expire bientôt
+      else certFin = addDaysIso(TODAY, ri(90, 900));
+      const rl = rnd();
+      const licStatut = rl < 0.72 ? 'validee' : (rl < 0.9 ? 'attente' : 'a_renouveler');
+      const rc = rnd();
+      let cotStatut, cotPaye;
+      if (cat.cot === 0) { cotStatut = 'exoneree'; cotPaye = 0; }
+      else if (rc < 0.62) { cotStatut = 'payee'; cotPaye = cat.cot; }
+      else if (rc < 0.78) { cotStatut = 'partielle'; cotPaye = Math.round(cat.cot / 2); }
+      else { cotStatut = 'impayee'; cotPaye = 0; }
+      state.licencies.push({
+        id: id++, nom, prenom, sexe: estF ? 'F' : 'M', naissance,
+        cat: cat.code,
+        licence: '2026' + String(ri(100000, 999999)),
+        licStatut, certFin,
+        cot: cat.cot, cotPaye, cotStatut,
+        email: `${prenom.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}.${nom.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}@exemple.fr`,
+        tel: `06 ${String(ri(10,99))} ${String(ri(10,99))} ${String(ri(10,99))} ${String(ri(10,99))}`,
+        ville: pick(VILLES),
+        inscrit: 2026 - ri(0, 8),
+      });
+    }
+  }
+})();
+const catLabel = code => (CATEGORIES.find(c => c.code === code) || {label: code}).label;
+
+/* ---- Comptabilité : 12 mois d'écritures + relevé bancaire ---- */
+const CAT_RECETTES = ['Cotisations','Subvention municipale','Subvention ANS','Sponsors & partenaires','Buvette','Événements & lotos'];
+const CAT_DEPENSES = ['Équipement sportif','Déplacements','Affiliation & licences FFR','Arbitrage','Pharmacie & secours','Assurance','Frais administratifs','Achats buvette','Location & entretien terrain'];
+
+(function genCompta() {
+  const mois = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date('2026-09-15T12:00:00'); d.setMonth(d.getMonth() - i);
+    mois.push({ y: d.getFullYear(), m: d.getMonth() + 1 });
+  }
+  let eid = 1, bid = 1;
+  const pushOp = (y, m, jour, sens, cat, libelle, montant, rapprochee=true) => {
+    const date = `${y}-${String(m).padStart(2,'0')}-${String(jour).padStart(2,'0')}`;
+    const ec = { id: eid++, date, sens, cat, libelle, montant };
+    state.ecritures.push(ec);
+    const brut = sens === 'R'
+      ? pick(['VIR SEPA ', 'VIR INST ', 'REMISE CHEQUE ', 'REMISE CB ']) + libelle.toUpperCase().slice(0, 24)
+      : pick(['PRLV SEPA ', 'CB ', 'VIR SEPA ', 'CHEQUE N°' + ri(1000,9999) + ' ']) + libelle.toUpperCase().slice(0, 24);
+    state.bank.push({ id: bid++, date, libelle: brut, montant: sens === 'R' ? montant : -montant, statut: rapprochee ? 'rapprochee' : 'a_rapprocher', ecritureId: rapprochee ? ec.id : null, catProposee: cat });
+  };
+  for (const { y, m } of mois) {
+    const isLast = (y === 2026 && m === 9);
+    // Recettes
+    if (m === 9 || m === 10) pushOp(y, m, ri(3, 25), 'R', 'Cotisations', 'Cotisations rentrée', ri(28, 46) * 100, !isLast);
+    else if (rnd() < 0.5) pushOp(y, m, ri(3, 25), 'R', 'Cotisations', 'Cotisations retardataires', ri(2, 8) * 50, !isLast);
+    if (m === 11) pushOp(y, m, 12, 'R', 'Subvention municipale', 'Subvention mairie Val d\'Adret', 3500);
+    if (m === 3) pushOp(y, m, 22, 'R', 'Subvention ANS', 'Subvention ANS projet école de rugby', 2200);
+    if (m === 10 || m === 2 || m === 6) pushOp(y, m, ri(5, 20), 'R', 'Sponsors & partenaires', pick(['Partenariat Boucherie Arnaud','Partenariat Garage du Pont','Sponsor Intermarché Montclar','Partenariat Menuiserie Roux']), ri(4, 12) * 100);
+    if (m >= 9 || m <= 5) pushOp(y, m, ri(10, 27), 'R', 'Buvette', 'Recettes buvette matchs', ri(120, 420), !isLast && rnd() > 0.2);
+    if (m === 12) pushOp(y, m, 14, 'R', 'Événements & lotos', 'Loto de Noël', 1850);
+    if (m === 5) pushOp(y, m, 30, 'R', 'Événements & lotos', 'Tournoi des familles', 940);
+    // Dépenses
+    if (m === 9) pushOp(y, m, 8, 'D', 'Affiliation & licences FFR', 'Affiliation FFR saison', 2740, !isLast);
+    if (m === 9 || m === 1) pushOp(y, m, ri(5, 25), 'D', 'Équipement sportif', pick(['Ballons + plots école de rugby','Jeu de maillots seniors','Boucliers de percussion','Casques et protège-dents']), ri(3, 9) * 100, !isLast);
+    if (m >= 10 || m <= 4) pushOp(y, m, ri(6, 26), 'D', 'Déplacements', 'Car déplacement ' + pick(['M14','M16','M19','Seniors']), ri(180, 520), !(isLast && rnd() < 0.5));
+    if ((m >= 10 || m <= 4) && rnd() < 0.7) pushOp(y, m, ri(6, 26), 'D', 'Arbitrage', 'Indemnités arbitrage', ri(80, 190));
+    if (rnd() < 0.35) pushOp(y, m, ri(4, 24), 'D', 'Pharmacie & secours', 'Réassort pharmacie', ri(45, 160), !isLast);
+    if (m === 10) pushOp(y, m, 3, 'D', 'Assurance', 'Assurance RC + locaux', 1240);
+    pushOp(y, m, 28, 'D', 'Frais administratifs', 'Frais bancaires', ri(8, 14));
+    if ((m >= 9 || m <= 5) && rnd() < 0.6) pushOp(y, m, ri(8, 22), 'D', 'Achats buvette', 'Achats buvette Metro', ri(60, 240), !isLast);
+    if (m === 7) pushOp(y, m, 10, 'D', 'Location & entretien terrain', 'Réfection pelouse + traçage', 860);
+  }
+  state.ecritures.sort((a, b) => b.date.localeCompare(a.date));
+  state.bank.sort((a, b) => b.date.localeCompare(a.date));
+})();
+
+/* ---- Paiements en ligne (module de paiement intégré simulé) ---- */
+(function genPaiements() {
+  let pid = 1;
+  for (const l of state.licencies) {
+    if (l.cotStatut === 'payee' && rnd() < 0.45) {
+      state.paiements.push({ id: pid++, licId: l.id, objet: 'Cotisation 2026-2027', montant: l.cot, statut: 'paye', creee: addDaysIso(TODAY, -ri(8, 40)), payee: addDaysIso(TODAY, -ri(1, 7)), relances: 0 });
+    } else if (l.cotStatut === 'partielle') {
+      state.paiements.push({ id: pid++, licId: l.id, objet: 'Solde cotisation 2026-2027', montant: l.cot - l.cotPaye, statut: rnd() < 0.5 ? 'envoyee' : 'relancee', creee: addDaysIso(TODAY, -ri(10, 30)), payee: null, relances: rnd() < 0.5 ? 1 : 2 });
+    } else if (l.cotStatut === 'impayee' && rnd() < 0.7) {
+      state.paiements.push({ id: pid++, licId: l.id, objet: 'Cotisation 2026-2027', montant: l.cot, statut: rnd() < 0.6 ? 'envoyee' : 'relancee', creee: addDaysIso(TODAY, -ri(5, 25)), payee: null, relances: ri(0, 2) });
+    }
+  }
+})();
+
+/* ---- Stock multi-pôles ---- */
+const POLES = [
+  { code:'sportif', label:'Pôle sportif' },
+  { code:'pharmacie', label:'Pôle pharmacie' },
+  { code:'administratif', label:'Pôle administratif' },
+  { code:'buvette', label:'Pôle buvette' },
+];
+(function genStock() {
+  let sid = 1;
+  const add = (pole, nom, qte, seuil, unite, empl, peremption=null) =>
+    state.stock.push({ id: sid++, pole, nom, qte, seuil, unite, empl, peremption });
+  add('sportif','Ballons T3 (école de rugby)', 14, 10, 'u.', 'Local matériel');
+  add('sportif','Ballons T4 (M14/M16)', 9, 8, 'u.', 'Local matériel');
+  add('sportif','Ballons T5 (M19/Seniors)', 6, 8, 'u.', 'Local matériel');
+  add('sportif','Plots souples', 46, 30, 'u.', 'Local matériel');
+  add('sportif','Boucliers de percussion', 7, 6, 'u.', 'Local matériel');
+  add('sportif','Sacs de plaquage', 4, 4, 'u.', 'Local matériel');
+  add('sportif','Chasubles (jeu de 12)', 5, 4, 'jeux', 'Local matériel');
+  add('sportif','Maillots match Seniors (jeu)', 2, 2, 'jeux', 'Vestiaire A');
+  add('sportif','Maillots match M16 (jeu)', 1, 2, 'jeux', 'Vestiaire A');
+  add('sportif','Protège-dents (taille junior)', 11, 15, 'u.', 'Bureau');
+  add('pharmacie','Bombes de froid', 3, 6, 'u.', 'Infirmerie', '2027-11-01');
+  add('pharmacie','Strap 4 cm', 12, 10, 'rouleaux', 'Infirmerie', '2027-05-01');
+  add('pharmacie','Compresses stériles', 18, 15, 'boîtes', 'Infirmerie', '2026-10-05');
+  add('pharmacie','Solution antiseptique', 4, 4, 'flacons', 'Infirmerie', '2026-11-20');
+  add('pharmacie','Poches de glace instantanée', 8, 10, 'u.', 'Infirmerie', '2028-01-01');
+  add('pharmacie','Couvertures de survie', 6, 5, 'u.', 'Infirmerie');
+  add('pharmacie','Gants nitrile', 2, 3, 'boîtes', 'Infirmerie');
+  add('pharmacie','Sutures adhésives (steri-strips)', 5, 4, 'boîtes', 'Infirmerie', '2026-09-30');
+  add('administratif','Ramettes papier A4', 3, 4, 'u.', 'Bureau');
+  add('administratif','Cartouches encre imprimante', 2, 2, 'u.', 'Bureau');
+  add('administratif','Enveloppes A5', 120, 50, 'u.', 'Bureau');
+  add('administratif','Licences vierges / dossiers', 35, 20, 'u.', 'Bureau');
+  add('buvette','Café moulu', 4, 3, 'kg', 'Buvette');
+  add('buvette','Gobelets réutilisables', 180, 100, 'u.', 'Buvette');
+  add('buvette','Fûts bière blonde 30 L', 1, 2, 'u.', 'Buvette');
+  add('buvette','Sodas 33 cl', 48, 60, 'u.', 'Buvette');
+  add('buvette','Saucisses (congélateur)', 6, 5, 'kg', 'Buvette', '2026-12-15');
+  // Historique de mouvements
+  let mid = 1;
+  const noms = state.stock.map(s => s.id);
+  for (let i = 0; i < 26; i++) {
+    const art = state.stock[Math.floor(rnd() * state.stock.length)];
+    const sortie = rnd() < 0.6;
+    state.mouvements.push({
+      id: mid++, date: addDaysIso(TODAY, -ri(1, 90)), artId: art.id,
+      delta: sortie ? -ri(1, 4) : ri(2, 10),
+      motif: sortie ? pick(['Sortie match','Sortie entraînement','Casse / perte','Usage infirmerie','Vente buvette']) : pick(['Réassort','Achat','Don partenaire','Retour matériel']),
+      par: pick(['J. Fabre','M. Roussel','C. Delmas','A. Peyre']),
+    });
+  }
+  state.mouvements.sort((a, b) => b.date.localeCompare(a.date));
+})();
+
+/* ---- Codir, réunions & AG ---- */
+(function genCodir() {
+  state.bureau = [
+    { id:1, nom:'Jean-Marc Fabre', role:'Président', voix: 1 },
+    { id:2, nom:'Christine Delmas', role:'Trésorière', voix: 1 },
+    { id:3, nom:'Antoine Peyre', role:'Secrétaire', voix: 1 },
+    { id:4, nom:'Marie Roussel', role:'Vice-présidente', voix: 1 },
+    { id:5, nom:'Karim Bensaïd', role:'Resp. école de rugby', voix: 1 },
+    { id:6, nom:'Sophie Vialar', role:'Resp. événements', voix: 1 },
+    { id:7, nom:'Pascal Gayraud', role:'Resp. matériel & terrain', voix: 1 },
+    { id:8, nom:'Laure Cantagrel', role:'Resp. partenariats', voix: 1 },
+  ];
+  state.reunions = [
+    {
+      id: 1, type: 'AG', titre: 'Assemblée générale ordinaire 2026', date: '2026-06-12', heure: '19:00',
+      lieu: 'Salle des fêtes de Val d\'Adret', statut: 'terminee',
+      convoquees: 96, presents: 41, pouvoirs: 13, quorumPct: 25,
+      odj: [
+        { id:1, titre:'Rapport moral du président', note:'Présenté par J.-M. Fabre. Adopté sans remarque majeure.', fait:true },
+        { id:2, titre:'Rapport financier 2025-2026', note:'Excédent de 1 240 € sur l\'exercice. Quitus donné à la trésorière.', fait:true },
+        { id:3, titre:'Montant des cotisations 2026-2027', note:'Hausse de 10 € sur toutes les catégories sauf école de rugby.', fait:true },
+        { id:4, titre:'Renouvellement du tiers sortant', note:'3 postes renouvelés, 1 candidature nouvelle (L. Cantagrel).', fait:true },
+        { id:5, titre:'Questions diverses', note:'Demande de créneau supplémentaire au gymnase — à porter en mairie.', fait:true },
+      ],
+      votes: [
+        { id:1, titre:'Approbation du rapport moral', mode:'AG', statut:'clos', pour:52, contre:0, abst:2, resultat:'adopte' },
+        { id:2, titre:'Approbation des comptes 2025-2026', mode:'AG', statut:'clos', pour:50, contre:1, abst:3, resultat:'adopte' },
+        { id:3, titre:'Cotisations 2026-2027 (+10 € hors EDR)', mode:'AG', statut:'clos', pour:38, contre:9, abst:7, resultat:'adopte' },
+        { id:4, titre:'Élection de Laure Cantagrel au comité', mode:'AG', statut:'clos', pour:49, contre:2, abst:3, resultat:'adopte' },
+      ],
+      docs: ['Convocation AG 2026.pdf','Rapport financier 2025-2026.pdf','PV AG 2025.pdf'],
+      presence: {},
+    },
+    {
+      id: 2, type: 'Codir', titre: 'Comité directeur de rentrée', date: '2026-09-01', heure: '20:30',
+      lieu: 'Club house', statut: 'terminee',
+      convoquees: 8, presents: 7, pouvoirs: 0, quorumPct: 50,
+      odj: [
+        { id:1, titre:'Bilan des inscriptions au 1er septembre', note:'87 dossiers reçus, objectif 105 licenciés maintenu.', fait:true },
+        { id:2, titre:'Organisation du tournoi de rentrée EDR', note:'Date fixée au 4 octobre. S. Vialar coordonne.', fait:true },
+        { id:3, titre:'Renouvellement du jeu de maillots M16', note:'Deux devis reçus, vote reporté au codir d\'octobre.', fait:true },
+      ],
+      votes: [
+        { id:1, titre:'Budget tournoi de rentrée (plafond 600 €)', mode:'Codir', statut:'clos', pour:7, contre:0, abst:0, resultat:'adopte' },
+      ],
+      docs: ['CR codir 2026-09-01.pdf'],
+      presence: { 1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:false },
+    },
+    {
+      id: 3, type: 'Codir', titre: 'Comité directeur d\'octobre', date: '2026-10-06', heure: '20:30',
+      lieu: 'Club house', statut: 'preparation',
+      convoquees: 8, presents: 0, pouvoirs: 0, quorumPct: 50, convocEnvoyee: false,
+      odj: [
+        { id:1, titre:'Point trésorerie et impayés de cotisation', note:'', fait:false },
+        { id:2, titre:'Choix du devis maillots M16', note:'Devis A : 780 € (Sport 2000) / Devis B : 920 € (fournisseur FFR)', fait:false },
+        { id:3, titre:'Préparation du loto de Noël', note:'', fait:false },
+      ],
+      votes: [
+        { id:1, titre:'Validation du devis maillots M16 (devis A, 780 €)', mode:'Codir', statut:'a_ouvrir', pour:0, contre:0, abst:0, resultat:null },
+        { id:2, titre:'Achat d\'un congélateur d\'occasion pour la buvette (250 €)', mode:'Codir', statut:'a_ouvrir', pour:0, contre:0, abst:0, resultat:null },
+      ],
+      docs: ['Devis maillots A - Sport 2000.pdf','Devis maillots B.pdf'],
+      presence: {},
+    },
+  ];
+})();
+</script>
+<script>
+/* ================= NAVIGATION & HELPERS PARTAGÉS ================= */
+
+const MODULES = [
+  { id:'dashboard', label:'Tableau de bord', ico:'▦' },
+  { id:'licencies', label:'Licenciés', ico:'👤' },
+  { id:'compta', label:'Comptabilité', ico:'€' },
+  { id:'stock', label:'Stock', ico:'▤' },
+  { id:'codir', label:'Codir & AG', ico:'⚖' },
+];
+const subTabs = { compta: 'synthese', stockPole: 'tous', codirOpen: null, codirTab: 'preparation', licOpen: null };
+
+function renderNav() {
+  $('#mainNav').innerHTML = MODULES.map(m =>
+    `<button class="${state.view === m.id ? 'active' : ''}" data-nav="${m.id}"><span class="ico" aria-hidden="true">${m.ico}</span>${m.label}</button>`).join('');
+  $$('#mainNav [data-nav]').forEach(b => b.onclick = () => { state.view = b.dataset.nav; render(); });
+}
+
+function render() {
+  renderNav();
+  const v = $('#view');
+  if (state.view === 'dashboard') v.innerHTML = viewDashboard();
+  else if (state.view === 'licencies') v.innerHTML = viewLicencies();
+  else if (state.view === 'compta') v.innerHTML = viewCompta();
+  else if (state.view === 'stock') v.innerHTML = viewStock();
+  else if (state.view === 'codir') v.innerHTML = viewCodir();
+  bindView();
+  window.scrollTo(0, 0);
+}
+
+/* Statuts licenciés */
+const licBadge = s => ({
+  validee: '<span class="badge b-good"><span class="dot"></span>Validée FFR</span>',
+  attente: '<span class="badge b-warn"><span class="dot"></span>En attente FFR</span>',
+  a_renouveler: '<span class="badge b-serious"><span class="dot"></span>À renouveler</span>',
+}[s] || esc(s));
+const cotBadge = s => ({
+  payee: '<span class="badge b-good"><span class="dot"></span>Payée</span>',
+  partielle: '<span class="badge b-warn"><span class="dot"></span>Partielle</span>',
+  impayee: '<span class="badge b-crit"><span class="dot"></span>Impayée</span>',
+  exoneree: '<span class="badge">Exonérée</span>',
+}[s] || esc(s));
+function certBadge(l) {
+  const d = daysUntil(l.certFin);
+  if (d < 0) return `<span class="badge b-crit"><span class="dot"></span>Expiré (${dfrShort(l.certFin)})</span>`;
+  if (d <= 60) return `<span class="badge b-warn"><span class="dot"></span>Expire dans ${d} j</span>`;
+  return `<span class="badge b-good"><span class="dot"></span>Valide → ${dfrShort(l.certFin)}</span>`;
+}
+
+/* Agrégats partagés */
+function soldeCourant() {
+  const r = state.ecritures.reduce((s, e) => s + (e.sens === 'R' ? e.montant : -e.montant), 0);
+  return state.soldeInitial + r;
+}
+function alertesStock() {
+  const sousSeuil = state.stock.filter(a => a.qte <= a.seuil);
+  const perimes = state.stock.filter(a => a.peremption && daysUntil(a.peremption) <= 60);
+  return { sousSeuil, perimes };
+}
+function impayes() { return state.licencies.filter(l => l.cotStatut === 'impayee' || l.cotStatut === 'partielle'); }
+function certsProblemes() { return state.licencies.filter(l => daysUntil(l.certFin) <= 60); }
+
+/* ---- Mini-lib graphiques SVG ---- */
+function chartMensuel(id) {
+  // Recettes vs dépenses par mois (12 mois) — 2 séries
+  const byMonth = new Map();
+  for (const e of state.ecritures) {
+    const k = e.date.slice(0, 7);
+    if (!byMonth.has(k)) byMonth.set(k, { R: 0, D: 0 });
+    byMonth.get(k)[e.sens] += e.montant;
+  }
+  const keys = [...byMonth.keys()].sort().slice(-12);
+  const data = keys.map(k => ({ k, ...byMonth.get(k) }));
+  const max = Math.max(...data.map(d => Math.max(d.R, d.D)), 1);
+  const W = 640, H = 220, padL = 46, padB = 26, padT = 12, padR = 6;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const gw = iw / data.length;
+  const bw = Math.min(14, gw / 2 - 3);
+  const y = v => padT + ih - (v / max) * ih;
+  const moisFr = k => new Date(k + '-15T12:00:00').toLocaleDateString('fr-FR', { month: 'short' });
+  let gridY = '';
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const v = (max / steps) * i, yy = y(v);
+    gridY += `<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" stroke="var(--chart-grid)" stroke-width="1"/>
+      <text x="${padL - 6}" y="${yy + 3.5}" text-anchor="end" font-size="10" fill="var(--ink-3)" font-variant-numeric="tabular-nums">${Math.round(v / 100) / 10} k€</text>`;
+  }
+  let bars = '';
+  data.forEach((d, i) => {
+    const cx = padL + gw * i + gw / 2;
+    bars += `<g class="mgroup" data-i="${i}">
+      <rect x="${cx - bw - 1}" y="${y(d.R)}" width="${bw}" height="${Math.max(ih + padT - y(d.R), 0)}" rx="3" fill="var(--chart-s1)"/>
+      <rect x="${cx + 1}" y="${y(d.D)}" width="${bw}" height="${Math.max(ih + padT - y(d.D), 0)}" rx="3" fill="var(--chart-s2)"/>
+      <rect class="hit" x="${padL + gw * i}" y="${padT}" width="${gw}" height="${ih}" fill="transparent"
+        data-tip="<strong>${moisFr(d.k)} ${d.k.slice(0,4)}</strong><br>Recettes : ${eur(d.R)}<br>Dépenses : ${eur(d.D)}"/>
+      <text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--ink-3)">${moisFr(d.k)}</text>
+    </g>`;
+  });
+  return `<svg id="${id}" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Recettes et dépenses mensuelles">
+      ${gridY}
+      <line x1="${padL}" x2="${W - padR}" y1="${padT + ih}" y2="${padT + ih}" stroke="var(--chart-axis)" stroke-width="1"/>
+      ${bars}
+    </svg>
+    <div class="legend"><span><span class="sw" style="background:var(--chart-s1)"></span>Recettes</span>
+    <span><span class="sw" style="background:var(--chart-s2)"></span>Dépenses</span></div>`;
+}
+
+function chartSolde(id) {
+  // Ligne d'évolution du solde sur 12 mois
+  const byMonth = new Map();
+  for (const e of [...state.ecritures].sort((a, b) => a.date.localeCompare(b.date))) {
+    const k = e.date.slice(0, 7);
+    byMonth.set(k, (byMonth.get(k) || 0) + (e.sens === 'R' ? e.montant : -e.montant));
+  }
+  const keys = [...byMonth.keys()].sort().slice(-12);
+  let cum = state.soldeInitial;
+  const pts = keys.map(k => { cum += byMonth.get(k); return { k, v: cum }; });
+  const min = Math.min(...pts.map(p => p.v)), max = Math.max(...pts.map(p => p.v));
+  const lo = Math.max(0, min - (max - min) * 0.15), hi = max + (max - min) * 0.1 || max + 100;
+  const W = 640, H = 200, padL = 48, padB = 24, padT = 10, padR = 10;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const x = i => padL + (i / (pts.length - 1)) * iw;
+  const y = v => padT + ih - ((v - lo) / (hi - lo)) * ih;
+  const moisFr = k => new Date(k + '-15T12:00:00').toLocaleDateString('fr-FR', { month: 'short' });
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  const area = line + ` L${x(pts.length - 1).toFixed(1)},${padT + ih} L${x(0).toFixed(1)},${padT + ih} Z`;
+  let gridY = '';
+  for (let i = 0; i <= 3; i++) {
+    const v = lo + ((hi - lo) / 3) * i, yy = y(v);
+    gridY += `<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" stroke="var(--chart-grid)" stroke-width="1"/>
+      <text x="${padL - 6}" y="${yy + 3.5}" text-anchor="end" font-size="10" fill="var(--ink-3)">${(v / 1000).toFixed(1)} k€</text>`;
+  }
+  const last = pts[pts.length - 1];
+  let hits = '';
+  pts.forEach((p, i) => {
+    hits += `<rect class="hit" x="${x(i) - iw / pts.length / 2}" y="${padT}" width="${iw / pts.length}" height="${ih}" fill="transparent"
+      data-tip="<strong>${moisFr(p.k)} ${p.k.slice(0,4)}</strong><br>Solde : ${eur(Math.round(p.v))}"/>`;
+    if (i % 2 === 0) hits += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--ink-3)">${moisFr(p.k)}</text>`;
+  });
+  return `<svg id="${id}" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Évolution du solde de trésorerie">
+    ${gridY}
+    <path d="${area}" fill="var(--chart-s1)" opacity="0.12"/>
+    <path d="${line}" fill="none" stroke="var(--chart-s1)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${x(pts.length - 1)}" cy="${y(last.v)}" r="4" fill="var(--chart-s1)" stroke="var(--surface)" stroke-width="2"/>
+    <text x="${x(pts.length - 1) - 6}" y="${y(last.v) - 10}" text-anchor="end" font-size="11" font-weight="600" fill="var(--ink)">${eur(Math.round(last.v))}</text>
+    ${hits}
+  </svg>`;
+}
+
+function hbars(rows, colorVar='--chart-s1') {
+  const max = Math.max(...rows.map(r => r.v), 1);
+  return rows.map(r => `<div class="hbar-row">
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.label)}">${esc(r.label)}</span>
+    <div class="hbar-track"><div class="hbar-fill" style="width:${(r.v / max * 100).toFixed(1)}%;background:var(${colorVar})"></div></div>
+    <span class="hbar-val">${r.fmt || eur(r.v)}</span>
+  </div>`).join('');
+}
+
+function bindChartTips(scope) {
+  $$('svg .hit', scope).forEach(h => {
+    h.addEventListener('mousemove', e => showTip(h.dataset.tip, e.clientX, e.clientY));
+    h.addEventListener('mouseleave', hideTip);
+  });
+}
+
+/* ================= MODULE : TABLEAU DE BORD ================= */
+
+function viewDashboard() {
+  const solde = soldeCourant();
+  const { sousSeuil, perimes } = alertesStock();
+  const imp = impayes();
+  const certs = certsProblemes();
+  const prochaine = state.reunions.filter(r => r.statut !== 'terminee').sort((a,b) => a.date.localeCompare(b.date))[0];
+  const attenteFFR = state.licencies.filter(l => l.licStatut === 'attente').length;
+  const resteACollecter = imp.reduce((s, l) => s + (l.cot - l.cotPaye), 0);
+  const parCat = CATEGORIES.map(c => ({ label: c.label.replace(/ – .*/, ' ' + (c.label.split('– ')[1] || '')), v: state.licencies.filter(l => l.cat === c.code).length, fmt: String(state.licencies.filter(l => l.cat === c.code).length) }));
+
+  const alertes = [];
+  for (const l of certs.filter(l => daysUntil(l.certFin) < 0).slice(0, 3))
+    alertes.push({ badge: '<span class="badge b-crit"><span class="dot"></span>Certificat</span>', txt: `${l.prenom} ${l.nom} — certificat médical expiré`, go: 'licencies' });
+  if (sousSeuil.length) alertes.push({ badge: '<span class="badge b-serious"><span class="dot"></span>Stock</span>', txt: `${sousSeuil.length} article(s) sous le seuil d'alerte`, go: 'stock' });
+  for (const a of perimes.slice(0, 2))
+    alertes.push({ badge: '<span class="badge b-warn"><span class="dot"></span>Péremption</span>', txt: `${a.nom} — ${daysUntil(a.peremption) < 0 ? 'périmé' : 'périme le ' + dfrShort(a.peremption)}`, go: 'stock' });
+  if (imp.length) alertes.push({ badge: '<span class="badge b-warn"><span class="dot"></span>Cotisations</span>', txt: `${imp.length} cotisation(s) en attente — ${eur(resteACollecter)} à collecter`, go: 'compta' });
+  const aRapprocher = state.bank.filter(b => b.statut === 'a_rapprocher').length;
+  if (aRapprocher) alertes.push({ badge: '<span class="badge b-info"><span class="dot"></span>Banque</span>', txt: `${aRapprocher} transaction(s) bancaire(s) à rapprocher`, go: 'compta' });
+  if (prochaine && !prochaine.convocEnvoyee && prochaine.statut === 'preparation')
+    alertes.push({ badge: '<span class="badge b-info"><span class="dot"></span>Codir</span>', txt: `Convocations non envoyées pour « ${prochaine.titre} »`, go: 'codir' });
+
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Tableau de bord</h1>
+    <p class="page-sub">RC Val d'Adret — saison 2026-2027 · situation au ${dfr(TODAY)}</p></div>
+  </div>
+  <div class="grid kpis">
+    <div class="card"><h3>Licenciés</h3><div class="kpi-value">${state.licencies.length}</div>
+      <div class="kpi-note">${attenteFFR} licence(s) en attente FFR</div></div>
+    <div class="card"><h3>Trésorerie</h3><div class="kpi-value">${eur(Math.round(solde))}</div>
+      <div class="kpi-note">${eur(resteACollecter)} de cotisations à encaisser</div></div>
+    <div class="card"><h3>Alertes stock</h3><div class="kpi-value">${sousSeuil.length + perimes.length}</div>
+      <div class="kpi-note">${sousSeuil.length} sous seuil · ${perimes.length} péremption(s)</div></div>
+    <div class="card"><h3>Prochaine réunion</h3>
+      <div class="kpi-value" style="font-size:22px;line-height:1.15">${prochaine ? esc(prochaine.titre) : '—'}</div>
+      <div class="kpi-note">${prochaine ? dfr(prochaine.date) + ' · ' + esc(prochaine.lieu) : 'Rien de planifié'}</div></div>
+  </div>
+  <div class="grid two-col">
+    <div class="card">
+      <h3>Trésorerie — 12 derniers mois</h3>
+      ${chartSolde('dashSolde')}
+    </div>
+    <div class="card">
+      <h3>À traiter</h3>
+      ${alertes.length ? alertes.map(a => `<div class="alert-line">${a.badge}<span>${esc(a.txt)}</span>
+        <button class="btn btn-sm" data-goto="${a.go}">Voir</button></div>`).join('') : '<p class="empty">Rien à signaler.</p>'}
+    </div>
+  </div>
+  <div class="grid two-col">
+    <div class="card">
+      <h3>Effectifs par catégorie</h3>
+      ${hbars(parCat.map(c => ({...c, label: c.label})), '--chart-s3')}
+    </div>
+    <div class="card">
+      <h3>Cotisations</h3>
+      ${(() => {
+        const p = state.licencies.filter(l => l.cotStatut === 'payee').length;
+        const pa = state.licencies.filter(l => l.cotStatut === 'partielle').length;
+        const im = state.licencies.filter(l => l.cotStatut === 'impayee').length;
+        const ex = state.licencies.filter(l => l.cotStatut === 'exoneree').length;
+        const tot = p + pa + im || 1;
+        return `<div class="vote-bar" style="height:20px" role="img" aria-label="Répartition des cotisations">
+          <i class="vote-pour" style="width:${p/tot*100}%" title="Payées"></i>
+          <i style="width:${pa/tot*100}%;background:var(--warning)" title="Partielles"></i>
+          <i class="vote-contre" style="width:${im/tot*100}%" title="Impayées"></i>
+        </div>
+        <div class="legend">
+          <span><span class="sw" style="background:var(--good)"></span>Payées : ${p}</span>
+          <span><span class="sw" style="background:var(--warning)"></span>Partielles : ${pa}</span>
+          <span><span class="sw" style="background:var(--critical)"></span>Impayées : ${im}</span>
+          <span><span class="sw" style="background:var(--chart-axis)"></span>Exonérées : ${ex}</span>
+        </div>
+        <p style="font-size:12.5px;color:var(--ink-2);margin:10px 0 0">Le module de paiement en ligne (simulé ici) permet d'envoyer des liens de paiement et des relances automatiques — voir Comptabilité → Paiements.</p>`;
+      })()}
+    </div>
+  </div>`;
+}
+</script>
+<script>
+/* ================= MODULE : LICENCIÉS ================= */
+
+function viewLicencies() {
+  const f = state.filtres.lic;
+  let rows = state.licencies;
+  if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(l => (l.prenom + ' ' + l.nom + ' ' + l.licence).toLowerCase().includes(q)); }
+  if (f.cat) rows = rows.filter(l => l.cat === f.cat);
+  if (f.cot) rows = rows.filter(l => l.cotStatut === f.cot);
+  if (f.cert === 'ko') rows = rows.filter(l => daysUntil(l.certFin) < 0);
+  if (f.cert === 'bientot') rows = rows.filter(l => { const d = daysUntil(l.certFin); return d >= 0 && d <= 60; });
+  rows = [...rows].sort((a, b) => (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
+
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Licenciés</h1>
+    <p class="page-sub">${state.licencies.length} licenciés — licences FFR, certificats médicaux et cotisations</p></div>
+    <div class="head-actions">
+      <button class="btn" id="btnExportLic">Exporter (simulé)</button>
+      <button class="btn btn-primary" id="btnNewLic">+ Nouveau licencié</button>
+    </div>
+  </div>
+  <div class="toolbar">
+    <input type="search" id="licQ" placeholder="Rechercher un nom, un n° de licence…" value="${esc(f.q)}" aria-label="Recherche">
+    <select id="licCat" aria-label="Filtrer par catégorie">
+      <option value="">Toutes catégories</option>
+      ${CATEGORIES.map(c => `<option value="${c.code}" ${f.cat === c.code ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}
+    </select>
+    <select id="licCot" aria-label="Filtrer par cotisation">
+      <option value="">Cotisation : toutes</option>
+      <option value="payee" ${f.cot === 'payee' ? 'selected' : ''}>Payée</option>
+      <option value="partielle" ${f.cot === 'partielle' ? 'selected' : ''}>Partielle</option>
+      <option value="impayee" ${f.cot === 'impayee' ? 'selected' : ''}>Impayée</option>
+    </select>
+    <select id="licCert" aria-label="Filtrer par certificat">
+      <option value="">Certificat : tous</option>
+      <option value="ko" ${f.cert === 'ko' ? 'selected' : ''}>Expirés</option>
+      <option value="bientot" ${f.cert === 'bientot' ? 'selected' : ''}>Expirent sous 60 j</option>
+    </select>
+    <span class="count-note">${rows.length} affiché(s)</span>
+  </div>
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nom</th><th>Catégorie</th><th>Licence FFR</th><th>Certificat / attestation</th><th>Cotisation</th><th class="num">Réglé</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(l => `<tr class="rowlink" data-lic="${l.id}" tabindex="0">
+          <td><strong>${esc(l.nom.toUpperCase())}</strong> ${esc(l.prenom)}<br><span style="color:var(--ink-3);font-size:12px">${l.naissance.slice(0,4)} · ${esc(l.ville)}</span></td>
+          <td>${esc(catLabel(l.cat))}</td>
+          <td>${l.licence}<br>${licBadge(l.licStatut)}</td>
+          <td>${certBadge(l)}</td>
+          <td>${cotBadge(l.cotStatut)}</td>
+          <td class="num">${l.cot ? `${eur(l.cotPaye)} / ${eur(l.cot)}` : '—'}</td>
+        </tr>`).join('') : '<tr><td colspan="6" class="empty">Aucun licencié ne correspond aux filtres.</td></tr>'}
+      </tbody>
+    </table>
+    </div>
+  </div>`;
+}
+
+function openFicheLic(id) {
+  const l = state.licencies.find(x => x.id === id);
+  if (!l) return;
+  const pays = state.paiements.filter(p => p.licId === id);
+  openModal(`${l.prenom} ${l.nom}`, `
+    <div class="form-grid" style="margin-bottom:14px">
+      <div><label>Catégorie</label>${esc(catLabel(l.cat))}</div>
+      <div><label>Né(e) le</label>${dfr(l.naissance)}</div>
+      <div><label>Licence FFR</label>${l.licence} — ${licBadge(l.licStatut)}</div>
+      <div><label>Certificat / attestation</label>${certBadge(l)}</div>
+      <div><label>Email</label>${esc(l.email)}</div>
+      <div><label>Téléphone</label>${esc(l.tel)}</div>
+      <div><label>Commune</label>${esc(l.ville)}</div>
+      <div><label>Au club depuis</label>${l.inscrit}</div>
+    </div>
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Cotisation 2026-2027</h3>
+    <p style="margin:0 0 10px">${cotBadge(l.cotStatut)} &nbsp; ${l.cot ? `${eur(l.cotPaye)} réglés sur ${eur(l.cot)}` : 'Exonéré (dirigeant / éducateur)'}</p>
+    ${pays.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Demande de paiement</th><th>Créée</th><th>Statut</th><th class="num">Montant</th></tr></thead>
+      <tbody>${pays.map(p => `<tr><td>${esc(p.objet)}</td><td>${dfrShort(p.creee)}</td>
+        <td>${p.statut === 'paye' ? '<span class="badge b-good"><span class="dot"></span>Payé le ' + dfrShort(p.payee) + '</span>' : p.statut === 'relancee' ? '<span class="badge b-serious"><span class="dot"></span>Relancé ×' + p.relances + '</span>' : '<span class="badge b-warn"><span class="dot"></span>Lien envoyé</span>'}</td>
+        <td class="num">${eur(p.montant)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty" style="padding:6px 0">Aucune demande de paiement en ligne.</p>'}
+  `, `
+    ${l.cotStatut !== 'payee' && l.cot ? `<button class="btn" id="ficheLien" data-lic="${l.id}">Envoyer un lien de paiement</button>` : ''}
+    <button class="btn" id="ficheEdit" data-lic="${l.id}">Modifier</button>
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>
+  `);
+  const lienBtn = $('#ficheLien');
+  if (lienBtn) lienBtn.onclick = () => { creerDemandePaiement(l); closeModal(); render(); };
+  $('#ficheEdit').onclick = () => openFormLic(l.id);
+}
+
+function creerDemandePaiement(l) {
+  const montant = l.cot - l.cotPaye;
+  state.paiements.unshift({ id: Date.now(), licId: l.id, objet: (l.cotPaye ? 'Solde cotisation' : 'Cotisation') + ' 2026-2027', montant, statut: 'envoyee', creee: TODAY, payee: null, relances: 0 });
+  toast(`Lien de paiement de ${eur(montant)} envoyé à ${l.prenom} ${l.nom} (simulé)`);
+}
+
+function openFormLic(id) {
+  const l = id ? state.licencies.find(x => x.id === id) : null;
+  openModal(l ? 'Modifier le licencié' : 'Nouveau licencié', `
+    <div class="form-grid">
+      <div class="field"><label for="fPrenom">Prénom</label><input id="fPrenom" value="${l ? esc(l.prenom) : ''}"></div>
+      <div class="field"><label for="fNom">Nom</label><input id="fNom" value="${l ? esc(l.nom) : ''}"></div>
+      <div class="field"><label for="fNaiss">Date de naissance</label><input id="fNaiss" type="date" value="${l ? l.naissance : '2010-01-01'}"></div>
+      <div class="field"><label for="fCat">Catégorie</label><select id="fCat">
+        ${CATEGORIES.map(c => `<option value="${c.code}" ${l && l.cat === c.code ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></div>
+      <div class="field"><label for="fEmail">Email</label><input id="fEmail" type="email" value="${l ? esc(l.email) : ''}"></div>
+      <div class="field"><label for="fTel">Téléphone</label><input id="fTel" value="${l ? esc(l.tel) : ''}"></div>
+      <div class="field"><label for="fVille">Commune</label><input id="fVille" value="${l ? esc(l.ville) : ''}"></div>
+      <div class="field"><label for="fCert">Fin de validité certificat</label><input id="fCert" type="date" value="${l ? l.certFin : ''}"></div>
+      <div class="field"><label for="fLicStatut">Statut licence FFR</label><select id="fLicStatut">
+        <option value="attente" ${l && l.licStatut === 'attente' ? 'selected' : ''}>En attente FFR</option>
+        <option value="validee" ${l && l.licStatut === 'validee' ? 'selected' : ''}>Validée</option>
+        <option value="a_renouveler" ${l && l.licStatut === 'a_renouveler' ? 'selected' : ''}>À renouveler</option></select></div>
+      <div class="field"><label for="fCotPaye">Montant réglé (€)</label><input id="fCotPaye" type="number" min="0" value="${l ? l.cotPaye : 0}"></div>
+    </div>
+    <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">Dans la version réelle : pièces jointes (certificat PDF, photo), envoi du dossier vers Oval-e / FFR, historique multi-saisons.</p>
+  `, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="fSave">${l ? 'Enregistrer' : 'Créer le licencié'}</button>
+  `);
+  $('#fSave').onclick = () => {
+    const cat = CATEGORIES.find(c => c.code === $('#fCat').value);
+    const prenom = $('#fPrenom').value.trim(), nom = $('#fNom').value.trim();
+    if (!prenom || !nom) { toast('Prénom et nom sont obligatoires.'); return; }
+    const cotPaye = Math.max(0, Number($('#fCotPaye').value) || 0);
+    const cotStatut = cat.cot === 0 ? 'exoneree' : cotPaye >= cat.cot ? 'payee' : cotPaye > 0 ? 'partielle' : 'impayee';
+    const base = {
+      prenom, nom, naissance: $('#fNaiss').value, cat: cat.code,
+      email: $('#fEmail').value.trim(), tel: $('#fTel').value.trim(), ville: $('#fVille').value.trim() || 'Val d\'Adret',
+      certFin: $('#fCert').value || addDaysIso(TODAY, 365),
+      licStatut: $('#fLicStatut').value,
+      cot: cat.cot, cotPaye: Math.min(cotPaye, cat.cot), cotStatut,
+    };
+    if (l) { Object.assign(l, base); toast(`Fiche de ${prenom} ${nom} mise à jour.`); }
+    else {
+      state.licencies.push({ id: Date.now(), sexe: 'M', licence: '2026' + ri(100000, 999999), inscrit: 2026, ...base });
+      toast(`${prenom} ${nom} ajouté aux licenciés.`);
+    }
+    closeModal(); render();
+  };
+}
+</script>
+<script>
+/* ================= MODULE : COMPTABILITÉ ================= */
+
+function viewCompta() {
+  const tabs = [
+    { id:'synthese', label:'Synthèse' },
+    { id:'banque', label:'Banque & rapprochement' },
+    { id:'paiements', label:'Paiements en ligne' },
+    { id:'journal', label:'Journal' },
+  ];
+  const t = subTabs.compta;
+  let body = '';
+  if (t === 'synthese') body = comptaSynthese();
+  else if (t === 'banque') body = comptaBanque();
+  else if (t === 'paiements') body = comptaPaiements();
+  else body = comptaJournal();
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Comptabilité</h1>
+    <p class="page-sub">Exercice 2026-2027 · connecteur bancaire et paiement en ligne simulés</p></div>
+    <div class="head-actions"><button class="btn" id="btnNewEcriture">+ Écriture manuelle</button></div>
+  </div>
+  <div class="tabs" role="tablist">${tabs.map(x => `<button role="tab" aria-selected="${t === x.id}" class="${t === x.id ? 'active' : ''}" data-ctab="${x.id}">${x.label}</button>`).join('')}</div>
+  <div class="tab-body">${body}</div>`;
+}
+
+function comptaSynthese() {
+  const solde = soldeCourant();
+  const now = '2026-';
+  const exercice = state.ecritures.filter(e => e.date >= '2026-07-01'); // exercice depuis juillet
+  const rec = exercice.filter(e => e.sens === 'R').reduce((s, e) => s + e.montant, 0);
+  const dep = exercice.filter(e => e.sens === 'D').reduce((s, e) => s + e.montant, 0);
+  const parCatDep = CAT_DEPENSES.map(c => ({ label: c, v: state.ecritures.filter(e => e.sens === 'D' && e.cat === c && e.date >= '2025-10-01').reduce((s, e) => s + e.montant, 0) }))
+    .filter(c => c.v > 0).sort((a, b) => b.v - a.v);
+  const aRappro = state.bank.filter(b => b.statut === 'a_rapprocher');
+  return `
+  <div class="grid kpis">
+    <div class="card"><h3>Solde de trésorerie</h3><div class="kpi-value">${eur(Math.round(solde))}</div>
+      <div class="kpi-note">Compte courant Crédit Agricole (simulé)</div></div>
+    <div class="card"><h3>Recettes exercice</h3><div class="kpi-value" style="color:var(--good-text)">${eur(rec)}</div>
+      <div class="kpi-note">depuis le 1er juillet 2026</div></div>
+    <div class="card"><h3>Dépenses exercice</h3><div class="kpi-value" style="color:var(--critical-text)">${eur(dep)}</div>
+      <div class="kpi-note">depuis le 1er juillet 2026</div></div>
+    <div class="card"><h3>À rapprocher</h3><div class="kpi-value">${aRappro.length}</div>
+      <div class="kpi-note">transactions bancaires en attente</div></div>
+  </div>
+  <div class="grid two-col">
+    <div class="card"><h3>Recettes / dépenses — 12 mois</h3>${chartMensuel('comptaMensuel')}</div>
+    <div class="card"><h3>Dépenses par poste (12 mois)</h3>${hbars(parCatDep, '--chart-s2')}</div>
+  </div>`;
+}
+
+function comptaBanque() {
+  const f = state.filtres.banque;
+  let rows = state.bank;
+  if (f.statut) rows = rows.filter(b => b.statut === f.statut);
+  const aRappro = state.bank.filter(b => b.statut === 'a_rapprocher').length;
+  return `
+  <div class="toolbar">
+    <button class="btn btn-primary" id="btnSync">⟳ Synchroniser avec la banque</button>
+    <select id="bqStatut" aria-label="Filtrer par statut">
+      <option value="">Toutes les transactions</option>
+      <option value="a_rapprocher" ${f.statut === 'a_rapprocher' ? 'selected' : ''}>À rapprocher (${aRappro})</option>
+      <option value="rapprochee" ${f.statut === 'rapprochee' ? 'selected' : ''}>Rapprochées</option>
+    </select>
+    <span class="count-note">Dernière synchro : aujourd'hui 08:12 (simulée)</span>
+  </div>
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Libellé bancaire</th><th class="num">Montant</th><th>Statut</th><th>Catégorie</th><th></th></tr></thead>
+      <tbody>${rows.slice(0, 40).map(b => `<tr>
+        <td style="white-space:nowrap">${dfrShort(b.date)}</td>
+        <td style="font-family:ui-monospace,monospace;font-size:12px">${esc(b.libelle)}</td>
+        <td class="num" style="color:${b.montant >= 0 ? 'var(--good-text)' : 'var(--critical-text)'};font-weight:600">${b.montant >= 0 ? '+' : ''}${eur(b.montant)}</td>
+        <td>${b.statut === 'rapprochee' ? '<span class="badge b-good"><span class="dot"></span>Rapprochée</span>' : '<span class="badge b-warn"><span class="dot"></span>À rapprocher</span>'}</td>
+        <td>${b.statut === 'rapprochee' ? esc(b.catProposee) : `<select data-cat-for="${b.id}" aria-label="Catégorie">
+            ${[...CAT_RECETTES, ...CAT_DEPENSES].map(c => `<option ${c === b.catProposee ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`}</td>
+        <td>${b.statut === 'a_rapprocher' ? `<button class="btn btn-sm btn-primary" data-rappro="${b.id}">Valider</button>` : ''}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Dans la version réelle : connexion DSP2 (Bridge, Powens ou GoCardless) au compte du club, catégorisation automatique apprise, règles de rapprochement avec les demandes de paiement.</p>`;
+}
+
+function syncBanque() {
+  const nouvelles = [
+    { libelle: 'VIR SEPA MME ROUSSEL COTISATION', montant: 175, cat: 'Cotisations' },
+    { libelle: 'CB DECATHLON PRO 16/09', montant: -184.5, cat: 'Équipement sportif' },
+    { libelle: 'REMISE CB BUVETTE 14/09', montant: 236, cat: 'Buvette' },
+    { libelle: 'PRLV SEPA SC OVALIE TELECOM', montant: -29.9, cat: 'Frais administratifs' },
+  ];
+  let bid = Math.max(...state.bank.map(b => b.id)) + 1;
+  for (const n of nouvelles) {
+    state.bank.unshift({ id: bid++, date: addDaysIso(TODAY, -ri(0, 3)), libelle: n.libelle, montant: n.montant, statut: 'a_rapprocher', ecritureId: null, catProposee: n.cat });
+  }
+  state.bank.sort((a, b) => b.date.localeCompare(a.date));
+  toast(`${nouvelles.length} nouvelles transactions importées depuis la banque (simulé).`);
+}
+
+function rapprocher(id) {
+  const b = state.bank.find(x => x.id === id);
+  if (!b) return;
+  const sel = $(`[data-cat-for="${id}"]`);
+  const cat = sel ? sel.value : b.catProposee;
+  const ec = { id: Date.now(), date: b.date, sens: b.montant >= 0 ? 'R' : 'D', cat, libelle: b.libelle.replace(/^(VIR SEPA |VIR INST |PRLV SEPA |CB |REMISE CHEQUE |REMISE CB |CHEQUE N°\d+ )/,'').trim() || cat, montant: Math.abs(b.montant) };
+  state.ecritures.unshift(ec);
+  state.ecritures.sort((a, b2) => b2.date.localeCompare(a.date));
+  b.statut = 'rapprochee'; b.ecritureId = ec.id; b.catProposee = cat;
+  toast(`Transaction rapprochée — écriture « ${cat} » créée.`);
+}
+
+function comptaPaiements() {
+  const enAttente = state.paiements.filter(p => p.statut !== 'paye');
+  const payes = state.paiements.filter(p => p.statut === 'paye');
+  const totAttente = enAttente.reduce((s, p) => s + p.montant, 0);
+  const totMois = payes.filter(p => p.payee >= '2026-09-01').reduce((s, p) => s + p.montant, 0);
+  const licName = id => { const l = state.licencies.find(x => x.id === id); return l ? `${l.prenom} ${l.nom}` : '—'; };
+  const ligne = p => `<tr>
+    <td><strong>${esc(licName(p.licId))}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(p.objet)}</span></td>
+    <td>${dfrShort(p.creee)}</td>
+    <td>${p.statut === 'paye' ? '<span class="badge b-good"><span class="dot"></span>Payé le ' + dfrShort(p.payee) + '</span>'
+        : p.statut === 'relancee' ? `<span class="badge b-serious"><span class="dot"></span>Relancé ×${p.relances}</span>`
+        : '<span class="badge b-warn"><span class="dot"></span>Lien envoyé</span>'}</td>
+    <td class="num" style="font-weight:600">${eur(p.montant)}</td>
+    <td style="white-space:nowrap">${p.statut !== 'paye' ? `
+      <button class="btn btn-sm" data-relance="${p.id}">Relancer</button>
+      <button class="btn btn-sm btn-primary" data-simulpay="${p.id}" title="Simule le paiement par la famille">Simuler le paiement</button>` : ''}</td>
+  </tr>`;
+  return `
+  <div class="grid kpis">
+    <div class="card"><h3>En attente de paiement</h3><div class="kpi-value">${eur(totAttente)}</div>
+      <div class="kpi-note">${enAttente.length} lien(s) actif(s)</div></div>
+    <div class="card"><h3>Encaissé en septembre</h3><div class="kpi-value" style="color:var(--good-text)">${eur(totMois)}</div>
+      <div class="kpi-note">${payes.filter(p => p.payee >= '2026-09-01').length} paiement(s) en ligne</div></div>
+    <div class="card"><h3>Comment ça marche</h3>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:0">Chaque famille reçoit un lien de paiement par email (CB / virement). Le paiement crée automatiquement l'écriture comptable et met la cotisation à jour. Ici tout est simulé.</p></div>
+  </div>
+  <div class="toolbar" style="margin-top:16px">
+    <button class="btn btn-primary" id="btnNewPay">+ Nouvelle demande de paiement</button>
+    <button class="btn" id="btnRelanceAll">Relancer tous les impayés</button>
+  </div>
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Licencié</th><th>Créée</th><th>Statut</th><th class="num">Montant</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${enAttente.map(ligne).join('')}
+        ${payes.slice(0, 12).map(ligne).join('')}
+        ${!state.paiements.length ? '<tr><td colspan="5" class="empty">Aucune demande de paiement.</td></tr>' : ''}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+function simulerPaiement(pid) {
+  const p = state.paiements.find(x => x.id === pid);
+  if (!p) return;
+  p.statut = 'paye'; p.payee = TODAY;
+  const l = state.licencies.find(x => x.id === p.licId);
+  if (l) { l.cotPaye = Math.min(l.cot, l.cotPaye + p.montant); l.cotStatut = l.cotPaye >= l.cot ? 'payee' : 'partielle'; }
+  const ec = { id: Date.now(), date: TODAY, sens: 'R', cat: 'Cotisations', libelle: 'Paiement en ligne — ' + (l ? l.prenom + ' ' + l.nom : ''), montant: p.montant };
+  state.ecritures.unshift(ec);
+  state.bank.unshift({ id: Date.now() + 1, date: TODAY, libelle: 'VIR INST OVALIE-PAY ' + (l ? l.nom.toUpperCase() : ''), montant: p.montant, statut: 'rapprochee', ecritureId: ec.id, catProposee: 'Cotisations' });
+  toast(`Paiement de ${eur(p.montant)} reçu — écriture et cotisation mises à jour.`);
+}
+
+function openFormPaiement() {
+  const candidats = state.licencies.filter(l => l.cotStatut === 'impayee' || l.cotStatut === 'partielle');
+  openModal('Nouvelle demande de paiement', `
+    <div class="form-grid">
+      <div class="field"><label for="pLic">Licencié</label><select id="pLic">
+        ${candidats.map(l => `<option value="${l.id}">${esc(l.nom.toUpperCase() + ' ' + l.prenom)} — reste ${eur(l.cot - l.cotPaye)}</option>`).join('')}</select></div>
+      <div class="field"><label for="pObjet">Objet</label><input id="pObjet" value="Cotisation 2026-2027"></div>
+      <div class="field"><label for="pMontant">Montant (€)</label><input id="pMontant" type="number" min="1" value="${candidats.length ? candidats[0].cot - candidats[0].cotPaye : 100}"></div>
+      <div class="field"><label>Canal</label><select id="pCanal"><option>Email</option><option>SMS</option><option>Email + SMS</option></select></div>
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="pSend">Envoyer le lien</button>`);
+  $('#pLic').onchange = () => { const l = state.licencies.find(x => x.id === Number($('#pLic').value)); if (l) $('#pMontant').value = l.cot - l.cotPaye; };
+  $('#pSend').onclick = () => {
+    const l = state.licencies.find(x => x.id === Number($('#pLic').value));
+    if (!l) return;
+    state.paiements.unshift({ id: Date.now(), licId: l.id, objet: $('#pObjet').value, montant: Number($('#pMontant').value) || 0, statut: 'envoyee', creee: TODAY, payee: null, relances: 0 });
+    toast(`Lien de paiement envoyé à ${l.prenom} ${l.nom} (simulé).`);
+    closeModal(); render();
+  };
+}
+
+function comptaJournal() {
+  return `
+  <div class="card" style="padding:4px 8px;margin-top:2px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th class="num">Recette</th><th class="num">Dépense</th></tr></thead>
+      <tbody>${state.ecritures.slice(0, 60).map(e => `<tr>
+        <td style="white-space:nowrap">${dfrShort(e.date)}</td>
+        <td>${esc(e.libelle)}</td>
+        <td><span class="badge">${esc(e.cat)}</span></td>
+        <td class="num" style="color:var(--good-text)">${e.sens === 'R' ? eur(e.montant) : ''}</td>
+        <td class="num" style="color:var(--critical-text)">${e.sens === 'D' ? eur(e.montant) : ''}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">${state.ecritures.length} écritures sur l'exercice glissant. Dans la version réelle : export FEC / compte de résultat associatif, budgets par section, pièces justificatives attachées.</p>`;
+}
+
+function openFormEcriture() {
+  openModal('Écriture manuelle', `
+    <div class="form-grid">
+      <div class="field"><label for="eDate">Date</label><input id="eDate" type="date" value="${TODAY}"></div>
+      <div class="field"><label for="eSens">Sens</label><select id="eSens"><option value="R">Recette</option><option value="D">Dépense</option></select></div>
+      <div class="field"><label for="eCat">Catégorie</label><select id="eCat">${[...CAT_RECETTES, ...CAT_DEPENSES].map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label for="eMontant">Montant (€)</label><input id="eMontant" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field" style="grid-column:1/-1"><label for="eLib">Libellé</label><input id="eLib" placeholder="ex. Vente calendriers école de rugby"></div>
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="eSave">Enregistrer</button>`);
+  $('#eSave').onclick = () => {
+    const m = Number($('#eMontant').value);
+    if (!m || !$('#eLib').value.trim()) { toast('Libellé et montant sont obligatoires.'); return; }
+    state.ecritures.unshift({ id: Date.now(), date: $('#eDate').value || TODAY, sens: $('#eSens').value, cat: $('#eCat').value, libelle: $('#eLib').value.trim(), montant: m });
+    state.ecritures.sort((a, b) => b.date.localeCompare(a.date));
+    toast('Écriture enregistrée.');
+    closeModal(); render();
+  };
+}
+</script>
+<script>
+/* ================= MODULE : STOCK MULTI-PÔLES ================= */
+
+function viewStock() {
+  const f = state.filtres.stock;
+  const pole = subTabs.stockPole;
+  let rows = pole === 'tous' ? state.stock : state.stock.filter(a => a.pole === pole);
+  if (f.alerte) rows = rows.filter(a => a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= 60));
+  const { sousSeuil, perimes } = alertesStock();
+  const poleLabel = c => (POLES.find(p => p.code === c) || {label:c}).label;
+  const nbAlertes = c => state.stock.filter(a => a.pole === c && (a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= 60))).length;
+
+  const gauge = a => {
+    const ratio = a.seuil ? a.qte / (a.seuil * 2) : 1;
+    const cls = a.qte <= a.seuil ? 'low' : a.qte <= a.seuil * 1.4 ? 'mid' : '';
+    return `<div class="gauge ${cls}" role="img" aria-label="${a.qte} ${a.unite} pour un seuil de ${a.seuil}"><i style="width:${Math.min(100, ratio * 100).toFixed(0)}%"></i></div>`;
+  };
+  const peremp = a => {
+    if (!a.peremption) return '<span style="color:var(--ink-3)">—</span>';
+    const d = daysUntil(a.peremption);
+    if (d < 0) return `<span class="badge b-crit"><span class="dot"></span>Périmé (${dfrShort(a.peremption)})</span>`;
+    if (d <= 60) return `<span class="badge b-warn"><span class="dot"></span>${dfrShort(a.peremption)} (${d} j)</span>`;
+    return `<span style="color:var(--ink-2)">${dfrShort(a.peremption)}</span>`;
+  };
+
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Stock</h1>
+    <p class="page-sub">${state.stock.length} références réparties sur ${POLES.length} pôles · ${sousSeuil.length} sous seuil, ${perimes.length} péremption(s) à surveiller</p></div>
+    <div class="head-actions">
+      <button class="btn" id="btnHistoStock">Historique des mouvements</button>
+      <button class="btn btn-primary" id="btnNewArt">+ Nouvel article</button>
+    </div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="${pole === 'tous'}" class="${pole === 'tous' ? 'active' : ''}" data-pole="tous">Tous les pôles</button>
+    ${POLES.map(p => `<button role="tab" aria-selected="${pole === p.code}" class="${pole === p.code ? 'active' : ''}" data-pole="${p.code}">${p.label}${nbAlertes(p.code) ? ` <span class="badge b-serious" style="margin-left:4px">${nbAlertes(p.code)}</span>` : ''}</button>`).join('')}
+  </div>
+  <div class="toolbar">
+    <label style="display:flex;align-items:center;gap:7px;margin:0;font-size:13px;font-weight:500;color:var(--ink)">
+      <input type="checkbox" id="stAlerte" ${f.alerte ? 'checked' : ''}> Uniquement les alertes</label>
+    <span class="count-note">${rows.length} référence(s)</span>
+  </div>
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Article</th>${pole === 'tous' ? '<th>Pôle</th>' : ''}<th class="num">Quantité</th><th>Niveau</th><th class="num">Seuil</th><th>Péremption</th><th>Emplacement</th><th>Mouvement</th></tr></thead>
+      <tbody>${rows.length ? rows.map(a => `<tr>
+        <td><strong>${esc(a.nom)}</strong>${a.qte <= a.seuil ? ' <span class="badge b-crit" style="margin-left:4px"><span class="dot"></span>Sous seuil</span>' : ''}</td>
+        ${pole === 'tous' ? `<td><span class="badge">${esc(poleLabel(a.pole))}</span></td>` : ''}
+        <td class="num" style="font-weight:600">${a.qte} <span style="color:var(--ink-3);font-weight:400">${esc(a.unite)}</span></td>
+        <td>${gauge(a)}</td>
+        <td class="num" style="color:var(--ink-3)">${a.seuil}</td>
+        <td>${peremp(a)}</td>
+        <td style="color:var(--ink-2)">${esc(a.empl)}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm" data-mv="-" data-art="${a.id}" aria-label="Sortie de stock">− Sortie</button>
+          <button class="btn btn-sm" data-mv="+" data-art="${a.id}" aria-label="Entrée en stock">+ Entrée</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="8" class="empty">Aucun article dans ce pôle.</td></tr>'}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Dans la version réelle : inventaires annuels avec écarts, affectation par équipe (jeu de maillots M16 → resp. catégorie), commandes fournisseurs générées depuis les seuils, scan code-barres pour la buvette.</p>`;
+}
+
+function openMouvement(artId, sens) {
+  const a = state.stock.find(x => x.id === artId);
+  if (!a) return;
+  openModal(`${sens === '+' ? 'Entrée' : 'Sortie'} — ${a.nom}`, `
+    <p style="margin:0 0 12px;color:var(--ink-2)">Stock actuel : <strong style="color:var(--ink)">${a.qte} ${esc(a.unite)}</strong> · seuil d'alerte : ${a.seuil}</p>
+    <div class="form-grid">
+      <div class="field"><label for="mvQte">Quantité</label><input id="mvQte" type="number" min="1" value="1"></div>
+      <div class="field"><label for="mvMotif">Motif</label><select id="mvMotif">
+        ${(sens === '+' ? ['Réassort','Achat','Don partenaire','Retour matériel','Correction d\'inventaire']
+          : ['Sortie match','Sortie entraînement','Usage infirmerie','Vente buvette','Casse / perte','Correction d\'inventaire']).map(m => `<option>${m}</option>`).join('')}</select></div>
+      <div class="field" style="grid-column:1/-1"><label for="mvQui">Par</label><input id="mvQui" value="J.-M. Fabre"></div>
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="mvSave">Enregistrer le mouvement</button>`);
+  $('#mvSave').onclick = () => {
+    const q = Math.max(1, Number($('#mvQte').value) || 1);
+    const delta = sens === '+' ? q : -q;
+    if (a.qte + delta < 0) { toast('Le stock ne peut pas devenir négatif.'); return; }
+    a.qte += delta;
+    state.mouvements.unshift({ id: Date.now(), date: TODAY, artId: a.id, delta, motif: $('#mvMotif').value, par: $('#mvQui').value.trim() || '—' });
+    toast(`${sens === '+' ? '+' : '−'}${q} ${a.unite} — ${a.nom} : ${a.qte} ${a.unite} en stock.` + (a.qte <= a.seuil ? ' ⚠ Sous le seuil.' : ''));
+    closeModal(); render();
+  };
+}
+
+function openHistoStock() {
+  const nomArt = id => { const a = state.stock.find(x => x.id === id); return a ? a.nom : '—'; };
+  openModal('Historique des mouvements', `
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Article</th><th class="num">Δ</th><th>Motif</th><th>Par</th></tr></thead>
+      <tbody>${state.mouvements.slice(0, 40).map(m => `<tr>
+        <td style="white-space:nowrap">${dfrShort(m.date)}</td>
+        <td>${esc(nomArt(m.artId))}</td>
+        <td class="num" style="font-weight:600;color:${m.delta >= 0 ? 'var(--good-text)' : 'var(--critical-text)'}">${m.delta >= 0 ? '+' : ''}${m.delta}</td>
+        <td>${esc(m.motif)}</td><td style="color:var(--ink-2)">${esc(m.par)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`, `<button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+}
+
+function openFormArticle() {
+  openModal('Nouvel article', `
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1"><label for="aNom">Désignation</label><input id="aNom" placeholder="ex. Bouteilles d'eau 50 cl"></div>
+      <div class="field"><label for="aPole">Pôle</label><select id="aPole">${POLES.map(p => `<option value="${p.code}">${p.label}</option>`).join('')}</select></div>
+      <div class="field"><label for="aUnite">Unité</label><input id="aUnite" value="u."></div>
+      <div class="field"><label for="aQte">Quantité initiale</label><input id="aQte" type="number" min="0" value="0"></div>
+      <div class="field"><label for="aSeuil">Seuil d'alerte</label><input id="aSeuil" type="number" min="0" value="5"></div>
+      <div class="field"><label for="aEmpl">Emplacement</label><input id="aEmpl" placeholder="ex. Local matériel"></div>
+      <div class="field"><label for="aPeremp">Péremption (optionnel)</label><input id="aPeremp" type="date"></div>
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="aSave">Créer l'article</button>`);
+  $('#aSave').onclick = () => {
+    const nom = $('#aNom').value.trim();
+    if (!nom) { toast('La désignation est obligatoire.'); return; }
+    state.stock.push({ id: Date.now(), pole: $('#aPole').value, nom, qte: Number($('#aQte').value) || 0, seuil: Number($('#aSeuil').value) || 0, unite: $('#aUnite').value.trim() || 'u.', empl: $('#aEmpl').value.trim() || '—', peremption: $('#aPeremp').value || null });
+    toast(`Article « ${nom} » créé.`);
+    closeModal(); render();
+  };
+}
+</script>
+<script>
+/* ================= MODULE : CODIR & AG ================= */
+
+const statutReunion = s => ({
+  preparation: '<span class="badge b-info"><span class="dot"></span>En préparation</span>',
+  en_cours: '<span class="badge b-warn"><span class="dot"></span>En séance</span>',
+  terminee: '<span class="badge b-good"><span class="dot"></span>Terminée</span>',
+}[s] || esc(s));
+
+function viewCodir() {
+  if (subTabs.codirOpen) return viewReunion(subTabs.codirOpen);
+  const reunions = [...state.reunions].sort((a, b) => b.date.localeCompare(a.date));
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Codir & assemblées</h1>
+    <p class="page-sub">Comité directeur de 8 membres · préparation, séance, votes et comptes-rendus</p></div>
+    <div class="head-actions"><button class="btn btn-primary" id="btnNewReu">+ Planifier une réunion</button></div>
+  </div>
+  <div class="grid two-col">
+    <div>
+      <div class="card" style="padding:4px 8px">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Réunion</th><th>Date</th><th>Statut</th><th>Votes</th></tr></thead>
+          <tbody>${reunions.map(r => `<tr class="rowlink" data-reu="${r.id}" tabindex="0">
+            <td><strong>${esc(r.titre)}</strong><br><span style="color:var(--ink-3);font-size:12px">${r.type === 'AG' ? 'Assemblée générale' : 'Comité directeur'} · ${esc(r.lieu)}</span></td>
+            <td style="white-space:nowrap">${dfr(r.date)}<br><span style="color:var(--ink-3);font-size:12px">${r.heure}</span></td>
+            <td>${statutReunion(r.statut)}</td>
+            <td>${r.votes.filter(v => v.statut === 'clos').length}/${r.votes.length} clos</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Comité directeur</h3>
+      ${state.bureau.map(m => `<div class="alert-line"><strong style="min-width:0">${esc(m.nom)}</strong><span class="when">${esc(m.role)}</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function viewReunion(id) {
+  const r = state.reunions.find(x => x.id === id);
+  if (!r) { subTabs.codirOpen = null; return viewCodir(); }
+  const t = subTabs.codirTab;
+  const tabs = [
+    { id:'preparation', label:'Préparation' },
+    { id:'seance', label:'Séance' },
+    { id:'votes', label:`Votes (${r.votes.length})` },
+    { id:'cr', label:'Compte-rendu' },
+  ];
+  let body = '';
+  if (t === 'preparation') body = reunionPrep(r);
+  else if (t === 'seance') body = reunionSeance(r);
+  else if (t === 'votes') body = reunionVotes(r);
+  else body = reunionCR(r);
+  return `
+  <div class="page-head">
+    <div>
+      <p class="page-sub" style="margin:0 0 4px"><button class="btn btn-sm" id="btnBackReu">← Toutes les réunions</button></p>
+      <h1 class="page-title">${esc(r.titre)}</h1>
+      <p class="page-sub">${r.type === 'AG' ? 'Assemblée générale' : 'Comité directeur'} · ${dfr(r.date)} à ${r.heure} · ${esc(r.lieu)} · ${statutReunion(r.statut)}</p>
+    </div>
+  </div>
+  <div class="tabs" role="tablist">${tabs.map(x => `<button role="tab" aria-selected="${t === x.id}" class="${t === x.id ? 'active' : ''}" data-rtab="${x.id}">${x.label}</button>`).join('')}</div>
+  <div class="tab-body">${body}</div>`;
+}
+
+function reunionPrep(r) {
+  return `
+  <div class="grid two-col">
+    <div class="card">
+      <h3>Ordre du jour</h3>
+      ${r.odj.map((o, i) => `<div class="odj-item">
+        <span class="odj-num">${i + 1}.</span>
+        <div style="min-width:0"><strong>${esc(o.titre)}</strong>${o.note ? `<br><span style="color:var(--ink-2);font-size:12.5px">${esc(o.note)}</span>` : ''}</div>
+        ${r.statut === 'preparation' ? `<button class="x-btn" data-delodj="${o.id}" title="Retirer ce point" style="margin-left:auto">✕</button>` : ''}
+      </div>`).join('')}
+      ${r.statut === 'preparation' ? `
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <input id="odjNew" placeholder="Ajouter un point à l'ordre du jour…" style="flex:1">
+        <button class="btn" id="odjAdd">Ajouter</button>
+      </div>` : ''}
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Convocations</h3>
+        <p style="margin:0 0 10px;font-size:13px;color:var(--ink-2)">${r.type === 'AG' ? `${r.convoquees} membres à convoquer (15 jours avant, statuts art. 11)` : `${r.convoquees} membres du comité à convoquer`}</p>
+        ${r.statut === 'preparation'
+          ? (r.convocEnvoyee
+            ? '<span class="badge b-good"><span class="dot"></span>Convocations envoyées</span>'
+            : `<button class="btn btn-primary" id="btnConvoc">Envoyer les convocations (simulé)</button>`)
+          : `<span class="badge b-good"><span class="dot"></span>Envoyées · ${r.presents} présent(s)${r.pouvoirs ? ' + ' + r.pouvoirs + ' pouvoirs' : ''}</span>`}
+      </div>
+      <div class="card">
+        <h3>Documents joints</h3>
+        ${r.docs.map(d => `<div class="alert-line"><span>📄 ${esc(d)}</span><span class="when">PDF</span></div>`).join('') || '<p class="empty">Aucun document.</p>'}
+        <button class="btn btn-sm" style="margin-top:10px" id="btnDocAdd">+ Joindre un document (simulé)</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function reunionSeance(r) {
+  const presents = Object.values(r.presence).filter(Boolean).length;
+  const quorumMin = Math.ceil(r.convoquees * r.quorumPct / 100);
+  const quorumOk = (r.statut === 'terminee' ? r.presents + r.pouvoirs : presents) >= quorumMin;
+  return `
+  <div class="grid two-col">
+    <div class="card">
+      <h3>Déroulé de la séance</h3>
+      ${r.odj.map((o, i) => `<div class="odj-item">
+        <span class="odj-num">${i + 1}.</span>
+        <div style="min-width:0;flex:1">
+          <strong>${esc(o.titre)}</strong>
+          ${o.note ? `<br><span style="color:var(--ink-2);font-size:12.5px">${esc(o.note)}</span>` : ''}
+          ${r.statut !== 'terminee' ? `<div style="margin-top:6px"><input data-note-for="${o.id}" placeholder="Décision / note de séance…" value="${esc(o.note)}" style="width:100%"></div>` : ''}
+        </div>
+        <label style="margin:0;display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap">
+          <input type="checkbox" data-fait="${o.id}" ${o.fait ? 'checked' : ''} ${r.statut === 'terminee' ? 'disabled' : ''}> traité</label>
+      </div>`).join('')}
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Quorum</h3>
+        ${r.statut === 'terminee'
+          ? `<p style="margin:0"><strong>${r.presents} présents</strong>${r.pouvoirs ? ` + ${r.pouvoirs} pouvoirs` : ''} sur ${r.convoquees} convoqués.<br>
+             <span class="badge ${quorumOk ? 'b-good' : 'b-crit'}" style="margin-top:6px"><span class="dot"></span>Quorum ${quorumOk ? 'atteint' : 'non atteint'} (min. ${quorumMin})</span></p>`
+          : `<p style="margin:0 0 8px"><strong>${presents}</strong> présent(s) émargés · quorum : ${quorumMin} (${r.quorumPct} %)
+             <span class="badge ${quorumOk ? 'b-good' : 'b-warn'}" style="margin-left:6px"><span class="dot"></span>${quorumOk ? 'Atteint' : 'Pas encore atteint'}</span></p>`}
+      </div>
+      ${r.type !== 'AG' ? `<div class="card">
+        <h3>Émargement</h3>
+        <div class="presence-grid">
+          ${state.bureau.map(m => `<label><input type="checkbox" data-pres="${m.id}" ${r.presence[m.id] ? 'checked' : ''} ${r.statut === 'terminee' ? 'disabled' : ''}> ${esc(m.nom)}</label>`).join('')}
+        </div>
+      </div>` : `<div class="card"><h3>Émargement AG</h3><p style="margin:0;font-size:13px;color:var(--ink-2)">${r.statut === 'terminee' ? `Feuille d'émargement archivée : ${r.presents} signatures + ${r.pouvoirs} pouvoirs.` : 'L\'émargement des adhérents se fait à l\'entrée (liste imprimée ou tablette).'}</p></div>`}
+    </div>
+  </div>`;
+}
+
+function reunionVotes(r) {
+  const totalVotants = r.type === 'AG' ? (r.presents + r.pouvoirs || 54) : Math.max(Object.values(r.presence).filter(Boolean).length, r.presents) || state.bureau.length;
+  const bar = v => {
+    const tot = v.pour + v.contre + v.abst || 1;
+    return `<div class="vote-bar" role="img" aria-label="Pour ${v.pour}, contre ${v.contre}, abstentions ${v.abst}">
+      <i class="vote-pour" style="width:${v.pour / tot * 100}%"></i>
+      <i class="vote-contre" style="width:${v.contre / tot * 100}%"></i>
+      <i class="vote-abst" style="width:${v.abst / tot * 100}%"></i>
+    </div>
+    <div class="legend" style="margin-top:6px">
+      <span><span class="sw" style="background:var(--good)"></span>Pour : ${v.pour}</span>
+      <span><span class="sw" style="background:var(--critical)"></span>Contre : ${v.contre}</span>
+      <span><span class="sw" style="background:var(--chart-axis)"></span>Abst. : ${v.abst}</span>
+    </div>`;
+  };
+  return `
+  <div class="grid" style="grid-template-columns:1fr;max-width:760px">
+    ${r.votes.map(v => `<div class="card">
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+        <strong style="flex:1;min-width:200px">${esc(v.titre)}</strong>
+        ${v.statut === 'clos'
+          ? (v.resultat === 'adopte' ? '<span class="badge b-good"><span class="dot"></span>Adoptée</span>' : '<span class="badge b-crit"><span class="dot"></span>Rejetée</span>')
+          : v.statut === 'ouvert' ? '<span class="badge b-warn"><span class="dot"></span>Vote en cours</span>' : '<span class="badge"><span class="dot"></span>À ouvrir</span>'}
+      </div>
+      <div style="margin-top:10px">
+        ${v.statut === 'a_ouvrir'
+          ? `<p style="font-size:13px;color:var(--ink-2);margin:0 0 10px">Le vote sera ouvert en séance. Votants attendus : ${totalVotants}.</p>
+             ${r.statut !== 'terminee' ? `<button class="btn btn-primary btn-sm" data-vopen="${v.id}">Ouvrir le vote</button>` : ''}`
+          : v.statut === 'ouvert'
+          ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+              <div class="field"><label for="vp${v.id}">Pour</label><input id="vp${v.id}" type="number" min="0" value="${v.pour}" style="width:80px"></div>
+              <div class="field"><label for="vc${v.id}">Contre</label><input id="vc${v.id}" type="number" min="0" value="${v.contre}" style="width:80px"></div>
+              <div class="field"><label for="va${v.id}">Abstention</label><input id="va${v.id}" type="number" min="0" value="${v.abst}" style="width:80px"></div>
+              <button class="btn btn-primary" data-vclose="${v.id}">Clore le vote</button>
+            </div>
+            <p style="font-size:12px;color:var(--ink-3);margin:8px 0 0">Saisie par le secrétaire (main levée) — la version réelle permettrait aussi le vote sur smartphone de chaque membre, avec anonymat configurable.</p>`
+          : bar(v)}
+      </div>
+    </div>`).join('')}
+    ${r.statut !== 'terminee' ? `
+    <div class="card">
+      <h3>Nouvelle résolution</h3>
+      <div style="display:flex;gap:8px">
+        <input id="vNew" placeholder="ex. Augmentation du budget arbitrage de 10 %" style="flex:1">
+        <button class="btn" id="vAdd">Ajouter</button>
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+
+function reunionCR(r) {
+  const faits = r.odj.filter(o => o.fait);
+  const quorumMin = Math.ceil(r.convoquees * r.quorumPct / 100);
+  return `
+  <div class="card" style="max-width:760px">
+    <h3>Compte-rendu ${r.statut === 'terminee' ? '' : '(brouillon généré)'}</h3>
+    <div style="font-size:13.5px;line-height:1.65">
+      <p><strong>${esc(r.titre)}</strong> — ${dfr(r.date)} à ${r.heure}, ${esc(r.lieu)}.</p>
+      <p>${r.statut === 'terminee'
+        ? `Présents : ${r.presents}${r.pouvoirs ? ` · Pouvoirs : ${r.pouvoirs}` : ''} · Quorum requis : ${quorumMin} — atteint.`
+        : `Réunion à venir : le compte-rendu se remplira automatiquement à partir du déroulé de séance et des votes.`}</p>
+      ${faits.length ? '<ol style="padding-left:20px;margin:8px 0">' + faits.map(o => `<li style="margin-bottom:6px"><strong>${esc(o.titre)}.</strong> ${esc(o.note || 'Point traité.')}</li>`).join('') + '</ol>' : ''}
+      ${r.votes.filter(v => v.statut === 'clos').length ? `
+        <p><strong>Résolutions soumises au vote :</strong></p>
+        <ul style="padding-left:20px;margin:8px 0">
+        ${r.votes.filter(v => v.statut === 'clos').map(v => `<li style="margin-bottom:4px">${esc(v.titre)} — <strong>${v.resultat === 'adopte' ? 'adoptée' : 'rejetée'}</strong> (${v.pour} pour, ${v.contre} contre, ${v.abst} abst.)</li>`).join('')}
+        </ul>` : ''}
+      <p style="color:var(--ink-3)">Le secrétaire : A. Peyre · Le président : J.-M. Fabre</p>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn" id="btnCrPdf">Exporter en PDF (simulé)</button>
+      <button class="btn" id="btnCrMail">Diffuser aux membres (simulé)</button>
+    </div>
+  </div>`;
+}
+
+function openFormReunion() {
+  openModal('Planifier une réunion', `
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1"><label for="rTitre">Titre</label><input id="rTitre" placeholder="ex. Comité directeur de novembre"></div>
+      <div class="field"><label for="rType">Type</label><select id="rType"><option value="Codir">Comité directeur</option><option value="AG">Assemblée générale</option></select></div>
+      <div class="field"><label for="rLieu">Lieu</label><input id="rLieu" value="Club house"></div>
+      <div class="field"><label for="rDate">Date</label><input id="rDate" type="date" value="${addDaysIso(TODAY, 30)}"></div>
+      <div class="field"><label for="rHeure">Heure</label><input id="rHeure" type="time" value="20:30"></div>
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="rSave">Créer</button>`);
+  $('#rSave').onclick = () => {
+    const titre = $('#rTitre').value.trim();
+    if (!titre) { toast('Le titre est obligatoire.'); return; }
+    const type = $('#rType').value;
+    const reu = { id: Date.now(), type, titre, date: $('#rDate').value, heure: $('#rHeure').value, lieu: $('#rLieu').value.trim() || 'Club house',
+      statut: 'preparation', convoquees: type === 'AG' ? state.licencies.length : state.bureau.length, presents: 0, pouvoirs: 0,
+      quorumPct: type === 'AG' ? 25 : 50, convocEnvoyee: false, odj: [], votes: [], docs: [], presence: {} };
+    state.reunions.push(reu);
+    subTabs.codirOpen = reu.id; subTabs.codirTab = 'preparation';
+    toast(`Réunion « ${titre} » créée.`);
+    closeModal(); render();
+  };
+}
+</script>
+<script>
+/* ================= LIAISON DES ÉVÉNEMENTS & DÉMARRAGE ================= */
+
+function bindView() {
+  const v = $('#view');
+  bindChartTips(v);
+  // Tableau de bord
+  $$('[data-goto]', v).forEach(b => b.onclick = () => { state.view = b.dataset.goto; render(); });
+
+  // Licenciés
+  const licQ = $('#licQ');
+  if (licQ) {
+    licQ.oninput = () => { state.filtres.lic.q = licQ.value; render(); const el = $('#licQ'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); };
+    $('#licCat').onchange = e => { state.filtres.lic.cat = e.target.value; render(); };
+    $('#licCot').onchange = e => { state.filtres.lic.cot = e.target.value; render(); };
+    $('#licCert').onchange = e => { state.filtres.lic.cert = e.target.value; render(); };
+    $('#btnNewLic').onclick = () => openFormLic(null);
+    $('#btnExportLic').onclick = () => toast('Export CSV généré (simulé dans la maquette).');
+    $$('[data-lic]', v).forEach(tr => {
+      const open = () => openFicheLic(Number(tr.dataset.lic));
+      tr.onclick = open;
+      tr.onkeydown = e => { if (e.key === 'Enter') open(); };
+    });
+  }
+
+  // Comptabilité
+  $$('[data-ctab]', v).forEach(b => b.onclick = () => { subTabs.compta = b.dataset.ctab; render(); });
+  const btnEc = $('#btnNewEcriture'); if (btnEc) btnEc.onclick = openFormEcriture;
+  const btnSync = $('#btnSync'); if (btnSync) btnSync.onclick = () => { syncBanque(); render(); };
+  const bqS = $('#bqStatut'); if (bqS) bqS.onchange = e => { state.filtres.banque.statut = e.target.value; render(); };
+  $$('[data-rappro]', v).forEach(b => b.onclick = () => { rapprocher(Number(b.dataset.rappro)); render(); });
+  const btnNewPay = $('#btnNewPay'); if (btnNewPay) btnNewPay.onclick = openFormPaiement;
+  const btnRelAll = $('#btnRelanceAll');
+  if (btnRelAll) btnRelAll.onclick = () => {
+    let n = 0;
+    for (const p of state.paiements) if (p.statut !== 'paye') { p.statut = 'relancee'; p.relances++; n++; }
+    toast(n ? `${n} relance(s) envoyée(s) par email (simulé).` : 'Aucun impayé à relancer.');
+    render();
+  };
+  $$('[data-relance]', v).forEach(b => b.onclick = () => {
+    const p = state.paiements.find(x => x.id === Number(b.dataset.relance));
+    if (p) { p.statut = 'relancee'; p.relances++; toast('Relance envoyée (simulé).'); render(); }
+  });
+  $$('[data-simulpay]', v).forEach(b => b.onclick = () => { simulerPaiement(Number(b.dataset.simulpay)); render(); });
+
+  // Stock
+  $$('[data-pole]', v).forEach(b => b.onclick = () => { subTabs.stockPole = b.dataset.pole; render(); });
+  const stA = $('#stAlerte'); if (stA) stA.onchange = e => { state.filtres.stock.alerte = e.target.checked; render(); };
+  $$('[data-mv]', v).forEach(b => b.onclick = () => openMouvement(Number(b.dataset.art), b.dataset.mv));
+  const btnHisto = $('#btnHistoStock'); if (btnHisto) btnHisto.onclick = openHistoStock;
+  const btnArt = $('#btnNewArt'); if (btnArt) btnArt.onclick = openFormArticle;
+
+  // Codir
+  const btnReu = $('#btnNewReu'); if (btnReu) btnReu.onclick = openFormReunion;
+  $$('[data-reu]', v).forEach(tr => {
+    const open = () => { subTabs.codirOpen = Number(tr.dataset.reu); subTabs.codirTab = 'preparation'; render(); };
+    tr.onclick = open;
+    tr.onkeydown = e => { if (e.key === 'Enter') open(); };
+  });
+  const back = $('#btnBackReu'); if (back) back.onclick = () => { subTabs.codirOpen = null; render(); };
+  $$('[data-rtab]', v).forEach(b => b.onclick = () => { subTabs.codirTab = b.dataset.rtab; render(); });
+
+  const r = subTabs.codirOpen ? state.reunions.find(x => x.id === subTabs.codirOpen) : null;
+  if (r) {
+    const odjAdd = $('#odjAdd');
+    if (odjAdd) odjAdd.onclick = () => {
+      const inp = $('#odjNew');
+      if (!inp.value.trim()) return;
+      r.odj.push({ id: Date.now(), titre: inp.value.trim(), note: '', fait: false });
+      toast('Point ajouté à l\'ordre du jour.');
+      render();
+    };
+    $$('[data-delodj]', v).forEach(b => b.onclick = () => { r.odj = r.odj.filter(o => o.id !== Number(b.dataset.delodj)); render(); });
+    const btnConvoc = $('#btnConvoc');
+    if (btnConvoc) btnConvoc.onclick = () => { r.convocEnvoyee = true; toast(`Convocations envoyées à ${r.convoquees} membre(s) par email (simulé).`); render(); };
+    const btnDoc = $('#btnDocAdd');
+    if (btnDoc) btnDoc.onclick = () => { r.docs.push('Document ' + (r.docs.length + 1) + '.pdf'); toast('Document joint (simulé).'); render(); };
+    $$('[data-pres]', v).forEach(c => c.onchange = () => { r.presence[c.dataset.pres] = c.checked; render(); });
+    $$('[data-fait]', v).forEach(c => c.onchange = () => {
+      const o = r.odj.find(x => x.id === Number(c.dataset.fait));
+      if (o) o.fait = c.checked;
+      render();
+    });
+    $$('[data-note-for]', v).forEach(inp => inp.onchange = () => {
+      const o = r.odj.find(x => x.id === Number(inp.dataset.noteFor));
+      if (o) { o.note = inp.value; toast('Note enregistrée.'); }
+    });
+    $$('[data-vopen]', v).forEach(b => b.onclick = () => {
+      const vt = r.votes.find(x => x.id === Number(b.dataset.vopen));
+      if (vt) { vt.statut = 'ouvert'; if (r.statut === 'preparation') r.statut = 'en_cours'; toast('Vote ouvert.'); render(); }
+    });
+    $$('[data-vclose]', v).forEach(b => b.onclick = () => {
+      const vt = r.votes.find(x => x.id === Number(b.dataset.vclose));
+      if (!vt) return;
+      vt.pour = Math.max(0, Number($('#vp' + vt.id).value) || 0);
+      vt.contre = Math.max(0, Number($('#vc' + vt.id).value) || 0);
+      vt.abst = Math.max(0, Number($('#va' + vt.id).value) || 0);
+      if (!vt.pour && !vt.contre && !vt.abst) { toast('Saisis au moins un vote avant de clore.'); return; }
+      vt.statut = 'clos';
+      vt.resultat = vt.pour > vt.contre ? 'adopte' : 'rejete';
+      toast(`Vote clos — résolution ${vt.resultat === 'adopte' ? 'adoptée' : 'rejetée'}.`);
+      render();
+    });
+    const vAdd = $('#vAdd');
+    if (vAdd) vAdd.onclick = () => {
+      const inp = $('#vNew');
+      if (!inp.value.trim()) return;
+      r.votes.push({ id: Date.now(), titre: inp.value.trim(), mode: r.type, statut: 'a_ouvrir', pour: 0, contre: 0, abst: 0, resultat: null });
+      toast('Résolution ajoutée.');
+      render();
+    };
+    const crPdf = $('#btnCrPdf'); if (crPdf) crPdf.onclick = () => toast('PDF du compte-rendu généré (simulé).');
+    const crMail = $('#btnCrMail'); if (crMail) crMail.onclick = () => toast('Compte-rendu diffusé aux membres (simulé).');
+  }
+}
+
+render();
+</script>
+
+</body>
+</html>
