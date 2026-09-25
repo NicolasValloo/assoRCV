@@ -357,15 +357,17 @@ label { font-size: 12px; font-weight: 600; color: var(--ink-2); display: block; 
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-badge" aria-hidden="true">
+      <div class="brand-badge" id="brandBadge" aria-hidden="true">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><ellipse cx="10" cy="10" rx="8.5" ry="5.6" transform="rotate(-32 10 10)" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M6.5 12.5 L13.5 7.5 M9 12.8 L9.6 11 M11 11.4 L11.6 9.6 M8 10.4 L8.6 8.6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
       </div>
       <div>
         <div class="brand-name">Ovalie Gestion</div>
-        <div class="brand-sub">RC Val d'Adret · Rugby</div>
+        <div class="brand-sub" id="brandSub">RC Val d'Adret · Rugby</div>
       </div>
     </div>
+    <div id="userBox"></div>
     <nav class="nav" id="mainNav" aria-label="Modules"></nav>
+    <div id="demoBox"></div>
     <div class="side-note">
       Maquette de démonstration.<br>
       Données fictives générées — aucune donnée réelle. Saison 2026-2027.
@@ -470,8 +472,16 @@ const state = {
   mouvements: [],
   reunions: [],
   bureau: [],
-  filtres: { lic: { q:'', cat:'', cot:'', cert:'' }, stock: { pole:'', alerte:false }, banque: { statut:'' } },
+  filtres: { lic: { q:'', cat:'', cot:'', cert:'' }, stock: { pole:'', alerte:false }, banque: { statut:'' }, ged: { q:'' } },
   soldeInitial: 8420,
+  params: {
+    clubNom: 'RC Val d\'Adret', clubSport: 'Rugby', logo: null,
+    couleur: '#1e5c42',
+    certJours: 60, peremptionJours: 60, relanceJours: 15,
+    quorumAG: 25, quorumCodir: 50, exerciceDebut: 7,
+    roles: null, // initialisé plus bas
+  },
+  ged: null, gedPath: [],
 };
 
 /* ---- Licenciés ---- */
@@ -515,7 +525,7 @@ const state = {
 const catLabel = code => (CATEGORIES.find(c => c.code === code) || {label: code}).label;
 
 /* ---- Comptabilité : 12 mois d'écritures + relevé bancaire ---- */
-const CAT_RECETTES = ['Cotisations','Subvention municipale','Subvention ANS','Sponsors & partenaires','Buvette','Événements & lotos'];
+const CAT_RECETTES = ['Cotisations','Subvention municipale','Subvention ANS','Sponsors & partenaires','Buvette','Boutique','Événements & lotos'];
 const CAT_DEPENSES = ['Équipement sportif','Déplacements','Affiliation & licences FFR','Arbitrage','Pharmacie & secours','Assurance','Frais administratifs','Achats buvette','Location & entretien terrain'];
 
 (function genCompta() {
@@ -700,20 +710,32 @@ const POLES = [
 
 const MODULES = [
   { id:'dashboard', label:'Tableau de bord', ico:'▦' },
+  { id:'sportif', label:'Sportif', ico:'🏉' },
   { id:'licencies', label:'Licenciés', ico:'👤' },
   { id:'compta', label:'Comptabilité', ico:'€' },
   { id:'stock', label:'Stock', ico:'▤' },
   { id:'codir', label:'Codir & AG', ico:'⚖' },
+  { id:'ged', label:'Documents', ico:'🗂' },
+  { id:'parametres', label:'Paramètres', ico:'⚙' },
 ];
 const subTabs = { compta: 'synthese', stockPole: 'tous', codirOpen: null, codirTab: 'preparation', licOpen: null };
 
 function renderNav() {
-  $('#mainNav').innerHTML = MODULES.map(m =>
+  const mods = window.visibleModules ? visibleModules() : MODULES;
+  $('#mainNav').innerHTML = mods.map(m =>
     `<button class="${state.view === m.id ? 'active' : ''}" data-nav="${m.id}"><span class="ico" aria-hidden="true">${m.ico}</span>${m.label}</button>`).join('');
   $$('#mainNav [data-nav]').forEach(b => b.onclick = () => { state.view = b.dataset.nav; render(); });
 }
 
 function render() {
+  if (window.applyClubTheme) applyClubTheme();
+  if (window.renderBrand) renderBrand();
+  if (window.renderUser) renderUser();
+  if (window.visibleModules) {
+    const mods = visibleModules();
+    if (state.view !== 'profil' && !mods.some(m => m.id === state.view)) state.view = mods[0].id;
+    document.body.classList.toggle('mod-ro', window.canW ? !canW(state.view) : false);
+  }
   renderNav();
   const v = $('#view');
   if (state.view === 'dashboard') v.innerHTML = viewDashboard();
@@ -721,6 +743,11 @@ function render() {
   else if (state.view === 'compta') v.innerHTML = viewCompta();
   else if (state.view === 'stock') v.innerHTML = viewStock();
   else if (state.view === 'codir') v.innerHTML = viewCodir();
+  else if (state.view === 'ged') v.innerHTML = viewGed();
+  else if (state.view === 'parametres') v.innerHTML = viewParams();
+  else if (state.view === 'mon-espace') v.innerHTML = viewMonEspace();
+  else if (state.view === 'profil') v.innerHTML = viewProfil();
+  else if (state.view === 'sportif') v.innerHTML = viewSportif();
   bindView();
   window.scrollTo(0, 0);
 }
@@ -740,7 +767,7 @@ const cotBadge = s => ({
 function certBadge(l) {
   const d = daysUntil(l.certFin);
   if (d < 0) return `<span class="badge b-crit"><span class="dot"></span>Expiré (${dfrShort(l.certFin)})</span>`;
-  if (d <= 60) return `<span class="badge b-warn"><span class="dot"></span>Expire dans ${d} j</span>`;
+  if (d <= state.params.certJours) return `<span class="badge b-warn"><span class="dot"></span>Expire dans ${d} j</span>`;
   return `<span class="badge b-good"><span class="dot"></span>Valide → ${dfrShort(l.certFin)}</span>`;
 }
 
@@ -751,11 +778,11 @@ function soldeCourant() {
 }
 function alertesStock() {
   const sousSeuil = state.stock.filter(a => a.qte <= a.seuil);
-  const perimes = state.stock.filter(a => a.peremption && daysUntil(a.peremption) <= 60);
+  const perimes = state.stock.filter(a => a.peremption && daysUntil(a.peremption) <= state.params.peremptionJours);
   return { sousSeuil, perimes };
 }
 function impayes() { return state.licencies.filter(l => l.cotStatut === 'impayee' || l.cotStatut === 'partielle'); }
-function certsProblemes() { return state.licencies.filter(l => daysUntil(l.certFin) <= 60); }
+function certsProblemes() { return state.licencies.filter(l => daysUntil(l.certFin) <= state.params.certJours); }
 
 /* ---- Mini-lib graphiques SVG ---- */
 function chartMensuel(id) {
@@ -887,7 +914,7 @@ function viewDashboard() {
   return `
   <div class="page-head">
     <div><h1 class="page-title">Tableau de bord</h1>
-    <p class="page-sub">RC Val d'Adret — saison 2026-2027 · situation au ${dfr(TODAY)}</p></div>
+    <p class="page-sub">${esc(state.params.clubNom)} — saison 2026-2027 · situation au ${dfr(TODAY)}</p></div>
   </div>
   <div class="grid kpis">
     <div class="card"><h3>Licenciés</h3><div class="kpi-value">${state.licencies.length}</div>
@@ -951,7 +978,7 @@ function viewLicencies() {
   if (f.cat) rows = rows.filter(l => l.cat === f.cat);
   if (f.cot) rows = rows.filter(l => l.cotStatut === f.cot);
   if (f.cert === 'ko') rows = rows.filter(l => daysUntil(l.certFin) < 0);
-  if (f.cert === 'bientot') rows = rows.filter(l => { const d = daysUntil(l.certFin); return d >= 0 && d <= 60; });
+  if (f.cert === 'bientot') rows = rows.filter(l => { const d = daysUntil(l.certFin); return d >= 0 && d <= state.params.certJours; });
   rows = [...rows].sort((a, b) => (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
 
   return `
@@ -978,7 +1005,7 @@ function viewLicencies() {
     <select id="licCert" aria-label="Filtrer par certificat">
       <option value="">Certificat : tous</option>
       <option value="ko" ${f.cert === 'ko' ? 'selected' : ''}>Expirés</option>
-      <option value="bientot" ${f.cert === 'bientot' ? 'selected' : ''}>Expirent sous 60 j</option>
+      <option value="bientot" ${f.cert === 'bientot' ? 'selected' : ''}>Expirent sous ${state.params.certJours} j</option>
     </select>
     <span class="count-note">${rows.length} affiché(s)</span>
   </div>
@@ -990,7 +1017,7 @@ function viewLicencies() {
         ${rows.length ? rows.map(l => `<tr class="rowlink" data-lic="${l.id}" tabindex="0">
           <td><strong>${esc(l.nom.toUpperCase())}</strong> ${esc(l.prenom)}<br><span style="color:var(--ink-3);font-size:12px">${l.naissance.slice(0,4)} · ${esc(l.ville)}</span></td>
           <td>${esc(catLabel(l.cat))}</td>
-          <td>${l.licence}<br>${licBadge(l.licStatut)}</td>
+          <td>${l.licence}<br>${licBadge(l.licStatut)}${l.mutation && l.licStatut !== 'validee' ? ' <span class="badge b-warn"><span class="dot"></span>Mutation</span>' : ''}</td>
           <td>${certBadge(l)}</td>
           <td>${cotBadge(l.cotStatut)}</td>
           <td class="num">${l.cot ? `${eur(l.cotPaye)} / ${eur(l.cot)}` : '—'}</td>
@@ -1024,7 +1051,7 @@ function openFicheLic(id) {
         <td>${p.statut === 'paye' ? '<span class="badge b-good"><span class="dot"></span>Payé le ' + dfrShort(p.payee) + '</span>' : p.statut === 'relancee' ? '<span class="badge b-serious"><span class="dot"></span>Relancé ×' + p.relances + '</span>' : '<span class="badge b-warn"><span class="dot"></span>Lien envoyé</span>'}</td>
         <td class="num">${eur(p.montant)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty" style="padding:6px 0">Aucune demande de paiement en ligne.</p>'}
   `, `
-    ${l.cotStatut !== 'payee' && l.cot ? `<button class="btn" id="ficheLien" data-lic="${l.id}">Envoyer un lien de paiement</button>` : ''}
+    ${l.cotStatut !== 'payee' && l.cot && (!window.canW || canW('licencies')) ? `<button class="btn" id="ficheLien" data-lic="${l.id}">Envoyer un lien de paiement</button>` : ''}
     <button class="btn" id="ficheEdit" data-lic="${l.id}">Modifier</button>
     <button class="btn btn-primary" onclick="closeModal()">Fermer</button>
   `);
@@ -1316,11 +1343,13 @@ function openFormEcriture() {
 function viewStock() {
   const f = state.filtres.stock;
   const pole = subTabs.stockPole;
+  if (window.viewBoutique && pole === 'boutique') return viewBoutique();
+  if (window.viewDotations && pole === 'dotations') return viewDotations();
   let rows = pole === 'tous' ? state.stock : state.stock.filter(a => a.pole === pole);
-  if (f.alerte) rows = rows.filter(a => a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= 60));
+  if (f.alerte) rows = rows.filter(a => a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= state.params.peremptionJours));
   const { sousSeuil, perimes } = alertesStock();
   const poleLabel = c => (POLES.find(p => p.code === c) || {label:c}).label;
-  const nbAlertes = c => state.stock.filter(a => a.pole === c && (a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= 60))).length;
+  const nbAlertes = c => state.stock.filter(a => a.pole === c && (a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= state.params.peremptionJours))).length;
 
   const gauge = a => {
     const ratio = a.seuil ? a.qte / (a.seuil * 2) : 1;
@@ -1331,7 +1360,7 @@ function viewStock() {
     if (!a.peremption) return '<span style="color:var(--ink-3)">—</span>';
     const d = daysUntil(a.peremption);
     if (d < 0) return `<span class="badge b-crit"><span class="dot"></span>Périmé (${dfrShort(a.peremption)})</span>`;
-    if (d <= 60) return `<span class="badge b-warn"><span class="dot"></span>${dfrShort(a.peremption)} (${d} j)</span>`;
+    if (d <= state.params.peremptionJours) return `<span class="badge b-warn"><span class="dot"></span>${dfrShort(a.peremption)} (${d} j)</span>`;
     return `<span style="color:var(--ink-2)">${dfrShort(a.peremption)}</span>`;
   };
 
@@ -1347,6 +1376,8 @@ function viewStock() {
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="${pole === 'tous'}" class="${pole === 'tous' ? 'active' : ''}" data-pole="tous">Tous les pôles</button>
     ${POLES.map(p => `<button role="tab" aria-selected="${pole === p.code}" class="${pole === p.code ? 'active' : ''}" data-pole="${p.code}">${p.label}${nbAlertes(p.code) ? ` <span class="badge b-serious" style="margin-left:4px">${nbAlertes(p.code)}</span>` : ''}</button>`).join('')}
+    <button role="tab" aria-selected="false" data-pole="boutique">🛒 Boutique</button>
+    <button role="tab" aria-selected="false" data-pole="dotations">🎽 Dotations</button>
   </div>
   <div class="toolbar">
     <label style="display:flex;align-items:center;gap:7px;margin:0;font-size:13px;font-weight:500;color:var(--ink)">
@@ -1356,7 +1387,7 @@ function viewStock() {
   <div class="card" style="padding:4px 8px">
     <div class="table-wrap"><table>
       <thead><tr><th>Article</th>${pole === 'tous' ? '<th>Pôle</th>' : ''}<th class="num">Quantité</th><th>Niveau</th><th class="num">Seuil</th><th>Péremption</th><th>Emplacement</th><th>Mouvement</th></tr></thead>
-      <tbody>${rows.length ? rows.map(a => `<tr>
+      <tbody>${rows.length ? rows.map(a => `<tr class="rowlink" data-artfiche="${a.id}" tabindex="0">
         <td><strong>${esc(a.nom)}</strong>${a.qte <= a.seuil ? ' <span class="badge b-crit" style="margin-left:4px"><span class="dot"></span>Sous seuil</span>' : ''}</td>
         ${pole === 'tous' ? `<td><span class="badge">${esc(poleLabel(a.pole))}</span></td>` : ''}
         <td class="num" style="font-weight:600">${a.qte} <span style="color:var(--ink-3);font-weight:400">${esc(a.unite)}</span></td>
@@ -1667,7 +1698,7 @@ function openFormReunion() {
     const type = $('#rType').value;
     const reu = { id: Date.now(), type, titre, date: $('#rDate').value, heure: $('#rHeure').value, lieu: $('#rLieu').value.trim() || 'Club house',
       statut: 'preparation', convoquees: type === 'AG' ? state.licencies.length : state.bureau.length, presents: 0, pouvoirs: 0,
-      quorumPct: type === 'AG' ? 25 : 50, convocEnvoyee: false, odj: [], votes: [], docs: [], presence: {} };
+      quorumPct: type === 'AG' ? state.params.quorumAG : state.params.quorumCodir, convocEnvoyee: false, odj: [], votes: [], docs: [], presence: {} };
     state.reunions.push(reu);
     subTabs.codirOpen = reu.id; subTabs.codirTab = 'preparation';
     toast(`Réunion « ${titre} » créée.`);
@@ -1681,6 +1712,7 @@ function openFormReunion() {
 function bindView() {
   const v = $('#view');
   bindChartTips(v);
+  if (window.bindExtra) bindExtra(v);
   // Tableau de bord
   $$('[data-goto]', v).forEach(b => b.onclick = () => { state.view = b.dataset.goto; render(); });
 
@@ -1790,6 +1822,1564 @@ function bindView() {
     const crMail = $('#btnCrMail'); if (crMail) crMail.onclick = () => toast('Compte-rendu diffusé aux membres (simulé).');
   }
 }
+
+render();
+</script>
+<style>
+/* ---------- GED ---------- */
+.crumb { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13.5px; margin: 2px 0 0; }
+.crumb button { border: 0; background: none; cursor: pointer; color: var(--accent); font: 600 13.5px/1.2 system-ui, sans-serif; padding: 2px 2px; }
+.crumb .sep { color: var(--ink-3); }
+.crumb .here { font-weight: 600; }
+.ged-ico { font-size: 17px; width: 24px; display: inline-block; text-align: center; }
+.chip { display: inline-block; font-size: 11px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 1px 8px; margin: 1px 2px 1px 0; color: var(--ink-2); }
+/* ---------- Paramètres ---------- */
+.color-preview { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.swatch-btn { pointer-events: none; }
+.roles-table select { padding: 4px 6px; font-size: 12.5px; }
+.tarif-input { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+<script>
+/* ================= V2 : THÈME CLUB (OPTION A), GED, PARAMÈTRES ================= */
+
+/* ---- Couleur club : helpers + application (option A) ---- */
+const _hx = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+const _toHex = (r,g,b) => '#' + [r,g,b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2,'0')).join('');
+const _lum = h => { const [r,g,b] = _hx(h).map(v => { v/=255; return v <= .03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4); }); return .2126*r + .7152*g + .0722*b; };
+const _contrast = (a,b) => { const l1 = _lum(a), l2 = _lum(b); return (Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05); };
+const _mix = (a,b,t) => { const A = _hx(a), B = _hx(b); return _toHex(A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t, A[2]+(B[2]-A[2])*t); };
+
+function applyClubTheme() {
+  const r = document.documentElement.style;
+  let c = state.params.couleur || '#1e5c42';
+  // Garde-fou : couleur trop claire pour porter du texte → assombrie automatiquement
+  if (_contrast(c, '#ffffff') < 2.2 && _contrast(c, '#101410') < 4.5) c = _mix(c, '#000000', .35);
+  const ink = _contrast(c, '#ffffff') >= 3 ? '#ffffff' : '#131813';
+  r.setProperty('--accent', c);
+  r.setProperty('--accent-ink', ink);
+  r.setProperty('--accent-soft', _mix(c, '#ffffff', .88));
+}
+
+const BADGE_SVG = document.getElementById('brandBadge') ? document.getElementById('brandBadge').innerHTML : '';
+function renderBrand() {
+  const sub = $('#brandSub');
+  if (sub) sub.textContent = `${state.params.clubNom} · ${state.params.clubSport}`;
+  const badge = $('#brandBadge');
+  if (badge) badge.innerHTML = state.params.logo
+    ? `<img src="${state.params.logo}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    : BADGE_SVG;
+}
+
+/* ---- Droits : matrice par défaut ---- */
+const ROLES = [
+  { id:'president', label:'Président' },
+  { id:'tresorier', label:'Trésorier' },
+  { id:'secretaire', label:'Secrétaire' },
+  { id:'codir', label:'Membre du codir' },
+  { id:'educateur', label:'Éducateur' },
+  { id:'adherent', label:'Adhérent / parent' },
+];
+const MODS_DROITS = [
+  { id:'sportif', label:'Sportif' },
+  { id:'licencies', label:'Licenciés' },
+  { id:'compta', label:'Comptabilité' },
+  { id:'stock', label:'Stock' },
+  { id:'codir', label:'Codir & AG' },
+  { id:'ged', label:'Documents' },
+  { id:'parametres', label:'Paramètres' },
+];
+const NIVEAUX = [['aucun','Aucun'],['lecture','Lecture'],['ecriture','Écriture'],['admin','Admin']];
+state.params.roles = {
+  president:  { sportif:'admin', licencies:'admin', compta:'admin', stock:'admin', codir:'admin', ged:'admin', parametres:'admin' },
+  tresorier:  { sportif:'lecture', licencies:'lecture', compta:'admin', stock:'lecture', codir:'ecriture', ged:'ecriture', parametres:'aucun' },
+  secretaire: { sportif:'ecriture', licencies:'admin', compta:'lecture', stock:'lecture', codir:'admin', ged:'admin', parametres:'aucun' },
+  codir:      { sportif:'lecture', licencies:'lecture', compta:'lecture', stock:'ecriture', codir:'ecriture', ged:'lecture', parametres:'aucun' },
+  educateur:  { sportif:'admin', licencies:'lecture', compta:'aucun', stock:'ecriture', codir:'aucun', ged:'lecture', parametres:'aucun' },
+  adherent:   { sportif:'lecture', licencies:'aucun', compta:'aucun', stock:'aucun', codir:'aucun', ged:'lecture', parametres:'aucun' },
+};
+
+/* ---- GED : arborescence de départ ---- */
+let _gid = 1;
+const D = (nom, partage, children) => ({ id: _gid++, type:'dir', nom, partage, children });
+const F = (nom, taille, modif, par, partage, versions=1) => {
+  const ext = nom.slice(nom.lastIndexOf('.') + 1).toLowerCase();
+  const vs = []; let d = modif;
+  for (let i = versions; i >= 1; i--) { vs.unshift({ n: i, date: d, par }); d = addDaysIso(d, -ri(10, 120)); }
+  return { id: _gid++, type:'file', nom, ext, taille, modif, par, partage, versions: vs };
+};
+state.ged = [
+  D('Statuts & administratif', ['Bureau','Codir'], [
+    F('Statuts du club — 2024.pdf', '420 Ko', '2024-11-03', 'A. Peyre', ['Tous les membres'], 3),
+    F('Règlement intérieur.pdf', '180 Ko', '2025-09-12', 'A. Peyre', ['Tous les membres'], 2),
+    F('Récépissé préfecture.pdf', '95 Ko', '2024-11-20', 'J.-M. Fabre', ['Bureau']),
+    F('RIB du club.pdf', '60 Ko', '2026-01-08', 'C. Delmas', ['Bureau']),
+  ]),
+  D('PV & réunions', ['Codir'], [
+    F('PV AG 2026.pdf', '310 Ko', '2026-06-20', 'A. Peyre', ['Tous les membres']),
+    F('CR codir 2026-09-01.pdf', '150 Ko', '2026-09-03', 'A. Peyre', ['Codir']),
+    F('Convocation AG 2026.pdf', '120 Ko', '2026-05-27', 'A. Peyre', ['Tous les membres']),
+    F('Rapport financier 2025-2026.xlsx', '88 Ko', '2026-06-10', 'C. Delmas', ['Codir'], 4),
+  ]),
+  D('Assurances', ['Bureau'], [
+    F('Contrat RC 2026-2027.pdf', '1,2 Mo', '2026-08-28', 'J.-M. Fabre', ['Bureau'], 2),
+    F('Attestation locaux mairie.pdf', '210 Ko', '2026-09-02', 'J.-M. Fabre', ['Bureau']),
+  ]),
+  D('Licences & FFR', ['Bureau','Éducateurs'], [
+    F('Affiliation FFR 2026-2027.pdf', '340 Ko', '2026-09-08', 'A. Peyre', ['Bureau']),
+    F('Dossier type inscription.docx', '75 Ko', '2026-07-15', 'M. Roussel', ['Éducateurs'], 5),
+    F('Certificat médical — modèle.pdf', '52 Ko', '2026-07-15', 'M. Roussel', ['Tous les membres']),
+  ]),
+  D('Sponsors & partenaires', ['Bureau'], [
+    F('Convention Intermarché Montclar.pdf', '260 Ko', '2026-06-30', 'L. Cantagrel', ['Bureau']),
+    F('Plaquette partenaires 2026.pptx', '4,8 Mo', '2026-08-19', 'L. Cantagrel', ['Bureau'], 3),
+  ]),
+  F('Logo du club.png', '340 Ko', '2025-10-02', 'S. Vialar', ['Tous les membres']),
+  F('Trombinoscope codir.pdf', '2,1 Mo', '2026-09-05', 'S. Vialar', ['Codir']),
+];
+
+const GED_ICO = { pdf:'📄', docx:'📝', xlsx:'📊', pptx:'📽️', png:'🖼️', jpg:'🖼️' };
+function gedCwd() {
+  let list = state.ged, node = null;
+  for (const id of state.gedPath) {
+    node = list.find(n => n.id === id && n.type === 'dir');
+    if (!node) { state.gedPath = []; return { list: state.ged, chain: [] }; }
+    list = node.children;
+  }
+  const chain = [];
+  let l = state.ged;
+  for (const id of state.gedPath) { const n = l.find(x => x.id === id); chain.push(n); l = n.children; }
+  return { list, chain };
+}
+function gedFindAll(q, list = state.ged, path = []) {
+  let out = [];
+  for (const n of list) {
+    if (n.nom.toLowerCase().includes(q)) out.push({ n, path });
+    if (n.type === 'dir') out = out.concat(gedFindAll(q, n.children, [...path, n]));
+  }
+  return out;
+}
+
+/* ---- Vue GED ---- */
+function viewGed() {
+  if (window.viewGedTiles && ['adherent', 'educateur'].includes(state.currentUser.roleId)) return viewGedTiles();
+  const q = state.filtres.ged.q.trim().toLowerCase();
+  const { list, chain } = gedCwd();
+  const seeN = window.canSeeNode ? canSeeNode : (() => true);
+  let rows, searchMode = false;
+  if (q) { rows = gedFindAll(q).filter(x => seeN(x.n)); searchMode = true; }
+  else rows = [...list].filter(seeN).sort((a, b) => (a.type === b.type ? a.nom.localeCompare(b.nom, 'fr') : a.type === 'dir' ? -1 : 1)).map(n => ({ n, path: chain }));
+  const ico = n => n.type === 'dir' ? '📁' : (GED_ICO[n.ext] || '📎');
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Documents</h1>
+      <div class="crumb">
+        <button data-crumb="-1">Documents</button>
+        ${chain.map((c, i) => `<span class="sep">›</span>${i === chain.length - 1 && !searchMode ? `<span class="here">${esc(c.nom)}</span>` : `<button data-crumb="${i}">${esc(c.nom)}</button>`}`).join('')}
+        ${searchMode ? `<span class="sep">›</span><span class="here">Résultats de recherche</span>` : ''}
+      </div>
+    </div>
+    <div class="head-actions">
+      <button class="btn" id="gedNewDir">+ Nouveau dossier</button>
+      <button class="btn btn-primary" id="gedImport">↑ Importer un fichier</button>
+    </div>
+  </div>
+  <div class="toolbar">
+    <input type="search" id="gedQ" placeholder="Rechercher dans tous les documents…" value="${esc(state.filtres.ged.q)}" aria-label="Recherche documents">
+    <span class="count-note">${rows.length} élément(s)</span>
+  </div>
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Nom</th><th>Partagé avec</th><th class="num">Taille</th><th>Modifié</th><th>Par</th></tr></thead>
+      <tbody>${rows.length ? rows.map(({ n, path }) => `<tr class="rowlink" data-ged="${n.id}" tabindex="0">
+        <td><span class="ged-ico" aria-hidden="true">${ico(n)}</span> <strong>${esc(n.nom)}</strong>
+          ${searchMode && path.length ? `<br><span style="color:var(--ink-3);font-size:12px;margin-left:24px">dans ${path.map(p => esc(p.nom)).join(' › ')}</span>` : ''}
+          ${n.type === 'file' && n.versions.length > 1 ? ` <span class="badge" style="margin-left:4px">v${n.versions.length}</span>` : ''}</td>
+        <td>${(n.partage || []).map(p => `<span class="chip">${esc(p)}</span>`).join('')}</td>
+        <td class="num" style="color:var(--ink-2)">${n.type === 'file' ? n.taille : n.children.filter(seeN).length + ' élém.'}</td>
+        <td style="white-space:nowrap;color:var(--ink-2)">${n.type === 'file' ? dfrShort(n.modif) : '—'}</td>
+        <td style="color:var(--ink-2)">${n.type === 'file' ? esc(n.par) : '—'}</td>
+      </tr>`).join('') : `<tr><td colspan="5" class="empty">${searchMode ? 'Aucun document accessible ne correspond à la recherche.' : 'Dossier vide.'}</td></tr>`}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Dans la version réelle : glisser-déposer, aperçu des PDF/images dans le navigateur, partage par rôle appliqué aux droits réels, corbeille, et lien direct depuis les autres modules (PV attachés aux réunions, contrats aux sponsors…).</p>`;
+}
+
+function gedOpenFile(f, path) {
+  openModal(f.nom, `
+    <div class="form-grid" style="margin-bottom:14px">
+      <div><label>Emplacement</label>Documents${path.length ? ' › ' + path.map(p => esc(p.nom)).join(' › ') : ''}</div>
+      <div><label>Taille</label>${f.taille}</div>
+      <div><label>Dernière modification</label>${dfr(f.modif)} — ${esc(f.par)}</div>
+      <div><label>Partagé avec</label>${f.partage.map(p => `<span class="chip">${esc(p)}</span>`).join('')}</div>
+    </div>
+    <div style="background:var(--surface-2);border:1px dashed var(--line-strong);border-radius:10px;padding:28px;text-align:center;color:var(--ink-3);margin-bottom:14px">
+      Aperçu du document (simulé dans la maquette)
+    </div>
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Versions</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Version</th><th>Date</th><th>Par</th></tr></thead>
+      <tbody>${[...f.versions].reverse().map(v => `<tr><td>v${v.n}${v.n === f.versions.length ? ' <span class="badge b-good" style="margin-left:4px">actuelle</span>' : ''}</td><td>${dfrShort(v.date)}</td><td>${esc(v.par)}</td></tr>`).join('')}</tbody>
+    </table></div>`, `
+    <button class="btn" id="gedShare">Partager</button>
+    <button class="btn" id="gedDl">Télécharger (simulé)</button>
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  $('#gedDl').onclick = () => toast('Téléchargement simulé dans la maquette.');
+  $('#gedShare').onclick = () => toast('Dans la version réelle : choix des rôles ou personnes, lien interne.');
+}
+
+/* ---- Vue Paramètres ---- */
+subTabs.param = 'identite';
+function viewParams() {
+  const t = subTabs.param;
+  const tabs = [
+    { id:'identite', label:'Identité & couleurs' },
+    { id:'utilisateurs', label:'Utilisateurs' },
+    { id:'droits', label:'Droits & rôles' },
+    { id:'fonctionnement', label:'Alertes & fonctionnement' },
+    { id:'modeles', label:'Modèles' },
+  ];
+  let body = '';
+  if (t === 'identite') body = paramIdentite();
+  else if (t === 'utilisateurs') body = window.paramUtilisateurs ? paramUtilisateurs() : '';
+  else if (t === 'droits') body = paramDroits();
+  else if (t === 'fonctionnement') body = paramFonctionnement();
+  else body = paramModeles();
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Paramètres</h1>
+    <p class="page-sub">Configuration du club — nouveauté V2 de la maquette</p></div>
+  </div>
+  <div class="tabs" role="tablist">${tabs.map(x => `<button role="tab" aria-selected="${t === x.id}" class="${t === x.id ? 'active' : ''}" data-ptab="${x.id}">${x.label}</button>`).join('')}</div>
+  <div class="tab-body">${body}</div>`;
+}
+
+function paramIdentite() {
+  const p = state.params;
+  return `
+  <div class="grid two-col">
+    <div class="card">
+      <h3>Identité du club</h3>
+      <div class="form-grid">
+        <div class="field"><label for="pClubNom">Nom du club</label><input id="pClubNom" value="${esc(p.clubNom)}"></div>
+        <div class="field"><label for="pClubSport">Discipline</label><input id="pClubSport" value="${esc(p.clubSport)}"></div>
+        <div class="field"><label for="pLogo">Logo (image)</label><input id="pLogo" type="file" accept="image/*"></div>
+        <div class="field"><label>Logo actuel</label>${p.logo ? '<span class="badge b-good"><span class="dot"></span>Logo importé</span> <button class="btn btn-sm" id="pLogoDel">Retirer</button>' : '<span class="badge">Badge par défaut</span>'}</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Couleur du club — option A</h3>
+      <div class="form-grid">
+        <div class="field"><label for="pCouleur">Couleur principale</label><input id="pCouleur" type="color" value="${p.couleur}" style="width:72px;height:38px;padding:2px"></div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-sm" id="pCouleurReset">Revenir à la couleur produit</button></div>
+      </div>
+      <div class="color-preview">
+        <button class="btn btn-primary swatch-btn">Bouton principal</button>
+        <span class="badge b-info"><span class="dot"></span>Badge accent</span>
+      </div>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:12px 0 0">La couleur s'applique aux boutons, aux onglets et au menu actif — partout dans l'application, immédiatement. Les statuts (vert/orange/rouge), les graphiques et la structure de l'interface restent aux couleurs du produit. Si la couleur choisie est trop claire pour rester lisible, elle est assombrie automatiquement.</p>
+    </div>
+  </div>`;
+}
+
+function paramDroits() {
+  const roles = state.params.roles;
+  return `
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap roles-table"><table>
+      <thead><tr><th>Rôle</th>${MODS_DROITS.map(m => `<th>${m.label}</th>`).join('')}</tr></thead>
+      <tbody>${ROLES.map(r => `<tr>
+        <td><strong>${r.label}</strong></td>
+        ${MODS_DROITS.map(m => `<td><select data-droit="${r.id}:${m.id}" aria-label="${r.label} — ${m.label}">
+          ${NIVEAUX.map(([v, l]) => `<option value="${v}" ${roles[r.id][m.id] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>`).join('')}
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Matrice illustrative : dans la maquette, les droits sont enregistrés mais pas appliqués (il n'y a pas encore de comptes utilisateurs). Dans la version réelle, chaque personne invitée reçoit un rôle et ne voit que ce que sa ligne autorise — le rôle « Adhérent / parent » ne verrait par exemple que les documents partagés avec « Tous les membres ».</p>`;
+}
+
+function paramFonctionnement() {
+  const p = state.params;
+  const MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  return `
+  <div class="grid two-col">
+    <div class="card">
+      <h3>Alertes</h3>
+      <div class="form-grid">
+        <div class="field"><label for="pCert">Alerte certificat médical (jours avant expiration)</label><input id="pCert" type="number" min="7" max="365" value="${p.certJours}"></div>
+        <div class="field"><label for="pPeremp">Alerte péremption stock (jours)</label><input id="pPeremp" type="number" min="7" max="365" value="${p.peremptionJours}"></div>
+        <div class="field"><label for="pRelance">Relance de paiement après (jours)</label><input id="pRelance" type="number" min="3" max="90" value="${p.relanceJours}"></div>
+      </div>
+      <h3 style="margin-top:18px">Instances</h3>
+      <div class="form-grid">
+        <div class="field"><label for="pQuorumAG">Quorum AG (%)</label><input id="pQuorumAG" type="number" min="0" max="100" value="${p.quorumAG}"></div>
+        <div class="field"><label for="pQuorumCodir">Quorum codir (%)</label><input id="pQuorumCodir" type="number" min="0" max="100" value="${p.quorumCodir}"></div>
+        <div class="field"><label for="pExercice">Début d'exercice comptable</label><select id="pExercice">
+          ${MOIS.map((m, i) => `<option value="${i + 1}" ${p.exerciceDebut === i + 1 ? 'selected' : ''}>1er ${m}</option>`).join('')}</select></div>
+      </div>
+      <div style="margin-top:16px"><button class="btn btn-primary" id="pSaveFonct">Enregistrer</button></div>
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Les seuils d'alerte s'appliquent immédiatement au tableau de bord, aux licenciés et au stock. Les quorums s'appliquent aux prochaines réunions créées.</p>
+    </div>
+    <div class="card">
+      <h3>Catégories & tarifs de cotisation</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Catégorie</th><th class="num">Tarif (€)</th></tr></thead>
+        <tbody>${CATEGORIES.map(c => `<tr><td>${esc(c.label)}</td>
+          <td class="num"><input class="tarif-input" type="number" min="0" data-tarif="${c.code}" value="${c.cot}"></td></tr>`).join('')}</tbody>
+      </table></div>
+      <div style="margin-top:12px"><button class="btn btn-primary" id="pSaveTarifs">Enregistrer les tarifs</button></div>
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Appliqués aux nouvelles inscriptions ; les cotisations déjà émises ne sont pas recalculées.</p>
+    </div>
+  </div>`;
+}
+
+function paramModeles() {
+  const modeles = [
+    { nom: 'Convocation (codir & AG)', desc: 'Utilisé par l\'envoi de convocations du module Codir & AG.' },
+    { nom: 'Compte-rendu de réunion', desc: 'Trame du CR auto-généré : en-tête, présents, ordre du jour, résolutions.' },
+    { nom: 'Reçu de cotisation', desc: 'Envoyé automatiquement après chaque paiement en ligne.' },
+    { nom: 'Relance de paiement', desc: 'Email de relance, avec le lien de paiement et le montant restant dû.' },
+  ];
+  return `
+  <div class="grid" style="grid-template-columns:1fr;max-width:720px">
+    ${modeles.map(m => `<div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px"><strong>${m.nom}</strong><br><span style="font-size:12.5px;color:var(--ink-2)">${m.desc}</span></div>
+      <button class="btn btn-sm" data-modele="${esc(m.nom)}">Modifier (simulé)</button>
+    </div>`).join('')}
+  </div>`;
+}
+
+/* ---- Liaisons V2 ---- */
+function bindExtra(v) {
+  // GED
+  const gedQ = $('#gedQ');
+  if (gedQ) {
+    gedQ.oninput = () => { state.filtres.ged.q = gedQ.value; render(); const el = $('#gedQ'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); };
+    $$('[data-crumb]', v).forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.crumb);
+      state.gedPath = i < 0 ? [] : state.gedPath.slice(0, i + 1);
+      state.filtres.ged.q = ''; render();
+    });
+    $$('[data-ged]', v).forEach(tr => {
+      const open = () => {
+        const id = Number(tr.dataset.ged);
+        const hit = gedFindAll('').find(x => x.n.id === id);
+        if (!hit) return;
+        if (hit.n.type === 'dir') { state.gedPath = [...hit.path.map(p => p.id), hit.n.id]; state.filtres.ged.q = ''; render(); }
+        else gedOpenFile(hit.n, hit.path);
+      };
+      tr.onclick = open;
+      tr.onkeydown = e => { if (e.key === 'Enter') open(); };
+    });
+    $('#gedNewDir').onclick = () => {
+      openModal('Nouveau dossier', `<div class="field"><label for="gdNom">Nom du dossier</label><input id="gdNom" placeholder="ex. Événements 2026"></div>`,
+        `<button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="gdOk">Créer</button>`);
+      $('#gdOk').onclick = () => {
+        const nom = $('#gdNom').value.trim();
+        if (!nom) { toast('Donne un nom au dossier.'); return; }
+        gedCwd().list.push({ id: Date.now(), type:'dir', nom, partage:['Bureau'], children: [] });
+        toast(`Dossier « ${nom} » créé.`); closeModal(); render();
+      };
+    };
+    $('#gedImport').onclick = () => {
+      openModal('Importer un fichier', `
+        <div class="form-grid">
+          <div class="field"><label for="giNom">Nom du fichier</label><input id="giNom" value="Nouveau document.pdf"></div>
+          <div class="field"><label for="giPartage">Partagé avec</label><select id="giPartage"><option>Bureau</option><option>Codir</option><option>Éducateurs</option><option>Tous les membres</option></select></div>
+        </div>
+        <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">Dans la version réelle : vrai téléversement avec glisser-déposer. Ici le fichier est créé fictivement.</p>`,
+        `<button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="giOk">Importer</button>`);
+      $('#giOk').onclick = () => {
+        const nom = $('#giNom').value.trim() || 'Document.pdf';
+        const ext = nom.includes('.') ? nom.slice(nom.lastIndexOf('.') + 1).toLowerCase() : 'pdf';
+        gedCwd().list.push({ id: Date.now(), type:'file', nom, ext, taille: ri(60, 900) + ' Ko', modif: TODAY, par: 'J.-M. Fabre', partage: [$('#giPartage').value], versions: [{ n:1, date: TODAY, par: 'J.-M. Fabre' }] });
+        toast(`« ${nom} » importé (simulé).`); closeModal(); render();
+      };
+    };
+  }
+
+  // Paramètres
+  $$('[data-ptab]', v).forEach(b => b.onclick = () => { subTabs.param = b.dataset.ptab; render(); });
+  const pNom = $('#pClubNom');
+  if (pNom) {
+    pNom.onchange = () => { state.params.clubNom = pNom.value.trim() || 'Mon club'; renderBrand(); toast('Nom du club mis à jour.'); };
+    $('#pClubSport').onchange = e => { state.params.clubSport = e.target.value.trim() || '—'; renderBrand(); };
+    $('#pCouleur').oninput = e => { state.params.couleur = e.target.value; applyClubTheme(); };
+    $('#pCouleurReset').onclick = () => { state.params.couleur = '#1e5c42'; applyClubTheme(); render(); toast('Couleur produit restaurée.'); };
+    $('#pLogo').onchange = e => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => { state.params.logo = rd.result; renderBrand(); render(); toast('Logo importé.'); };
+      rd.readAsDataURL(f);
+    };
+    const del = $('#pLogoDel');
+    if (del) del.onclick = () => { state.params.logo = null; renderBrand(); render(); };
+  }
+  $$('[data-droit]', v).forEach(s => s.onchange = () => {
+    const [r, m] = s.dataset.droit.split(':');
+    state.params.roles[r][m] = s.value;
+    toast('Droit mis à jour (illustratif dans la maquette).');
+  });
+  const saveF = $('#pSaveFonct');
+  if (saveF) saveF.onclick = () => {
+    const p = state.params;
+    p.certJours = Math.max(7, Number($('#pCert').value) || 60);
+    p.peremptionJours = Math.max(7, Number($('#pPeremp').value) || 60);
+    p.relanceJours = Math.max(3, Number($('#pRelance').value) || 15);
+    p.quorumAG = Math.min(100, Math.max(0, Number($('#pQuorumAG').value) || 25));
+    p.quorumCodir = Math.min(100, Math.max(0, Number($('#pQuorumCodir').value) || 50));
+    p.exerciceDebut = Number($('#pExercice').value) || 7;
+    toast('Paramètres enregistrés — alertes recalculées.');
+    render();
+  };
+  const saveT = $('#pSaveTarifs');
+  if (saveT) saveT.onclick = () => {
+    $$('[data-tarif]', v).forEach(inp => {
+      const c = CATEGORIES.find(x => x.code === inp.dataset.tarif);
+      if (c) c.cot = Math.max(0, Number(inp.value) || 0);
+    });
+    toast('Tarifs enregistrés — appliqués aux nouvelles inscriptions.');
+  };
+  $$('[data-modele]', v).forEach(b => b.onclick = () => toast(`Éditeur du modèle « ${b.dataset.modele} » (simulé).`));
+}
+
+render();
+</script>
+<style>
+/* ---------- V3 : utilisateur connecté ---------- */
+.user-card {
+  margin: 0 2px 12px; padding: 10px; border-radius: 10px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+  color: var(--side-ink);
+}
+.user-line { display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 8px; }
+.user-line:hover .user-nom { color: var(--side-ink-strong); }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex: none;
+  background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; font-weight: 700; font-size: 13px; letter-spacing: .5px;
+}
+.user-nom { font-weight: 600; font-size: 13.5px; color: var(--side-ink-strong); line-height: 1.15; }
+.user-role { font-size: 11.5px; color: var(--side-ink); }
+.user-card select {
+  width: 100%; margin-top: 8px; font-size: 12px; padding: 5px 6px;
+  background: rgba(255,255,255,.08); color: var(--side-ink-strong);
+  border: 1px solid rgba(255,255,255,.15); border-radius: 7px;
+}
+.user-card select option { color: #14241c; background: #fff; }
+.user-card .demo-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--side-ink); margin-top: 8px; display: block; }
+/* Lecture seule : les actions d'écriture disparaissent */
+body.mod-ro #view .btn-primary,
+body.mod-ro #view [data-mv], body.mod-ro #view [data-rappro], body.mod-ro #view [data-relance],
+body.mod-ro #view [data-simulpay], body.mod-ro #view [data-vopen], body.mod-ro #view [data-vclose],
+body.mod-ro #view [data-delodj], body.mod-ro #view #btnRelanceAll, body.mod-ro #view #btnNewLic,
+body.mod-ro #view #btnNewArt, body.mod-ro #view #btnNewReu, body.mod-ro #view #btnNewEcriture,
+body.mod-ro #view #gedNewDir, body.mod-ro #view #gedImport, body.mod-ro #view #odjAdd, body.mod-ro #view #vAdd,
+body.mod-ro #view #btnConvoc, body.mod-ro #view #btnDocAdd { display: none !important; }
+.ro-note { font-size: 12px; color: var(--ink-3); }
+</style>
+<script>
+/* ================= V3 : UTILISATEUR CONNECTÉ, RÔLES & VUES ================= */
+
+const CLUB_SECOND = { nom: 'US Ovale', sport: 'Rugby à 5', couleur: '#1d4e89' };
+const CLUB_PRINCIPAL = { nom: state.params.clubNom, sport: state.params.clubSport, couleur: state.params.couleur };
+
+const _licSenior = state.licencies.find(l => l.cat === 'SEN');
+const _licEnfant = state.licencies.find(l => l.cat === 'M10');
+
+const PERSONAS = [
+  { id:'president', nom:'Jean-Marc Fabre', roleId:'president', roleLabel:'Président',
+    clubs:[{ club:'principal', role:'Président' }] },
+  { id:'tresoriere', nom:'Christine Delmas', roleId:'tresorier', roleLabel:'Trésorière',
+    clubs:[{ club:'principal', role:'Trésorière' }] },
+  { id:'educateur', nom:'Julien Vasseur', roleId:'educateur', roleLabel:'Éducateur M10',
+    clubs:[{ club:'principal', role:'Éducateur' }] },
+  { id:'joueur', nom:_licSenior ? _licSenior.prenom + ' ' + _licSenior.nom : 'Joueur Senior', roleId:'adherent', roleLabel:'Joueur — Seniors', licId:_licSenior ? _licSenior.id : null,
+    clubs:[{ club:'principal', role:'Joueur' }, { club:'second', role:'Joueur loisir' }] },
+  { id:'parent', nom:'Nathalie ' + (_licEnfant ? _licEnfant.nom : 'Martin'), roleId:'adherent', roleLabel:'Parent (M10)', enfantId:_licEnfant ? _licEnfant.id : null,
+    clubs:[{ club:'principal', role:'Parent' }] },
+];
+state.currentUser = PERSONAS[0];
+state.currentClub = 'principal';
+
+function canW(mod) {
+  const lv = state.params.roles[state.currentUser.roleId] && state.params.roles[state.currentUser.roleId][mod];
+  if (!lv) return true; // modules hors matrice (tableau de bord, mon espace)
+  return lv === 'ecriture' || lv === 'admin';
+}
+function canSee(mod) {
+  const lv = state.params.roles[state.currentUser.roleId] && state.params.roles[state.currentUser.roleId][mod];
+  return lv && lv !== 'aucun';
+}
+function visibleModules() {
+  const u = state.currentUser;
+  const out = [];
+  if (u.roleId === 'adherent') out.push({ id:'mon-espace', label:'Mon espace', ico:'🏉' });
+  if (['president','tresorier','secretaire','codir'].includes(u.roleId)) out.push(MODULES.find(m => m.id === 'dashboard'));
+  for (const m of MODULES) {
+    if (m.id === 'dashboard') continue;
+    if (canSee(m.id)) out.push(m);
+  }
+  return out;
+}
+
+function clubActif() { return state.currentClub === 'second' ? CLUB_SECOND : CLUB_PRINCIPAL; }
+function memoPrincipal() {
+  if (state.currentClub === 'principal') Object.assign(CLUB_PRINCIPAL, { nom: state.params.clubNom, sport: state.params.clubSport, couleur: state.params.couleur });
+}
+function setClub(c) {
+  memoPrincipal();
+  state.currentClub = c;
+  const club = clubActif();
+  state.params.clubNom = club.nom; state.params.clubSport = club.sport; state.params.couleur = club.couleur;
+  render();
+  if (c === 'second') toast('Club changé — démo : les données affichées restent celles du club principal.');
+}
+function setPersona(id) {
+  memoPrincipal();
+  state.currentUser = PERSONAS.find(p => p.id === id) || PERSONAS[0];
+  if (!state.currentUser.clubs.some(c => c.club === state.currentClub)) state.currentClub = 'principal';
+  const club = clubActif();
+  state.params.clubNom = club.nom; state.params.clubSport = club.sport; state.params.couleur = club.couleur;
+  state.view = state.currentUser.roleId === 'adherent' ? 'mon-espace' : 'dashboard';
+  subTabs.codirOpen = null;
+  render();
+}
+
+const initiales = nom => nom.split(/[\s-]+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
+const CLUB_LABEL = c => c === 'second' ? CLUB_SECOND.nom : CLUB_PRINCIPAL.nom;
+
+function renderUser() {
+  const u = state.currentUser;
+  const box = $('#userBox');
+  if (!box) return;
+  box.innerHTML = `<div class="user-card">
+    <div class="user-line" id="userOpen" role="button" tabindex="0" title="Voir mon profil">
+      <span class="avatar" aria-hidden="true">${initiales(u.nom)}</span>
+      <span><span class="user-nom">${esc(u.nom)}</span><br><span class="user-role">${esc(u.roleLabel)}</span></span>
+    </div>
+    ${u.clubs.length > 1 ? `<select id="userClub" aria-label="Changer de club">
+      ${u.clubs.map(c => `<option value="${c.club}" ${state.currentClub === c.club ? 'selected' : ''}>${esc(CLUB_LABEL(c.club))} — ${esc(c.role)}</option>`).join('')}
+    </select>` : ''}
+  </div>`;
+  const demo = $('#demoBox');
+  if (demo) demo.innerHTML = `<div class="user-card" style="margin-bottom:8px">
+    <span class="demo-tag" style="margin-top:0">Démo — voir comme :</span>
+    <select id="userPersona" aria-label="Changer d'utilisateur (démo)">
+      ${PERSONAS.map(p => `<option value="${p.id}" ${u.id === p.id ? 'selected' : ''}>${esc(p.nom)} (${esc(p.roleLabel)})</option>`).join('')}
+    </select>
+  </div>`;
+  const open = () => openProfil();
+  $('#userOpen').onclick = open;
+  $('#userOpen').onkeydown = e => { if (e.key === 'Enter') open(); };
+  $('#userPersona').onchange = e => setPersona(e.target.value);
+  const uc = $('#userClub');
+  if (uc) uc.onchange = e => setClub(e.target.value);
+}
+
+function openProfil() {
+  const u = state.currentUser;
+  const lic = u.licId ? state.licencies.find(l => l.id === u.licId) : null;
+  const enfant = u.enfantId ? state.licencies.find(l => l.id === u.enfantId) : null;
+  const email = u.nom.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, '').trim().replace(/ +/g, '.') + '@exemple.fr';
+  openModal('Mon profil', `
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
+      <span class="avatar" style="width:52px;height:52px;font-size:18px">${initiales(u.nom)}</span>
+      <div><strong style="font-size:16px">${esc(u.nom)}</strong><br><span style="color:var(--ink-2)">${esc(email)}</span></div>
+    </div>
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Mes clubs & rôles</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Club</th><th>Rôle</th><th>Statut</th></tr></thead>
+      <tbody>${u.clubs.map(c => `<tr>
+        <td><strong>${esc(CLUB_LABEL(c.club))}</strong></td><td>${esc(c.role)}</td>
+        <td><span class="badge b-good"><span class="dot"></span>Actif</span></td></tr>`).join('')}
+      </tbody></table></div>
+    <p style="margin:8px 0 16px"><button class="btn btn-sm" id="profJoin">Demander à rejoindre un autre club (simulé)</button></p>
+    ${lic ? `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Ma licence</h3>
+      <p style="margin:0 0 16px">N° ${lic.licence} — ${esc(catLabel(lic.cat))} · ${licBadge(lic.licStatut)} · ${certBadge(lic)}</p>` : ''}
+    ${enfant ? `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Licencié rattaché</h3>
+      <p style="margin:0 0 16px">${esc(enfant.prenom + ' ' + enfant.nom)} — ${esc(catLabel(enfant.cat))} · ${licBadge(enfant.licStatut)}</p>` : ''}
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Notifications</h3>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" checked> Convocations et réunions</label>
+      <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" checked> Rappels de paiement</label>
+      <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox"> Actualités du club</label>
+    </div>`, `
+    <button class="btn" id="profMdp">Changer de mot de passe (simulé)</button>
+    <button class="btn" id="profOut">Se déconnecter (simulé)</button>
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  $('#profJoin').onclick = () => toast('Dans la version réelle : recherche du club et demande envoyée à son bureau pour validation.');
+  $('#profMdp').onclick = () => toast('Changement de mot de passe simulé.');
+  $('#profOut').onclick = () => { toast('Déconnexion simulée — la maquette reste connectée.'); closeModal(); };
+}
+
+/* ---- Mon espace (joueur / parent) ---- */
+function viewMonEspace() {
+  const u = state.currentUser;
+  const lic = u.licId ? state.licencies.find(l => l.id === u.licId) : (u.enfantId ? state.licencies.find(l => l.id === u.enfantId) : null);
+  const estParent = !!u.enfantId;
+  const pays = lic ? state.paiements.filter(p => p.licId === lic.id && p.statut !== 'paye') : [];
+  const docsPublics = gedFindAll('').filter(x => x.n.type === 'file' && x.n.partage.includes('Tous les membres'));
+  const prochaine = state.reunions.filter(r => r.statut !== 'terminee' && r.type === 'AG')[0];
+  const reste = lic ? lic.cot - lic.cotPaye : 0;
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Mon espace</h1>
+    <p class="page-sub">${esc(state.params.clubNom)} — saison 2026-2027${state.currentClub === 'second' ? ' · <em>démo : données identiques au club principal</em>' : ''}</p></div>
+  </div>
+  <div class="grid kpis">
+    <div class="card"><h3>${estParent ? 'Licence de ' + esc(lic ? lic.prenom : '') : 'Ma licence'}</h3>
+      ${lic ? `<div style="margin-bottom:6px"><strong>${esc(lic.prenom + ' ' + lic.nom)}</strong> — ${esc(catLabel(lic.cat))}</div>
+      <div>N° ${lic.licence}</div><div style="margin-top:6px">${licBadge(lic.licStatut)}</div>` : '<p class="empty">Aucune licence rattachée.</p>'}</div>
+    <div class="card"><h3>Certificat médical</h3>
+      ${lic ? `<div style="margin-top:2px">${certBadge(lic)}</div>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:8px 0 0">${daysUntil(lic.certFin) <= state.params.certJours ? 'Pense à transmettre un nouveau certificat au club.' : 'Rien à faire pour le moment.'}</p>` : ''}</div>
+    <div class="card"><h3>${estParent ? 'Cotisation' : 'Ma cotisation'}</h3>
+      ${lic ? `<div class="kpi-value" style="font-size:24px">${eur(lic.cotPaye)} / ${eur(lic.cot)}</div>
+      <div style="margin-top:6px">${cotBadge(lic.cotStatut)}</div>
+      ${reste > 0 ? `<div style="margin-top:10px"><button class="btn btn-primary btn-sm" id="mePayer">Payer ${eur(reste)} en ligne (simulé)</button></div>` : ''}` : ''}</div>
+    ${window.meProchainsEvts ? meProchainsEvts(lic) : `<div class="card"><h3>Prochain rendez-vous</h3>
+      ${prochaine ? `<strong>${esc(prochaine.titre)}</strong><br><span style="color:var(--ink-2)">${dfr(prochaine.date)} · ${esc(prochaine.lieu)}</span>` : '<span style="color:var(--ink-2)">Rien de planifié pour les adhérents.</span>'}</div>`}
+  </div>
+  <div class="grid two-col">
+    <div class="card">
+      <h3>Documents du club partagés avec moi</h3>
+      ${docsPublics.length ? `<div class="table-wrap"><table>
+        <thead><tr><th>Document</th><th>Modifié</th></tr></thead>
+        <tbody>${docsPublics.map(({ n }) => `<tr class="rowlink" data-medoc="${n.id}" tabindex="0">
+          <td><span class="ged-ico">${GED_ICO[n.ext] || '📎'}</span> ${esc(n.nom)}</td>
+          <td style="white-space:nowrap;color:var(--ink-2)">${dfrShort(n.modif)}</td></tr>`).join('')}</tbody>
+      </table></div>` : '<p class="empty">Aucun document partagé.</p>'}
+    </div>
+    <div class="card">
+      <h3>Contacter le club</h3>
+      ${state.bureau.slice(0, 3).map(m => `<div class="alert-line"><strong>${esc(m.nom)}</strong><span class="when">${esc(m.role)}</span></div>`).join('')}
+      <p style="font-size:12.5px;color:var(--ink-2);margin:10px 0 0">Dans la version réelle : messagerie interne ou emails directs, demandes d'attestation, mise à jour de mes coordonnées soumise à validation.</p>
+    </div>
+  </div>`;
+}
+
+/* ---- Liaisons V3 ---- */
+const _bindExtraV2 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV2(v);
+  const payer = $('#mePayer');
+  if (payer) payer.onclick = () => {
+    const u = state.currentUser;
+    const licId = u.licId || u.enfantId;
+    const lic = state.licencies.find(l => l.id === licId);
+    if (!lic) return;
+    let p = state.paiements.find(x => x.licId === licId && x.statut !== 'paye');
+    if (!p) {
+      p = { id: Date.now(), licId, objet: (lic.cotPaye ? 'Solde cotisation' : 'Cotisation') + ' 2026-2027', montant: lic.cot - lic.cotPaye, statut: 'envoyee', creee: TODAY, payee: null, relances: 0 };
+      state.paiements.unshift(p);
+    }
+    simulerPaiement(p.id);
+    render();
+  };
+  $$('[data-medoc]', v).forEach(tr => {
+    const open = () => {
+      const hit = gedFindAll('').find(x => x.n.id === Number(tr.dataset.medoc));
+      if (hit) gedOpenFile(hit.n, hit.path);
+    };
+    tr.onclick = open;
+    tr.onkeydown = e => { if (e.key === 'Enter') open(); };
+  });
+};
+
+render();
+</script>
+<script>
+/* ================= V3.1 : VISIBILITÉ DES DOCUMENTS PAR RÔLE ================= */
+/* Audiences que chaque rôle peut voir dans la GED (null = tout voir). */
+const GED_AUDIENCES = {
+  president: null,
+  tresorier: null,
+  secretaire: null,
+  codir: ['Codir', 'Tous les membres'],
+  educateur: ['Éducateurs', 'Tous les membres'],
+  adherent: ['Tous les membres'],
+};
+function canSeeNode(n) {
+  const allowed = GED_AUDIENCES[state.currentUser.roleId];
+  if (allowed === null || allowed === undefined) return allowed === null; // null = accès total ; rôle inconnu = rien
+  if (n.type === 'file') return (n.partage || []).some(p => allowed.includes(p));
+  // Un dossier est visible si son partage l'autorise OU s'il contient au moins un élément visible
+  return (n.partage || []).some(p => allowed.includes(p)) || (n.children || []).some(canSeeNode);
+}
+render();
+</script>
+<style>
+#demoBox { margin-top: auto; }
+.sidebar .side-note { margin-top: 0; }
+@media (max-width: 760px) { #demoBox { margin-top: 0; margin-left: auto; min-width: 200px; } }
+</style>
+<script>
+/* ================= V3.2 : PAGE PROFIL DÉDIÉE (remplace la modale) ================= */
+
+openProfil = function () {
+  if (state.view !== 'profil') state.prevView = state.view;
+  state.view = 'profil';
+  render();
+};
+
+function viewProfil() {
+  const u = state.currentUser;
+  const lic = u.licId ? state.licencies.find(l => l.id === u.licId) : null;
+  const enfant = u.enfantId ? state.licencies.find(l => l.id === u.enfantId) : null;
+  const licAff = lic || enfant;
+  const email = u.nom.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, '').trim().replace(/ +/g, '.') + '@exemple.fr';
+  const pays = licAff ? state.paiements.filter(p => p.licId === licAff.id) : [];
+  return `
+  <div class="page-head">
+    <div>
+      <p class="page-sub" style="margin:0 0 4px"><button class="btn btn-sm" id="profBack">← Retour</button></p>
+      <h1 class="page-title">Mon profil</h1>
+      <p class="page-sub">Compte personnel — indépendant du club affiché</p>
+    </div>
+  </div>
+  <div class="grid two-col">
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Identité</h3>
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
+          <span class="avatar" style="width:56px;height:56px;font-size:19px">${initiales(u.nom)}</span>
+          <div><strong style="font-size:16px">${esc(u.nom)}</strong><br><span style="color:var(--ink-2)">${esc(email)}</span></div>
+        </div>
+        <div class="form-grid">
+          <div><label>Téléphone</label>${u.tel || (u.tel = `06 ${ri(10,99)} ${ri(10,99)} ${ri(10,99)} ${ri(10,99)}`)}</div>
+          <div><label>Compte créé</label>septembre 2026</div>
+        </div>
+        <div style="margin-top:12px"><button class="btn btn-sm" id="profEdit">Modifier mes informations (simulé)</button></div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Mes clubs & rôles</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Club</th><th>Rôle</th><th>Statut</th></tr></thead>
+          <tbody>${u.clubs.map(c => `<tr>
+            <td><strong>${esc(CLUB_LABEL(c.club))}</strong></td><td>${esc(c.role)}</td>
+            <td><span class="badge b-good"><span class="dot"></span>Actif</span></td></tr>`).join('')}
+          </tbody></table></div>
+        <div style="margin-top:12px"><button class="btn btn-sm" id="profJoin">Demander à rejoindre un autre club (simulé)</button></div>
+      </div>
+      ${licAff ? `<div class="card">
+        <h3>${lic ? 'Ma licence' : 'Licencié rattaché'}</h3>
+        <p style="margin:0 0 8px"><strong>${esc(licAff.prenom + ' ' + licAff.nom)}</strong> — ${esc(catLabel(licAff.cat))} · N° ${licAff.licence}</p>
+        <p style="margin:0 0 12px">${licBadge(licAff.licStatut)} ${certBadge(licAff)} ${cotBadge(licAff.cotStatut)}</p>
+        ${pays.length ? `<h3 style="margin-top:14px">Historique de paiements</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Objet</th><th>Date</th><th>Statut</th><th class="num">Montant</th></tr></thead>
+          <tbody>${pays.map(p => `<tr><td>${esc(p.objet)}</td><td>${dfrShort(p.creee)}</td>
+            <td>${p.statut === 'paye' ? '<span class="badge b-good"><span class="dot"></span>Payé</span>' : '<span class="badge b-warn"><span class="dot"></span>En attente</span>'}</td>
+            <td class="num">${eur(p.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      </div>` : ''}
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Notifications</h3>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" class="prof-notif" checked> Convocations et réunions</label>
+          <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" class="prof-notif" checked> Rappels de paiement</label>
+          <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" class="prof-notif" checked> Alertes certificat médical</label>
+          <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" class="prof-notif"> Actualités du club</label>
+        </div>
+        <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Par email ; notifications push prévues avec l'application mobile.</p>
+      </div>
+      <div class="card">
+        <h3>Sécurité & session</h3>
+        <div class="alert-line"><span>💻 Cet appareil — navigateur web</span><span class="when">maintenant</span></div>
+        <div class="alert-line"><span>📱 Téléphone Android</span><span class="when">hier, 19:42</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-sm" id="profMdp">Changer de mot de passe (simulé)</button>
+          <button class="btn btn-sm" id="profOut">Se déconnecter (simulé)</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+const _bindExtraV31 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV31(v);
+  const back = $('#profBack');
+  if (back) {
+    back.onclick = () => { state.view = state.prevView || (state.currentUser.roleId === 'adherent' ? 'mon-espace' : 'dashboard'); render(); };
+    $('#profEdit').onclick = () => toast('Dans la version réelle : édition des coordonnées, soumise à validation du club pour les licenciés.');
+    $('#profJoin').onclick = () => toast('Dans la version réelle : recherche du club et demande envoyée à son bureau pour validation.');
+    $('#profMdp').onclick = () => toast('Changement de mot de passe simulé.');
+    $('#profOut').onclick = () => toast('Déconnexion simulée — la maquette reste connectée.');
+    $$('.prof-notif', v).forEach(c => c.onchange = () => toast('Préférence enregistrée (simulé).'));
+  }
+};
+
+render();
+</script>
+<style>
+/* ---------- V4 : module sportif (cartes, pensé mobile) ---------- */
+.evt-list { display: flex; flex-direction: column; gap: 10px; max-width: 780px; }
+.evt-card { display: flex; gap: 14px; align-items: flex-start; }
+.evt-date {
+  flex: none; width: 56px; text-align: center; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent); padding: 7px 4px 6px;
+}
+.evt-date .d { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 24px; line-height: 1; }
+.evt-date .m { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
+.evt-date .wd { font-size: 10px; color: var(--ink-3); }
+.evt-main { flex: 1; min-width: 0; }
+.evt-title { font-weight: 600; font-size: 14.5px; }
+.evt-meta { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+.evt-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+.evt-score {
+  flex: none; font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  font-weight: 700; font-size: 22px; align-self: center; font-variant-numeric: tabular-nums;
+}
+.rsvp-ok { border-color: var(--good) !important; color: var(--good-text) !important; }
+.rsvp-ko { border-color: var(--critical) !important; color: var(--critical-text) !important; }
+/* ---------- V4 : documents en cases ---------- */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 16px 10px 13px; text-align: center; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 7px; min-height: 108px;
+}
+.tile:hover { background: var(--surface-2); }
+.tile .t-ico { font-size: 30px; line-height: 1; }
+.tile .t-nom { font-size: 12.5px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.tile .t-meta { font-size: 11px; color: var(--ink-3); margin-top: auto; }
+.tile-section { margin: 18px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--ink-2); font-weight: 600; }
+</style>
+<script>
+/* ================= V4 : MODULE SPORTIF + DOCUMENTS EN CASES ================= */
+
+/* ---- Données : calendrier sportif ---- */
+const LIEUX = { dom: 'Stade municipal, Val d\'Adret', ext1: 'Stade de Montclar', ext2: 'Complexe de Rochebrune', gym: 'Gymnase intercommunal' };
+let _eid = 1;
+const EVT = (type, cat, date, heure, lieu, extra = {}) => ({ id: _eid++, type, cat, date, heure, lieu, convoques: [], reponses: {}, presence: {}, resultat: null, ...extra });
+state.events = [
+  // Passé (résultats)
+  EVT('match', 'SEN', '2026-09-06', '15:00', LIEUX.dom, { adversaire: 'RC Montclar', domicile: true, resultat: { nous: 24, eux: 13 } }),
+  EVT('match', 'SEN', '2026-09-13', '15:00', LIEUX.ext2, { adversaire: 'US Rochebrune', domicile: false, resultat: { nous: 19, eux: 22 } }),
+  EVT('match', 'M16', '2026-09-13', '10:30', LIEUX.dom, { adversaire: 'Entente Villeneuve', domicile: true, resultat: { nous: 31, eux: 10 } }),
+  // À venir
+  EVT('match', 'SEN', '2026-09-20', '15:00', LIEUX.dom, { adversaire: 'Stade Pontétois', domicile: true }),
+  EVT('match', 'M16', '2026-09-20', '10:30', LIEUX.ext1, { adversaire: 'RC Montclar', domicile: false }),
+  EVT('match', 'M19', '2026-09-27', '13:00', LIEUX.dom, { adversaire: 'US Rochebrune', domicile: true }),
+  EVT('match', 'SEN', '2026-09-27', '15:00', LIEUX.ext1, { adversaire: 'RC Montclar', domicile: false }),
+  EVT('tournoi', 'M10', '2026-10-04', '09:30', LIEUX.dom, { adversaire: 'Tournoi de rentrée EDR (M6→M12)' }),
+  EVT('match', 'SEN', '2026-10-11', '15:00', LIEUX.dom, { adversaire: 'Ovalie Serrane', domicile: true }),
+];
+// Entraînements récurrents sur 2 semaines
+(function genEntrainements() {
+  const creneaux = [
+    { cat:'M10', jours:[3], heure:'14:00', lieu: LIEUX.dom },       // mercredi
+    { cat:'M14', jours:[3], heure:'16:00', lieu: LIEUX.dom },
+    { cat:'M16', jours:[2,5], heure:'18:30', lieu: LIEUX.dom },     // mardi, vendredi
+    { cat:'M19', jours:[2,5], heure:'19:00', lieu: LIEUX.dom },
+    { cat:'SEN', jours:[2,4], heure:'19:30', lieu: LIEUX.dom },     // mardi, jeudi
+    { cat:'LOI', jours:[4], heure:'20:00', lieu: LIEUX.gym },
+  ];
+  for (let j = 0; j < 15; j++) {
+    const d = addDaysIso(TODAY, j);
+    const dow = new Date(d + 'T12:00:00').getDay();
+    for (const c of creneaux) if (c.jours.includes(dow)) state.events.push(EVT('entrainement', c.cat, d, c.heure, c.lieu));
+  }
+  state.events.sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+})();
+// Convocations pré-remplies pour les prochains matchs
+(function genConvocs() {
+  for (const e of state.events.filter(x => x.type === 'match' && !x.resultat && x.date <= addDaysIso(TODAY, 10))) {
+    const pool = state.licencies.filter(l => l.cat === e.cat).slice(0, e.cat === 'SEN' ? 22 : 18);
+    e.convoques = pool.map(l => l.id);
+    for (const l of pool) { const r = rnd(); e.reponses[l.id] = r < 0.62 ? 'present' : r < 0.75 ? 'absent' : '?'; }
+  }
+})();
+
+const EVT_TYPES = { match: ['Match', 'b-info'], entrainement: ['Entraînement', ''], tournoi: ['Tournoi', 'b-warn'] };
+const CATS_SPORT = ['M6','M8','M10','M12','M14','M16','M19','SEN','LOI'];
+subTabs.sportCat = ''; subTabs.sportOnglet = 'avenir';
+const evtDateBlock = e => { const d = new Date(e.date + 'T12:00:00'); return `<div class="evt-date"><div class="wd">${d.toLocaleDateString('fr-FR',{weekday:'short'})}</div><div class="d">${d.getDate()}</div><div class="m">${d.toLocaleDateString('fr-FR',{month:'short'})}</div></div>`; };
+const evtTitre = e => e.type === 'match' ? `${e.domicile ? state.params.clubNom + ' – ' + e.adversaire : e.adversaire + ' – ' + state.params.clubNom}` : e.type === 'tournoi' ? e.adversaire : 'Entraînement ' + catLabel(e.cat).replace(/ – .*/, '');
+function monLicSportif() { const u = state.currentUser; const id = u.licId || u.enfantId; return id ? state.licencies.find(l => l.id === id) : null; }
+
+function evtCard(e, opts = {}) {
+  const [tl, tb] = EVT_TYPES[e.type];
+  const lic = monLicSportif();
+  const concerne = lic && lic.cat === e.cat;
+  const rep = concerne ? (e.reponses[lic.id] || (e.type === 'entrainement' ? null : (e.convoques.includes(lic.id) ? '?' : null))) : null;
+  const nbP = Object.values(e.reponses).filter(r => r === 'present').length;
+  const nbA = Object.values(e.reponses).filter(r => r === 'absent').length;
+  const ecrit = !window.canW || canW('sportif');
+  const passe = e.date < TODAY;
+  return `<div class="card evt-card">
+    ${evtDateBlock(e)}
+    <div class="evt-main">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="badge ${tb}">${tl}</span>
+        <span class="badge">${esc(catLabel(e.cat).replace(/ – .*/, s => '').split(' – ')[0])}</span>
+        ${e.type === 'match' ? `<span class="badge">${e.domicile ? 'Domicile' : 'Extérieur'}</span>` : ''}
+      </div>
+      <div class="evt-title" style="margin-top:6px">${esc(evtTitre(e))}</div>
+      <div class="evt-meta">${e.heure} · ${esc(e.lieu)}${e.convoques.length ? ` · ${e.convoques.length} convoqué(s), ${nbP} présent(s)${nbA ? ', ' + nbA + ' absent(s)' : ''}` : ''}</div>
+      ${concerne && !passe && (e.type !== 'match' || e.convoques.includes(lic.id)) ? `
+      <div class="evt-actions">
+        <button class="btn btn-sm ${rep === 'present' ? 'rsvp-ok' : ''}" data-rsvp="present" data-evt="${e.id}">✓ Présent${rep === 'present' ? ' (confirmé)' : ''}</button>
+        <button class="btn btn-sm ${rep === 'absent' ? 'rsvp-ko' : ''}" data-rsvp="absent" data-evt="${e.id}">✕ Absent</button>
+      </div>` : ''}
+      ${ecrit && !opts.compact ? `<div class="evt-actions">
+        ${!passe && e.type === 'match' ? `<button class="btn btn-sm btn-primary" data-convoq="${e.id}">${e.convoques.length ? 'Modifier la convocation' : 'Convoquer'}</button>` : ''}
+        ${e.convoques.length || e.type === 'entrainement' ? `<button class="btn btn-sm" data-feuille="${e.id}">${e.type === 'entrainement' ? 'Feuille de présence' : 'Réponses'}</button>` : ''}
+        ${passe && e.type === 'match' && !e.resultat ? `<button class="btn btn-sm btn-primary" data-score="${e.id}">Saisir le résultat</button>` : ''}
+      </div>` : ''}
+    </div>
+    ${e.resultat ? `<div class="evt-score" style="color:${e.resultat.nous >= e.resultat.eux ? 'var(--good-text)' : 'var(--critical-text)'}">${e.resultat.nous}–${e.resultat.eux}</div>` : ''}
+  </div>`;
+}
+
+function viewSportif() {
+  const u = state.currentUser;
+  const lic = monLicSportif();
+  // Filtre par défaut : sa catégorie pour joueur/parent, M10 pour l'éducateur de démo
+  if (subTabs.sportCat === '' && u.roleId === 'adherent' && lic) subTabs.sportCat = lic.cat;
+  const cat = subTabs.sportCat;
+  const onglet = subTabs.sportOnglet;
+  let evts = state.events.filter(e => (!cat || e.cat === cat));
+  evts = onglet === 'avenir' ? evts.filter(e => e.date >= TODAY) : evts.filter(e => e.date < TODAY).reverse();
+  const ecrit = !window.canW || canW('sportif');
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Sportif</h1>
+    <p class="page-sub">Calendrier, convocations et présences${lic && u.roleId === 'adherent' ? ' — ' + esc(lic.prenom + ' ' + lic.nom) + ' (' + esc(catLabel(lic.cat)) + ')' : ''}</p></div>
+    ${ecrit ? `<div class="head-actions"><button class="btn btn-primary" id="btnNewEvt">+ Nouvel événement</button></div>` : ''}
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="${onglet === 'avenir'}" class="${onglet === 'avenir' ? 'active' : ''}" data-sptab="avenir">À venir</button>
+    <button role="tab" aria-selected="${onglet === 'passe'}" class="${onglet === 'passe' ? 'active' : ''}" data-sptab="passe">Résultats & passé</button>
+  </div>
+  <div class="toolbar">
+    <select id="spCat" aria-label="Filtrer par catégorie">
+      <option value="">Toutes les catégories</option>
+      ${CATS_SPORT.map(c => `<option value="${c}" ${cat === c ? 'selected' : ''}>${esc(catLabel(c))}</option>`).join('')}
+    </select>
+    <span class="count-note">${evts.length} événement(s)</span>
+  </div>
+  <div class="evt-list">
+    ${evts.length ? evts.map(e => evtCard(e)).join('') : '<div class="card"><p class="empty" style="padding:8px">Aucun événement.</p></div>'}
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2);max-width:780px">Dans la version réelle : notifications push aux convoqués, relance automatique des sans-réponse, import du calendrier fédéral, feuille de match FFR, covoiturage.</p>`;
+}
+
+function meProchainsEvts(lic) {
+  const l = lic || monLicSportif();
+  if (!l) return '<div class="card"><h3>Prochains événements</h3><p class="empty" style="padding:4px 0">Aucune licence rattachée.</p></div>';
+  const evts = state.events.filter(e => e.cat === l.cat && e.date >= TODAY).slice(0, 2);
+  return `<div class="card"><h3>Prochains événements</h3>
+    ${evts.length ? evts.map(e => `<div class="alert-line" style="align-items:center">
+      <span style="min-width:0"><strong>${esc(evtTitre(e))}</strong><br><span style="font-size:12px;color:var(--ink-2)">${dfrShort(e.date)} · ${e.heure}</span></span>
+      <button class="btn btn-sm" style="margin-left:auto" data-goto-sportif="1">Répondre</button>
+    </div>`).join('') : '<p class="empty" style="padding:4px 0">Rien de prévu.</p>'}</div>`;
+}
+
+/* ---- Documents en cases (joueur / coach) ---- */
+function docsPersos() {
+  const lic = monLicSportif();
+  if (!lic) return [];
+  const out = [
+    { ico:'🩺', nom:'Certificat médical', meta: daysUntil(lic.certFin) < 0 ? 'Expiré' : 'Valide → ' + dfrShort(lic.certFin), alerte: daysUntil(lic.certFin) <= state.params.certJours },
+    { ico:'🪪', nom:'Attestation de licence', meta: 'N° ' + lic.licence },
+  ];
+  if (lic.cotPaye > 0) out.push({ ico:'🧾', nom:'Reçu de cotisation', meta: eur(lic.cotPaye) + ' réglés' });
+  return out;
+}
+function viewGedTiles() {
+  const seeN = canSeeNode;
+  const persos = docsPersos();
+  const clubFiles = gedFindAll('').filter(x => x.n.type === 'file' && seeN(x.n));
+  const estCoach = state.currentUser.roleId === 'educateur';
+  // regrouper par dossier pour le coach, à plat pour le joueur
+  const groupes = new Map();
+  for (const { n, path } of clubFiles) {
+    const g = path.length ? path[0].nom : 'Général';
+    if (!groupes.has(g)) groupes.set(g, []);
+    groupes.get(g).push({ n, path });
+  }
+  const tuile = ({ n, path }) => `<div class="tile" data-gedtile="${n.id}" role="button" tabindex="0">
+    <span class="t-ico" aria-hidden="true">${GED_ICO[n.ext] || '📎'}</span>
+    <span class="t-nom">${esc(n.nom.replace(/\.[a-z0-9]+$/i, ''))}</span>
+    <span class="t-meta">${dfrShort(n.modif)}</span>
+  </div>`;
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Documents</h1>
+    <p class="page-sub">Mes documents et ceux partagés par le club</p></div>
+  </div>
+  ${persos.length ? `<div class="tile-section">Mes documents</div>
+  <div class="tile-grid">
+    ${persos.map((d, i) => `<div class="tile" data-perso="${i}" role="button" tabindex="0">
+      <span class="t-ico" aria-hidden="true">${d.ico}</span>
+      <span class="t-nom">${esc(d.nom)}${d.alerte ? ' <span class="badge b-crit" style="display:inline-flex;margin-top:3px"><span class="dot"></span>À renouveler</span>' : ''}</span>
+      <span class="t-meta">${esc(d.meta)}</span>
+    </div>`).join('')}
+  </div>` : ''}
+  ${estCoach
+    ? [...groupes.entries()].map(([g, items]) => `<div class="tile-section">${esc(g)}</div><div class="tile-grid">${items.map(tuile).join('')}</div>`).join('')
+    : `<div class="tile-section">Documents du club</div><div class="tile-grid">${clubFiles.map(tuile).join('')}</div>`}
+  <p style="font-size:12.5px;color:var(--ink-2);margin-top:18px">Dans la version réelle : dépôt du certificat médical en photo depuis le téléphone, reçus téléchargeables, notifications quand le club partage un nouveau document.</p>`;
+}
+
+/* ---- Liaisons V4 ---- */
+const _bindExtraV32 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV32(v);
+  // Sportif
+  $$('[data-sptab]', v).forEach(b => b.onclick = () => { subTabs.sportOnglet = b.dataset.sptab; render(); });
+  const spCat = $('#spCat');
+  if (spCat) spCat.onchange = e => { subTabs.sportCat = e.target.value; render(); };
+  $$('[data-rsvp]', v).forEach(b => b.onclick = () => {
+    const e = state.events.find(x => x.id === Number(b.dataset.evt));
+    const lic = monLicSportif();
+    if (!e || !lic) return;
+    e.reponses[lic.id] = b.dataset.rsvp;
+    if (e.type === 'entrainement' && !e.convoques.includes(lic.id)) e.convoques.push(lic.id);
+    toast(b.dataset.rsvp === 'present' ? 'Présence confirmée — le coach est prévenu (simulé).' : 'Absence signalée — le coach est prévenu (simulé).');
+    render();
+  });
+  $$('[data-goto-sportif]', v).forEach(b => b.onclick = () => { state.view = 'sportif'; render(); });
+  const newEvt = $('#btnNewEvt');
+  if (newEvt) newEvt.onclick = () => {
+    openModal('Nouvel événement', `
+      <div class="form-grid">
+        <div class="field"><label for="neType">Type</label><select id="neType"><option value="match">Match</option><option value="entrainement">Entraînement</option><option value="tournoi">Tournoi</option></select></div>
+        <div class="field"><label for="neCat">Catégorie</label><select id="neCat">${CATS_SPORT.map(c => `<option value="${c}">${esc(catLabel(c))}</option>`).join('')}</select></div>
+        <div class="field"><label for="neDate">Date</label><input id="neDate" type="date" value="${addDaysIso(TODAY, 7)}"></div>
+        <div class="field"><label for="neHeure">Heure</label><input id="neHeure" type="time" value="15:00"></div>
+        <div class="field" style="grid-column:1/-1"><label for="neLieu">Lieu</label><input id="neLieu" value="${esc(LIEUX.dom)}"></div>
+        <div class="field" style="grid-column:1/-1"><label for="neAdv">Adversaire / intitulé (matchs & tournois)</label><input id="neAdv" placeholder="ex. RC Montclar"></div>
+      </div>`, `
+      <button class="btn" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" id="neOk">Créer</button>`);
+    $('#neOk').onclick = () => {
+      const type = $('#neType').value;
+      state.events.push(EVT(type, $('#neCat').value, $('#neDate').value, $('#neHeure').value, $('#neLieu').value.trim() || LIEUX.dom,
+        type !== 'entrainement' ? { adversaire: $('#neAdv').value.trim() || 'À définir', domicile: true } : {}));
+      state.events.sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+      toast('Événement créé.'); closeModal(); render();
+    };
+  };
+  $$('[data-convoq]', v).forEach(b => b.onclick = () => {
+    const e = state.events.find(x => x.id === Number(b.dataset.convoq));
+    if (!e) return;
+    const pool = state.licencies.filter(l => l.cat === e.cat).sort((a, b2) => a.nom.localeCompare(b2.nom, 'fr'));
+    openModal('Convocation — ' + evtTitre(e), `
+      <p style="margin:0 0 10px;color:var(--ink-2);font-size:13px">${dfr(e.date)} à ${e.heure} · ${esc(e.lieu)}</p>
+      <div class="presence-grid">
+        ${pool.map(l => `<label><input type="checkbox" data-cv="${l.id}" ${e.convoques.includes(l.id) ? 'checked' : ''}> ${esc(l.prenom + ' ' + l.nom)}</label>`).join('')}
+      </div>`, `
+      <button class="btn" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" id="cvOk">Envoyer les convocations (simulé)</button>`);
+    $('#cvOk').onclick = () => {
+      const ids = $$('#modalRoot [data-cv]').filter(c => c.checked).map(c => Number(c.dataset.cv));
+      e.convoques = ids;
+      for (const id of ids) if (!e.reponses[id]) e.reponses[id] = '?';
+      for (const k of Object.keys(e.reponses)) if (!ids.includes(Number(k))) delete e.reponses[k];
+      toast(`${ids.length} convocation(s) envoyée(s) par notification (simulé).`);
+      closeModal(); render();
+    };
+  });
+  $$('[data-feuille]', v).forEach(b => b.onclick = () => {
+    const e = state.events.find(x => x.id === Number(b.dataset.feuille));
+    if (!e) return;
+    const ecrit = !window.canW || canW('sportif');
+    const pool = e.type === 'entrainement' ? state.licencies.filter(l => l.cat === e.cat) : state.licencies.filter(l => e.convoques.includes(l.id));
+    const chip = r => r === 'present' ? '<span class="badge b-good"><span class="dot"></span>Présent</span>' : r === 'absent' ? '<span class="badge b-crit"><span class="dot"></span>Absent</span>' : '<span class="badge"><span class="dot"></span>Sans réponse</span>';
+    openModal((e.type === 'entrainement' ? 'Présences — ' : 'Réponses — ') + evtTitre(e), `
+      <p style="margin:0 0 10px;color:var(--ink-2);font-size:13px">${dfr(e.date)} à ${e.heure}</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Licencié</th><th>Statut</th>${ecrit ? '<th>Pointer</th>' : ''}</tr></thead>
+        <tbody>${pool.sort((a, b2) => a.nom.localeCompare(b2.nom, 'fr')).map(l => `<tr>
+          <td>${esc(l.prenom + ' ' + l.nom)}</td>
+          <td>${chip(e.reponses[l.id])}</td>
+          ${ecrit ? `<td><button class="btn btn-sm" data-pt="${l.id}" data-val="present">P</button> <button class="btn btn-sm" data-pt="${l.id}" data-val="absent">A</button></td>` : ''}
+        </tr>`).join('')}</tbody></table></div>`,
+      `<button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+    $$('#modalRoot [data-pt]').forEach(p => p.onclick = () => {
+      e.reponses[Number(p.dataset.pt)] = p.dataset.val;
+      if (!e.convoques.includes(Number(p.dataset.pt))) e.convoques.push(Number(p.dataset.pt));
+      closeModal(); render();
+      toast('Pointage enregistré.');
+    });
+  });
+  $$('[data-score]', v).forEach(b => b.onclick = () => {
+    const e = state.events.find(x => x.id === Number(b.dataset.score));
+    if (!e) return;
+    openModal('Résultat — ' + evtTitre(e), `
+      <div class="form-grid">
+        <div class="field"><label for="scN">${esc(state.params.clubNom)}</label><input id="scN" type="number" min="0" value="0"></div>
+        <div class="field"><label for="scE">${esc(e.adversaire)}</label><input id="scE" type="number" min="0" value="0"></div>
+      </div>`, `
+      <button class="btn" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" id="scOk">Enregistrer</button>`);
+    $('#scOk').onclick = () => {
+      e.resultat = { nous: Math.max(0, Number($('#scN').value) || 0), eux: Math.max(0, Number($('#scE').value) || 0) };
+      toast('Résultat enregistré.'); closeModal(); render();
+    };
+  });
+  // Documents en cases
+  $$('[data-gedtile]', v).forEach(t => {
+    const open = () => { const hit = gedFindAll('').find(x => x.n.id === Number(t.dataset.gedtile)); if (hit) gedOpenFile(hit.n, hit.path); };
+    t.onclick = open;
+    t.onkeydown = e => { if (e.key === 'Enter') open(); };
+  });
+  $$('[data-perso]', v).forEach(t => {
+    const open = () => {
+      const d = docsPersos()[Number(t.dataset.perso)];
+      if (!d) return;
+      openModal(d.nom, `
+        <p style="margin:0 0 12px;color:var(--ink-2)">${esc(d.meta)}</p>
+        <div style="background:var(--surface-2);border:1px dashed var(--line-strong);border-radius:10px;padding:28px;text-align:center;color:var(--ink-3)">Aperçu du document (simulé)</div>`, `
+        ${d.nom === 'Certificat médical' ? '<button class="btn" id="dpUp">📷 Déposer un nouveau certificat (simulé)</button>' : ''}
+        <button class="btn" id="dpDl">Télécharger (simulé)</button>
+        <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+      $('#dpDl').onclick = () => toast('Téléchargement simulé.');
+      const up = $('#dpUp');
+      if (up) up.onclick = () => toast('Dans la version réelle : photo depuis le téléphone, transmise au secrétariat pour validation.');
+    };
+    t.onclick = open;
+    t.onkeydown = e => { if (e.key === 'Enter') open(); };
+  });
+};
+
+render();
+</script>
+<style>
+/* ---------- V5 ---------- */
+.ftabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line-strong); margin: 0 0 14px; overflow-x: auto; }
+.ftabs button { border: 0; background: none; cursor: pointer; font: 600 12.5px/1 system-ui, sans-serif; color: var(--ink-2); padding: 9px 11px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.ftabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; }
+.stat-tile { background: var(--surface-2); border-radius: 10px; padding: 12px 10px; text-align: center; }
+.stat-tile .v { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 26px; line-height: 1; }
+.stat-tile .l { font-size: 11px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .5px; margin-top: 5px; }
+.ean { font-family: ui-monospace, monospace; font-size: 12px; color: var(--ink-2); }
+</style>
+<script>
+/* ================= V5 : RETOURS TESTEUR — FICHE LICENCIÉ, STOCK+, BOUTIQUE, DOTATIONS, UTILISATEURS ================= */
+
+/* ---- Enrichissement des licenciés ---- */
+const CATS_MINEURS = ['M6','M8','M10','M12','M14','M16','M19'];
+const METIERS = ['Infirmière','Artisan menuisier','Enseignant','Agricultrice','Commercial','Aide-soignante','Chauffeur routier','Comptable','Coiffeuse','Employé communal','Kinésithérapeute','Boulanger'];
+const CLUBS_VOISINS = ['RC Montclar','US Rochebrune','Entente Villeneuve','Stade Pontétois','Ovalie Serrane'];
+const TAILLES_MIN = ['6 ans','8 ans','10 ans','12 ans','14 ans','XS'];
+const TAILLES_MAJ = ['S','M','L','XL','XXL'];
+(function enrichirLicencies() {
+  for (const l of state.licencies) {
+    const mineur = CATS_MINEURS.includes(l.cat);
+    const age = 2026 - Number(l.naissance.slice(0, 4));
+    l.nationalite = rnd() < 0.88 ? 'Française' : pick(['Italienne','Portugaise','Britannique','Fidjienne','Géorgienne']);
+    l.paysNaissance = l.nationalite === 'Française' ? 'France' : pick(['France', { Italienne:'Italie', Portugaise:'Portugal', Britannique:'Royaume-Uni', Fidjienne:'Fidji', 'Géorgienne':'Géorgie' }[l.nationalite]]);
+    l.villeNaissance = pick([...VILLES, 'Toulouse', 'Clermont-Ferrand', 'Pau', 'Lyon']);
+    l.dejaLicencie = l.inscrit < 2026 || rnd() < 0.3;
+    l.anneesLicence = l.dejaLicencie ? Math.max(1, 2026 - l.inscrit + (rnd() < 0.3 ? ri(1, 4) : 0)) : 0;
+    l.ancienClub = l.dejaLicencie ? (l.inscrit < 2026 ? state.params.clubNom : pick(CLUBS_VOISINS)) : null;
+    l.mutation = !!(l.dejaLicencie && l.ancienClub && l.ancienClub !== state.params.clubNom);
+    l.pointure = mineur ? ri(30, 41) : ri(39, 47);
+    l.tailleCm = mineur ? 100 + Math.min(85, age * 6) + ri(-6, 6) : ri(165, 196);
+    l.poids = mineur ? Math.max(18, Math.round(l.tailleCm / 2.6) + ri(-4, 8)) : ri(68, 118);
+    l.tailleShort = mineur && age < 15 ? pick(TAILLES_MIN) : pick(TAILLES_MAJ);
+    l.tailleMaillot = mineur && age < 15 ? pick(TAILLES_MIN) : pick(TAILLES_MAJ);
+    // Stats sportives (saison passée) — pas pour les dirigeants
+    l.stats = l.cat === 'DIR' ? null : {
+      saison: '2025-2026',
+      matchs: l.dejaLicencie ? ri(4, l.cat === 'SEN' ? 22 : 14) : 0,
+      essais: l.dejaLicencie ? ri(0, 9) : 0,
+      cartonsJ: l.dejaLicencie && rnd() < 0.3 ? ri(1, 3) : 0,
+      cartonsR: l.dejaLicencie && rnd() < 0.05 ? 1 : 0,
+    };
+    // Documents de la fiche
+    l.docsLic = [{ nom: `Certificat médical ${l.nom} ${l.certFin.slice(0,4)}.pdf`, type: 'Certificat médical', date: addDaysIso(l.certFin, -1095) }];
+    if (mineur && rnd() < 0.5) l.docsLic.push({ nom: `Autorisation parentale.pdf`, type: 'Autorisation', date: addDaysIso(TODAY, -ri(10, 80)) });
+    // Responsables légaux (mineurs)
+    if (mineur) {
+      const n = rnd() < 0.7 ? 2 : 1;
+      l.referents = [];
+      for (let i = 0; i < n; i++) {
+        const estMere = i === 0 ? rnd() < 0.5 : l.referents[0].lien === 'Père';
+        const prenom = estMere ? pick(PRENOMS_F) : pick(PRENOMS_M);
+        l.referents.push({
+          prenom, nom: rnd() < 0.85 ? l.nom : pick(NOMS),
+          lien: estMere ? 'Mère' : 'Père',
+          email: `${prenom.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}.${l.nom.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}@exemple.fr`,
+          tel: `06 ${ri(10,99)} ${ri(10,99)} ${ri(10,99)} ${ri(10,99)}`,
+          metier: pick(METIERS),
+        });
+      }
+      l.prefMail = n === 1 ? 'Référent 1' : pick(['Référent 1', 'Référent 2', 'Les deux', 'Les deux']);
+      l.prefWhatsapp = n === 1 ? 'Référent 1' : pick(['Référent 1', 'Référent 2', 'Les deux']);
+      l.familleAutres = rnd() < 0.3 ? pick(['Oui — un frère en M8', 'Oui — une sœur en M12', 'Oui — le père en rugby loisir', 'Oui — deux frères (M10 et M14)']) : 'Non';
+    } else l.referents = null;
+    // Paiement : mode + échéancier
+    l.modePaiement = l.cot === 0 ? '—' : pick(['CB en ligne','CB en ligne','Virement','Chèque','Chèque (×3)','Espèces','Chèques vacances (ANCV)']);
+    l.echeances = [];
+    if (l.cot > 0) {
+      if (l.cotStatut === 'payee') l.echeances.push({ date: addDaysIso(TODAY, -ri(5, 40)), montant: l.cot, statut: 'reglee' });
+      else if (l.cotStatut === 'partielle') {
+        l.echeances.push({ date: addDaysIso(TODAY, -ri(10, 40)), montant: l.cotPaye, statut: 'reglee' });
+        l.echeances.push({ date: addDaysIso(TODAY, ri(10, 45)), montant: l.cot - l.cotPaye, statut: 'a_venir' });
+      } else l.echeances.push({ date: addDaysIso(TODAY, -ri(1, 20)), montant: l.cot, statut: 'en_retard' });
+    }
+    l.dotations = l.dotations || [];
+  }
+})();
+
+/* ---- Enrichissement du stock : prix, EAN, articles boutique & dotation ---- */
+(function enrichirStock() {
+  const prix = { 'Ballons T3': [18, null], 'Ballons T4': [22, null], 'Ballons T5': [28, null], 'Plots': [1.5, null], 'Boucliers': [45, null], 'Sacs de plaquage': [65, null], 'Chasubles': [30, null], 'Maillots match': [520, null], 'Protège-dents': [3, 5], 'Bombes de froid': [4.5, null], 'Strap': [3.8, null], 'Compresses': [2.5, null], 'Solution antiseptique': [4, null], 'Poches de glace': [1.2, null], 'Couvertures': [2.5, null], 'Gants nitrile': [6, null], 'Sutures': [5, null], 'Ramettes': [5, null], 'Cartouches': [38, null], 'Enveloppes': [0.08, null], 'Licences vierges': [0.5, null], 'Café': [9, null], 'Gobelets': [0.9, 1], 'Fûts': [95, null], 'Sodas': [0.45, 1.5], 'Saucisses': [7.5, null] };
+  for (const a of state.stock) {
+    const k = Object.keys(prix).find(p => a.nom.startsWith(p.split(' ')[0]) && a.nom.includes(p.split(' ')[1] || ''));
+    const [pa, pv] = k ? prix[k] : [ri(2, 30), null];
+    a.prixAchat = a.prixAchat ?? pa;
+    a.prixVente = a.prixVente ?? pv;
+    a.ean = a.ean || '3' + String(ri(100000000000, 999999999999));
+    a.vente = !!a.prixVente;
+    a.dotation = false;
+  }
+  const addArt = (pole, nom, qte, seuil, unite, empl, pa, pv, opts = {}) => {
+    state.stock.push({ id: Date.now() + ri(1, 99999), pole, nom, qte, seuil, unite, empl, peremption: null, prixAchat: pa, prixVente: pv, ean: '3' + String(ri(100000000000, 999999999999)), vente: !!pv, dotation: !!opts.dot });
+  };
+  addArt('sportif', 'Chaussettes club (paire)', 64, 30, 'u.', 'Local matériel', 3.2, 8, { dot: true });
+  addArt('sportif', 'Short club', 41, 20, 'u.', 'Local matériel', 7.5, 18, { dot: true });
+  addArt('sportif', 'Maillot d\'entraînement club', 38, 20, 'u.', 'Local matériel', 9, 22, { dot: true });
+  addArt('sportif', 'Maillot réplique supporter', 22, 10, 'u.', 'Buvette', 21, 45);
+  addArt('sportif', 'Écharpe du club', 17, 10, 'u.', 'Buvette', 5.5, 15);
+  addArt('sportif', 'Bonnet du club', 12, 8, 'u.', 'Buvette', 4, 12);
+})();
+state.ventes = [];
+state.dotationsLog = [];
+// Quelques dotations et ventes passées pour peupler les écrans
+(function seedVentesDotations() {
+  const arts = state.stock.filter(a => a.dotation);
+  for (const l of state.licencies.filter(x => x.cat === 'SEN').slice(0, 8)) {
+    const a = pick(arts);
+    const d = addDaysIso(TODAY, -ri(3, 15));
+    l.dotations.push({ article: a.nom, qte: 1, date: d });
+    state.dotationsLog.push({ id: Date.now() + ri(1, 9999), licId: l.id, article: a.nom, qte: 1, date: d, par: 'P. Gayraud' });
+  }
+  const merch = state.stock.filter(a => a.vente && a.pole === 'sportif');
+  for (let i = 0; i < 5; i++) {
+    const a = pick(merch);
+    state.ventes.push({ id: Date.now() + ri(1, 9999), article: a.nom, qte: ri(1, 2), pu: a.prixVente, date: addDaysIso(TODAY, -ri(1, 12)), mode: pick(['CB','Espèces','CB','Chèque']), acheteur: pick(['Supporter','Famille adhérent','Adhérent']) });
+  }
+  state.dotationsLog.sort((a, b) => b.date.localeCompare(a.date));
+  state.ventes.sort((a, b) => b.date.localeCompare(a.date));
+})();
+
+/* ---- Fiche licencié en onglets ---- */
+subTabs.fiche = 'general';
+openFicheLic = function (id) { subTabs.fiche = 'general'; renderFiche(id); };
+
+function renderFiche(id, tab) {
+  if (tab) subTabs.fiche = tab;
+  const l = state.licencies.find(x => x.id === id);
+  if (!l) return;
+  const t = subTabs.fiche;
+  const tabs = [
+    ['general', 'Général'],
+    ...(l.referents ? [['responsable', 'Responsable légal']] : []),
+    ...(l.stats ? [['rugby', 'Rugby']] : []),
+    ['documents', `Documents (${l.docsLic.length})`],
+    ['paiement', 'Paiement'],
+    ['dotation', `Dotation (${l.dotations.length})`],
+  ];
+  const G = (lab, val) => `<div><label>${lab}</label>${val}</div>`;
+  let body = '';
+  if (t === 'general') body = `<div class="form-grid">
+    ${G('Catégorie', esc(catLabel(l.cat)))}
+    ${G('Sexe', l.sexe === 'F' ? 'Féminin' : 'Masculin')}
+    ${G('Né(e) le', dfr(l.naissance) + ' — ' + esc(l.villeNaissance) + ' (' + esc(l.paysNaissance) + ')')}
+    ${G('Nationalité', esc(l.nationalite))}
+    ${G('Licence FFR', l.licence + ' — ' + licBadge(l.licStatut))}
+    ${G('Certificat', certBadge(l))}
+    ${G('Licencié précédemment', (l.dejaLicencie ? `Oui — ${l.anneesLicence} saison(s), ${esc(l.ancienClub)}` : 'Non (première licence)') + (l.mutation ? ` <span class="badge b-warn"><span class="dot"></span>Mutation FFR${l.licStatut === 'attente' ? ' — dossier en cours' : l.licStatut === 'validee' ? ' — effectuée' : ''}</span>` : ''))}
+    ${G('Commune', esc(l.ville))}
+    ${l.referents ? '' : G('Email', esc(l.email)) + G('Téléphone', esc(l.tel))}
+    ${G('Taille / poids', l.tailleCm + ' cm · ' + l.poids + ' kg')}
+    ${G('Pointure (chaussettes)', l.pointure)}
+    ${G('Taille short', esc(l.tailleShort))}
+    ${G('Taille maillot d\'entraînement', esc(l.tailleMaillot))}
+    ${G('Au club depuis', l.inscrit)}
+  </div>`;
+  else if (t === 'responsable') body = `
+    ${l.referents.map((r, i) => `<div class="card" style="box-shadow:none;margin-bottom:12px">
+      <h3>Référent ${i + 1} — ${esc(r.lien)}</h3>
+      <div class="form-grid">
+        ${G('Nom', esc(r.prenom + ' ' + r.nom))}
+        ${G('Métier', esc(r.metier))}
+        ${G('Email', esc(r.email))}
+        ${G('Téléphone', esc(r.tel))}
+      </div>
+    </div>`).join('')}
+    <div class="form-grid">
+      ${G('Autres membres de la famille licenciés en 2026-2027', esc(l.familleAutres))}
+      ${G('Contact email du parent dirigeant', esc(l.prefMail))}
+      ${G('Contact WhatsApp du parent dirigeant', esc(l.prefWhatsapp))}
+    </div>`;
+  else if (t === 'rugby') body = `
+    <p style="margin:0 0 10px;font-size:12.5px;color:var(--ink-2)">Saison ${l.stats.saison} — dans la version réelle : matchs joués dérivés automatiquement des feuilles de match du module Sportif ; essais et cartons complétés par le coach à la saisie du résultat.</p>
+    <div class="stat-tiles">
+      <div class="stat-tile"><div class="v">${l.stats.matchs}</div><div class="l">Matchs joués</div></div>
+      <div class="stat-tile"><div class="v">${l.stats.essais}</div><div class="l">Essais</div></div>
+      <div class="stat-tile"><div class="v" style="color:${l.stats.cartonsJ ? 'var(--warning-text)' : 'inherit'}">${l.stats.cartonsJ}</div><div class="l">Cartons jaunes</div></div>
+      <div class="stat-tile"><div class="v" style="color:${l.stats.cartonsR ? 'var(--critical-text)' : 'inherit'}">${l.stats.cartonsR}</div><div class="l">Cartons rouges</div></div>
+    </div>`;
+  else if (t === 'documents') {
+    body = `
+    ${daysUntil(l.certFin) < 0 ? '<p style="margin:0 0 10px"><span class="badge b-crit"><span class="dot"></span>Certificat médical (fiche de soin) expiré — licence bloquée tant qu\'il n\'est pas redéposé</span></p>' : ''}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Document</th><th>Type</th><th>Déposé le</th><th></th></tr></thead>
+      <tbody>${l.docsLic.map((d, i) => `<tr>
+        <td>📄 ${esc(d.nom)}</td><td><span class="badge">${esc(d.type)}</span></td><td style="white-space:nowrap">${dfrShort(d.date)}</td>
+        <td style="white-space:nowrap"><button class="btn btn-sm" data-fdocren="${i}">Renommer</button> <button class="btn btn-sm" data-fdocdl="${i}">⬇</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div style="margin-top:12px"><button class="btn btn-sm" id="fdocAdd">+ Déposer un document (simulé)</button></div>`;
+  }
+  else if (t === 'paiement') {
+    const pays = state.paiements.filter(p => p.licId === l.id);
+    const echBadge = s => s === 'reglee' ? '<span class="badge b-good"><span class="dot"></span>Réglée</span>' : s === 'a_venir' ? '<span class="badge"><span class="dot"></span>À venir</span>' : '<span class="badge b-crit"><span class="dot"></span>En retard</span>';
+    body = `
+    <div class="form-grid" style="margin-bottom:12px">
+      ${G('État de la licence', licBadge(l.licStatut))}
+      ${G('Cotisation', cotBadge(l.cotStatut))}
+      ${G('Montant réglé', l.cot ? `${eur(l.cotPaye)} sur ${eur(l.cot)}` : 'Exonéré')}
+      ${G('Mode de paiement', esc(l.modePaiement))}
+    </div>
+    ${l.echeances.length ? `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Échéancier</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Échéance</th><th class="num">Montant</th><th>Statut</th></tr></thead>
+      <tbody>${l.echeances.map(e => `<tr><td>${dfrShort(e.date)}</td><td class="num">${eur(e.montant)}</td><td>${echBadge(e.statut)}</td></tr>`).join('')}</tbody>
+    </table></div>` : ''}
+    ${pays.length ? `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:14px 0 8px">Demandes de paiement en ligne</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Objet</th><th>Créée</th><th>Statut</th><th class="num">Montant</th></tr></thead>
+      <tbody>${pays.map(p => `<tr><td>${esc(p.objet)}</td><td>${dfrShort(p.creee)}</td>
+        <td>${p.statut === 'paye' ? '<span class="badge b-good"><span class="dot"></span>Payé le ' + dfrShort(p.payee) + '</span>' : p.statut === 'relancee' ? '<span class="badge b-serious"><span class="dot"></span>Relancé ×' + p.relances + '</span>' : '<span class="badge b-warn"><span class="dot"></span>Lien envoyé</span>'}</td>
+        <td class="num">${eur(p.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+  }
+  else if (t === 'dotation') body = `
+    ${l.dotations.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Article reçu</th><th class="num">Qté</th><th>Date</th></tr></thead>
+      <tbody>${l.dotations.map(d => `<tr><td>🎽 ${esc(d.article)}</td><td class="num">${d.qte}</td><td>${dfrShort(d.date)}</td></tr>`).join('')}</tbody>
+    </table></div>` : '<p class="empty" style="padding:6px 0">Aucune dotation reçue du club.</p>'}
+    ${(!window.canW || canW('stock')) ? `<div style="margin-top:12px"><button class="btn btn-sm" id="fdotAdd">+ Attribuer une dotation</button></div>` : ''}
+    <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">La dotation décrémente le stock du pôle sportif (tailles issues de la fiche : short ${esc(l.tailleShort)}, maillot ${esc(l.tailleMaillot)}, pointure ${l.pointure}).</p>`;
+
+  openModal(`${l.prenom} ${l.nom}`, `
+    <div class="ftabs">${tabs.map(([id2, lab]) => `<button class="${t === id2 ? 'active' : ''}" data-ftab="${id2}">${lab}</button>`).join('')}</div>
+    ${body}`, `
+    ${l.cotStatut !== 'payee' && l.cot && (!window.canW || canW('licencies')) ? `<button class="btn" id="ficheLien">Envoyer un lien de paiement</button>` : ''}
+    ${(!window.canW || canW('licencies')) ? `<button class="btn" id="ficheEdit">Modifier</button>` : ''}
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  $$('#modalRoot [data-ftab]').forEach(b => b.onclick = () => renderFiche(id, b.dataset.ftab));
+  const lien = $('#ficheLien');
+  if (lien) lien.onclick = () => { creerDemandePaiement(l); closeModal(); render(); };
+  const edit = $('#ficheEdit');
+  if (edit) edit.onclick = () => openFormLic(l.id);
+  $$('#modalRoot [data-fdocren]').forEach(b => b.onclick = () => {
+    const d = l.docsLic[Number(b.dataset.fdocren)];
+    openModal('Renommer le document', `<div class="field"><label for="rnNom">Nouveau nom</label><input id="rnNom" value="${esc(d.nom)}" style="width:100%"></div>`,
+      `<button class="btn" id="rnBack">Annuler</button><button class="btn btn-primary" id="rnOk">Renommer</button>`);
+    $('#rnBack').onclick = () => renderFiche(id, 'documents');
+    $('#rnOk').onclick = () => { d.nom = $('#rnNom').value.trim() || d.nom; toast('Document renommé.'); renderFiche(id, 'documents'); };
+  });
+  $$('#modalRoot [data-fdocdl]').forEach(b => b.onclick = () => toast('Téléchargement simulé.'));
+  const da = $('#fdocAdd');
+  if (da) da.onclick = () => { l.docsLic.push({ nom: 'Nouveau document.pdf', type: 'Autre', date: TODAY }); toast('Document déposé (simulé) — renomme-le.'); renderFiche(id, 'documents'); };
+  const dot = $('#fdotAdd');
+  if (dot) dot.onclick = () => openDotation(l.id, () => renderFiche(id, 'dotation'));
+}
+
+/* ---- Boutique ---- */
+function stockTabsHtml(active) {
+  return `<div class="tabs" role="tablist">
+    <button role="tab" aria-selected="false" data-pole="tous">Tous les pôles</button>
+    ${POLES.map(p => `<button role="tab" aria-selected="false" data-pole="${p.code}">${p.label}</button>`).join('')}
+    <button role="tab" aria-selected="${active === 'boutique'}" class="${active === 'boutique' ? 'active' : ''}" data-pole="boutique">🛒 Boutique</button>
+    <button role="tab" aria-selected="${active === 'dotations'}" class="${active === 'dotations' ? 'active' : ''}" data-pole="dotations">🎽 Dotations</button>
+  </div>`;
+}
+function viewBoutique() {
+  const arts = state.stock.filter(a => a.vente).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  const caMois = state.ventes.reduce((s, v) => s + v.qte * v.pu, 0);
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Stock</h1>
+    <p class="page-sub">Boutique du club — ${eur(caMois)} de ventes récentes, reversées en recettes « Boutique »</p></div>
+  </div>
+  ${stockTabsHtml('boutique')}
+  <div class="grid two-col" style="margin-top:14px">
+    <div class="card" style="padding:4px 8px">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Article</th><th class="num">Prix de vente</th><th class="num">En stock</th><th></th></tr></thead>
+        <tbody>${arts.map(a => `<tr>
+          <td><strong>${esc(a.nom)}</strong><br><span class="ean">${a.ean}</span></td>
+          <td class="num" style="font-weight:600">${eur(a.prixVente)}</td>
+          <td class="num">${a.qte}</td>
+          <td><button class="btn btn-sm btn-primary" data-vendre="${a.id}" ${a.qte <= 0 ? 'disabled' : ''}>Vendre</button></td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>
+    <div class="card" style="padding:4px 8px">
+      <div style="padding:10px 8px 0"><h3 style="margin:0 0 6px">Dernières ventes</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Article</th><th class="num">Qté</th><th class="num">Total</th><th>Mode</th></tr></thead>
+        <tbody>${state.ventes.length ? state.ventes.slice(0, 12).map(v => `<tr>
+          <td style="white-space:nowrap">${dfrShort(v.date)}</td><td>${esc(v.article)}</td>
+          <td class="num">${v.qte}</td><td class="num" style="font-weight:600">${eur(v.qte * v.pu)}</td><td>${esc(v.mode)}</td>
+        </tr>`).join('') : '<tr><td colspan="5" class="empty">Aucune vente.</td></tr>'}</tbody>
+      </table></div>
+    </div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Chaque vente décrémente le stock et crée l'écriture comptable « Boutique ». Dans la version réelle : scan EAN, caisse tablette les jours de match, paiement CB via le module de paiement.</p>`;
+}
+
+/* ---- Dotations ---- */
+function viewDotations() {
+  const nomLic = id => { const l = state.licencies.find(x => x.id === id); return l ? l.prenom + ' ' + l.nom : '—'; };
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Stock</h1>
+    <p class="page-sub">Dotations — équipement remis aux joueurs par le club</p></div>
+    <div class="head-actions"><button class="btn btn-primary" id="btnNewDot">+ Nouvelle dotation</button></div>
+  </div>
+  ${stockTabsHtml('dotations')}
+  <div class="card" style="padding:4px 8px;margin-top:14px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Joueur</th><th>Article</th><th class="num">Qté</th><th>Date</th><th>Remis par</th></tr></thead>
+      <tbody>${state.dotationsLog.length ? state.dotationsLog.map(d => `<tr>
+        <td><strong>${esc(nomLic(d.licId))}</strong></td><td>🎽 ${esc(d.article)}</td>
+        <td class="num">${d.qte}</td><td style="white-space:nowrap">${dfrShort(d.date)}</td><td style="color:var(--ink-2)">${esc(d.par)}</td>
+      </tr>`).join('') : '<tr><td colspan="5" class="empty">Aucune dotation enregistrée.</td></tr>'}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">La dotation apparaît aussi dans l'onglet « Dotation » de la fiche du licencié. Les tailles (short, maillot, pointure) viennent de sa fiche.</p>`;
+}
+
+function openDotation(licId, onDone) {
+  const arts = state.stock.filter(a => a.dotation && a.qte > 0);
+  const lics = [...state.licencies].sort((a, b) => (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
+  openModal('Nouvelle dotation', `
+    <div class="form-grid">
+      <div class="field"><label for="dtLic">Joueur</label><select id="dtLic">
+        ${lics.map(l => `<option value="${l.id}" ${licId === l.id ? 'selected' : ''}>${esc(l.nom.toUpperCase() + ' ' + l.prenom)} — ${esc(catLabel(l.cat))}</option>`).join('')}</select></div>
+      <div class="field"><label for="dtArt">Article</label><select id="dtArt">
+        ${arts.map(a => `<option value="${a.id}">${esc(a.nom)} (${a.qte} en stock)</option>`).join('')}</select></div>
+      <div class="field"><label for="dtQte">Quantité</label><input id="dtQte" type="number" min="1" value="1"></div>
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="dtOk">Attribuer</button>`);
+  $('#dtOk').onclick = () => {
+    const l = state.licencies.find(x => x.id === Number($('#dtLic').value));
+    const a = state.stock.find(x => x.id === Number($('#dtArt').value));
+    const q = Math.max(1, Number($('#dtQte').value) || 1);
+    if (!l || !a) return;
+    if (a.qte < q) { toast('Stock insuffisant.'); return; }
+    a.qte -= q;
+    l.dotations.push({ article: a.nom, qte: q, date: TODAY });
+    state.dotationsLog.unshift({ id: Date.now(), licId: l.id, article: a.nom, qte: q, date: TODAY, par: state.currentUser.nom });
+    state.mouvements.unshift({ id: Date.now() + 1, date: TODAY, artId: a.id, delta: -q, motif: 'Dotation joueur', par: state.currentUser.nom });
+    toast(`${q} × ${a.nom} attribué(s) à ${l.prenom} ${l.nom}.`);
+    if (onDone) onDone(); else { closeModal(); render(); }
+  };
+}
+
+/* ---- Fiche article ---- */
+function openFicheArticle(id) {
+  const a = state.stock.find(x => x.id === id);
+  if (!a) return;
+  const mvts = state.mouvements.filter(m => m.artId === id).slice(0, 6);
+  const marge = a.prixVente ? Math.round((a.prixVente - a.prixAchat) * 100) / 100 : null;
+  openModal(a.nom, `
+    <div class="form-grid" style="margin-bottom:12px">
+      <div><label>Pôle</label>${esc((POLES.find(p => p.code === a.pole) || {}).label || a.pole)}</div>
+      <div><label>Stock / seuil</label>${a.qte} ${esc(a.unite)} · seuil ${a.seuil}</div>
+      <div><label>Prix d'achat</label>${eur(a.prixAchat)}</div>
+      <div><label>Prix de vente</label>${a.prixVente ? `${eur(a.prixVente)} <span style="color:var(--good-text);font-size:12px">(marge ${eur(marge)})</span>` : '— (non vendu)'}</div>
+      <div><label>EAN</label><span class="ean">${a.ean}</span></div>
+      <div><label>Emplacement</label>${esc(a.empl)}</div>
+      ${a.peremption ? `<div><label>Péremption</label>${dfrShort(a.peremption)}</div>` : ''}
+      <div><label>Statuts</label>${a.vente ? '<span class="badge b-info">Vendu en boutique</span> ' : ''}${a.dotation ? '<span class="badge b-good">Article de dotation</span>' : ''}</div>
+    </div>
+    ${mvts.length ? `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Derniers mouvements</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th class="num">Δ</th><th>Motif</th><th>Par</th></tr></thead>
+      <tbody>${mvts.map(m => `<tr><td>${dfrShort(m.date)}</td>
+        <td class="num" style="font-weight:600;color:${m.delta >= 0 ? 'var(--good-text)' : 'var(--critical-text)'}">${m.delta >= 0 ? '+' : ''}${m.delta}</td>
+        <td>${esc(m.motif)}</td><td style="color:var(--ink-2)">${esc(m.par)}</td></tr>`).join('')}</tbody>
+    </table></div>` : ''}`,
+    `<button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+}
+
+/* ---- Paramètres : utilisateurs (back-office des droits) ---- */
+function paramUtilisateurs() {
+  return `
+  <div class="toolbar" style="margin-top:2px">
+    <button class="btn btn-primary" id="pInviter">+ Inviter un utilisateur</button>
+    <span class="count-note">${PERSONAS.length} comptes actifs (démo)</span>
+  </div>
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Utilisateur</th><th>Email</th><th>Rôle</th><th>Statut</th></tr></thead>
+      <tbody>${PERSONAS.map(p => `<tr>
+        <td><strong>${esc(p.nom)}</strong>${p.id === state.currentUser.id ? ' <span class="badge b-info">vous</span>' : ''}</td>
+        <td style="color:var(--ink-2)">${esc(p.nom.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, '').trim().replace(/ +/g, '.'))}@exemple.fr</td>
+        <td><select data-urole="${p.id}">${ROLES.map(r => `<option value="${r.id}" ${p.roleId === r.id ? 'selected' : ''}>${r.label}</option>`).join('')}</select></td>
+        <td><span class="badge b-good"><span class="dot"></span>Actif</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Le rôle attribué ici détermine ce que la personne voit et peut faire (matrice de l'onglet « Droits & rôles »). Dans la version réelle : invitation par email avec rôle pré-affecté, validation des demandes d'adhésion entrantes, désactivation d'un compte.</p>`;
+}
+
+/* ---- Liaisons V5 ---- */
+const _bindExtraV4 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV4(v);
+  $$('[data-artfiche]', v).forEach(tr => {
+    tr.onclick = e => { if (e.target.closest('button')) return; openFicheArticle(Number(tr.dataset.artfiche)); };
+    tr.onkeydown = e => { if (e.key === 'Enter' && !e.target.closest('button')) openFicheArticle(Number(tr.dataset.artfiche)); };
+  });
+  $$('[data-vendre]', v).forEach(b => b.onclick = () => {
+    const a = state.stock.find(x => x.id === Number(b.dataset.vendre));
+    if (!a) return;
+    openModal('Vente — ' + a.nom, `
+      <div class="form-grid">
+        <div class="field"><label for="vtQte">Quantité</label><input id="vtQte" type="number" min="1" max="${a.qte}" value="1"></div>
+        <div class="field"><label for="vtMode">Mode de paiement</label><select id="vtMode"><option>CB</option><option>Espèces</option><option>Chèque</option><option>Lien de paiement</option></select></div>
+        <div class="field" style="grid-column:1/-1"><label for="vtQui">Acheteur (optionnel)</label><input id="vtQui" placeholder="ex. Famille Robin"></div>
+      </div>
+      <p style="font-size:13px;margin:12px 0 0">Total : <strong id="vtTotal">${eur(a.prixVente)}</strong></p>`, `
+      <button class="btn" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" id="vtOk">Encaisser</button>`);
+    $('#vtQte').oninput = () => { $('#vtTotal').textContent = eur((Number($('#vtQte').value) || 1) * a.prixVente); };
+    $('#vtOk').onclick = () => {
+      const q = Math.min(a.qte, Math.max(1, Number($('#vtQte').value) || 1));
+      a.qte -= q;
+      const total = q * a.prixVente;
+      state.ventes.unshift({ id: Date.now(), article: a.nom, qte: q, pu: a.prixVente, date: TODAY, mode: $('#vtMode').value, acheteur: $('#vtQui').value.trim() || 'Comptoir' });
+      state.mouvements.unshift({ id: Date.now() + 1, date: TODAY, artId: a.id, delta: -q, motif: 'Vente boutique', par: state.currentUser.nom });
+      state.ecritures.unshift({ id: Date.now() + 2, date: TODAY, sens: 'R', cat: 'Boutique', libelle: `Vente boutique — ${q} × ${a.nom}`, montant: total });
+      toast(`Vente encaissée : ${eur(total)} — stock et comptabilité mis à jour.`);
+      closeModal(); render();
+    };
+  });
+  const nd = $('#btnNewDot');
+  if (nd) nd.onclick = () => openDotation(null, null);
+  const inv = $('#pInviter');
+  if (inv) inv.onclick = () => toast('Dans la version réelle : email d\'invitation avec rôle pré-affecté (chantier comptes utilisateurs).');
+  $$('[data-urole]', v).forEach(s => s.onchange = () => {
+    const p = PERSONAS.find(x => x.id === s.dataset.urole);
+    if (p) { p.roleId = s.value; p.roleLabel = (ROLES.find(r => r.id === s.value) || {}).label || p.roleLabel; toast(`Rôle de ${p.nom} mis à jour — visible via « voir comme ».`); render(); }
+  });
+};
 
 render();
 </script>
