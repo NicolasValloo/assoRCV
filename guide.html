@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Guide Ovalie Gestion</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap">
+<style>
+:root {
+  --bg: #f6f7f5; --surface: #ffffff; --surface-2: #eef1ed;
+  --ink: #182019; --ink-2: #5a635c; --ink-3: #8b938d;
+  --line: #e2e6e1; --line-strong: #c9cfc9;
+  --accent: #1e5c42; --accent-soft: #e3efe8;
+  --good: #0ca30c; --good-text: #006300;
+  --warning: #fab219; --warning-text: #8a5b00;
+  --critical: #d03b3b; --critical-text: #b02a2a;
+  --info-text: #1e5c42;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101412; --surface: #191f1b; --surface-2: #212823;
+    --ink: #e7ece8; --ink-2: #a6afa8; --ink-3: #79827b;
+    --line: #2a322c; --line-strong: #3b453e;
+    --accent: #4fae83; --accent-soft: #1d2f26;
+    --good: #0ca30c; --good-text: #4cc06a;
+    --warning: #fab219; --warning-text: #e3b95c;
+    --critical: #d03b3b; --critical-text: #e66767;
+    --info-text: #4fae83;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101412; --surface: #191f1b; --surface-2: #212823;
+  --ink: #e7ece8; --ink-2: #a6afa8; --ink-3: #79827b;
+  --line: #2a322c; --line-strong: #3b453e;
+  --accent: #4fae83; --accent-soft: #1d2f26;
+  --good: #0ca30c; --good-text: #4cc06a;
+  --warning: #fab219; --warning-text: #e3b95c;
+  --critical: #d03b3b; --critical-text: #e66767;
+  --info-text: #4fae83;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 14.5px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: 0 16px 60px;
+}
+.wrap { max-width: 860px; margin: 0 auto; }
+header.doc { padding: 34px 0 10px; border-bottom: 3px solid var(--accent); margin-bottom: 8px; }
+h1 { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 40px; margin: 0; line-height: 1; letter-spacing: .3px; }
+.sub { color: var(--ink-2); margin: 8px 0 0; font-size: 14px; }
+h2 {
+  font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 26px;
+  margin: 40px 0 4px; letter-spacing: .3px; display: flex; align-items: center; gap: 10px;
+  scroll-margin-top: 16px;
+}
+h2 .mico { font-size: 20px; }
+h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .9px; color: var(--ink-2); margin: 20px 0 8px; font-weight: 700; }
+p { margin: 8px 0; max-width: 72ch; }
+.lead { color: var(--ink-2); margin-top: 0; }
+ul { margin: 6px 0 12px; padding-left: 22px; }
+li { margin-bottom: 5px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--ink-3); padding: 7px 9px; border-bottom: 1px solid var(--line-strong); }
+td { padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 2px 6px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .2px; padding: 1px 8px; border-radius: 12px; white-space: nowrap; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); }
+.b-ecr { color: var(--good-text); border-color: color-mix(in srgb, var(--good) 35%, var(--line)); background: color-mix(in srgb, var(--good) 10%, var(--surface)); }
+.b-lec { color: var(--warning-text); border-color: color-mix(in srgb, var(--warning) 40%, var(--line)); background: color-mix(in srgb, var(--warning) 12%, var(--surface)); }
+.b-non { color: var(--critical-text); border-color: color-mix(in srgb, var(--critical) 30%, var(--line)); background: color-mix(in srgb, var(--critical) 8%, var(--surface)); }
+.b-adm { color: var(--info-text); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); background: var(--accent-soft); }
+.flow {
+  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: 8px; padding: 9px 13px; margin: 6px 0; font-size: 13.5px;
+}
+.flow b { color: var(--info-text); }
+.toc { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0 6px; }
+.toc a {
+  text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: 18px; padding: 5px 12px; font-size: 12.5px; font-weight: 600;
+}
+.toc a:hover { background: var(--accent-soft); border-color: var(--accent); }
+.note { background: var(--surface-2); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--ink-2); margin: 12px 0; }
+.sim { color: var(--ink-3); font-style: italic; }
+code { background: var(--surface-2); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+a { color: var(--info-text); }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+<header class="doc">
+  <h1>Guide Ovalie Gestion</h1>
+  <p class="sub">Maquette V5.3 · septembre 2026 · données 100 % fictives — ce guide décrit chaque module, les vues selon le rôle connecté, les actions possibles et leurs répercussions dans le reste de l'application.</p>
+</header>
+
+<div class="toc">
+  <a href="#roles">Rôles & vues</a><a href="#dashboard">Tableau de bord</a><a href="#sportif">Sportif</a>
+  <a href="#licencies">Licenciés</a><a href="#compta">Comptabilité</a><a href="#stock">Stock</a>
+  <a href="#codir">Codir & AG</a><a href="#documents">Documents</a><a href="#monespace">Mon espace</a>
+  <a href="#profil">Mon profil</a><a href="#parametres">Paramètres</a><a href="#simule">Ce qui est simulé</a>
+</div>
+
+<h2 id="roles">🎭 Rôles, vues et sélecteur de démo</h2>
+<p class="lead">Toute l'application se lit à travers le rôle de la personne connectée. Le sélecteur <b>« Démo — voir comme »</b> (en bas du menu) permet de changer d'utilisateur instantanément.</p>
+<ul>
+  <li><strong>Alban Salini — Président</strong> : accès complet, y compris Paramètres.</li>
+  <li><strong>Cybelle Mannes — Trésorière</strong> : Comptabilité en écriture, le reste surtout en lecture.</li>
+  <li><strong>Julien Vasseur — Éducateur M10</strong> : Sportif en écriture (convocations, présences), Licenciés en lecture, Stock en écriture, Documents en cases.</li>
+  <li><strong>Joueuse Seniors</strong> (2 clubs) : menu réduit à Mon espace, Sportif, Documents. Peut changer de club (l'interface prend la couleur de l'autre club).</li>
+  <li><strong>Parent d'un M10</strong> : mêmes vues que le joueur, mais rattaché à la licence de l'enfant.</li>
+</ul>
+<div class="note">Trois niveaux d'accès par module, définis dans Paramètres → Droits & rôles : <span class="badge b-adm">Admin</span> <span class="badge b-ecr">Écriture</span> <span class="badge b-lec">Lecture</span> (module visible, boutons d'action masqués) <span class="badge b-non">Aucun</span> (module absent du menu). Répondre présent/absent à une convocation reste possible en lecture : c'est une action sur ses propres données.</div>
+
+<h2 id="dashboard">▦ Tableau de bord</h2>
+<p class="lead">Vue de pilotage du club. Réservée aux rôles bureau (président, trésorière, secrétaire, membre codir).</p>
+<h3>Contenu</h3>
+<ul>
+  <li>4 indicateurs : licenciés (+ licences en attente FFR), trésorerie, alertes stock, prochaine réunion.</li>
+  <li>Courbe de trésorerie sur 12 mois (survol = détail par mois).</li>
+  <li>Liste <strong>« À traiter »</strong> : certificats expirés, stock sous seuil, péremptions, cotisations en attente, transactions bancaires à rapprocher, convocations non envoyées — chaque ligne a un bouton <em>Voir</em> qui ouvre le module concerné.</li>
+  <li>Effectifs par catégorie et répartition des cotisations (payées / partielles / impayées).</li>
+</ul>
+<h3>Connexions</h3>
+<div class="flow">Le tableau de bord ne produit rien : il <b>agrège</b> tous les modules. Les seuils qui déclenchent ses alertes (délai certificat, péremption) viennent de <b>Paramètres → Alertes</b> — les changer recalcule immédiatement les alertes.</div>
+
+<h2 id="sportif">🏉 Sportif</h2>
+<p class="lead">Calendrier des matchs, entraînements et tournois, convocations et présences. Le module principal des coachs et joueurs, pensé mobile (cartes).</p>
+<h3>Vues par rôle</h3>
+<div class="table-wrap"><table>
+  <tr><th>Rôle</th><th>Ce qu'il voit</th><th>Ce qu'il peut faire</th></tr>
+  <tr><td>Président, secrétaire</td><td>Toutes catégories</td><td>Créer un événement, convoquer, voir les réponses, saisir un résultat</td></tr>
+  <tr><td>Éducateur</td><td>Toutes catégories (filtre par défaut sur la sienne)</td><td>Idem + feuille de présence des entraînements (pointage P/A)</td></tr>
+  <tr><td>Trésorière, membre codir</td><td>Tout le calendrier</td><td>Lecture seule</td></tr>
+  <tr><td>Joueur / parent</td><td>Filtré sur sa catégorie</td><td>Répondre <em>Présent</em> / <em>Absent</em> aux événements qui le concernent</td></tr>
+</table></div>
+<h3>Actions & répercussions</h3>
+<div class="flow"><b>Convoquer</b> (match) → sélection des licenciés de la catégorie → chaque convoqué voit l'événement dans Sportif et <b>Mon espace</b>, avec boutons de réponse.</div>
+<div class="flow"><b>Réponse joueur</b> (Présent/Absent) → met à jour les compteurs de la carte et la liste <b>Réponses</b> vue par le coach.</div>
+<div class="flow"><b>Saisir le résultat</b> (match passé) → score affiché dans l'onglet Résultats. <span class="sim">Version réelle : alimenterait aussi les stats de l'onglet Rugby des fiches licenciés (matchs auto, essais/cartons saisis ici par le coach).</span></div>
+<div class="flow"><b>Feuille de présence</b> (entraînement) → pointage conservé sur l'événement. <span class="sim">Version réelle : historiques d'assiduité par joueur.</span></div>
+
+<h2 id="licencies">👤 Licenciés</h2>
+<p class="lead">Le registre du club : 113 licenciés générés. Liste filtrable (recherche, catégorie, cotisation, certificat) ; badge <b>Mutation</b> pour les arrivants d'un autre club dont la licence n'est pas validée.</p>
+<h3>La fiche licencié — 6 onglets</h3>
+<ul>
+  <li><strong>Général</strong> : identité complète, nationalité et lieu de naissance, antécédents (déjà licencié, ancien club, saisons → badge Mutation FFR), mensurations (taille, poids, pointure, tailles short/maillot — utilisées par les dotations).</li>
+  <li><strong>Responsable légal</strong> (mineurs) : référents 1 et 2 complets, autres membres de la famille licenciés, préférences de contact email et WhatsApp.</li>
+  <li><strong>Rugby</strong> : matchs, essais, cartons de la saison passée.</li>
+  <li><strong>Documents</strong> : certificat médical (« fiche de soin »), autorisation parentale — dépôt et <em>renommage</em>, alerte si certificat expiré.</li>
+  <li><strong>Paiement</strong> : état de la licence, montant réglé, mode de paiement, échéancier (réglée / à venir / en retard), demandes de paiement en ligne.</li>
+  <li><strong>Dotation</strong> : équipement reçu du club, bouton d'attribution.</li>
+</ul>
+<h3>Actions & répercussions</h3>
+<div class="flow"><b>Envoyer un lien de paiement</b> (fiche) → crée une demande dans <b>Comptabilité → Paiements en ligne</b>.</div>
+<div class="flow"><b>Attribuer une dotation</b> (fiche ou Stock → Dotations) → décrémente le <b>Stock</b>, trace un mouvement, apparaît dans la fiche du joueur.</div>
+<div class="flow"><b>Modifier / créer</b> → formulaire complet (identité, licence, mensurations, responsables légaux, cotisation). Un mineur sans responsable légal est refusé. Le montant réglé recalcule le statut de cotisation, donc le tableau de bord et les listes de relance.</div>
+<div class="flow">Les badges <b>certificat</b> dépendent du délai d'alerte de <b>Paramètres</b> ; les certificats expirés remontent au <b>Tableau de bord</b>.</div>
+
+<h2 id="compta">€ Comptabilité</h2>
+<p class="lead">Quatre onglets. En écriture pour président et trésorière ; lecture pour secrétaire et membre codir ; absent pour éducateur, joueur, parent.</p>
+<ul>
+  <li><strong>Synthèse</strong> : solde, recettes/dépenses de l'exercice, graphique 12 mois, dépenses par poste.</li>
+  <li><strong>Banque & rapprochement</strong> <span class="sim">(connecteur bancaire simulé)</span> : bouton <em>Synchroniser</em> qui importe des transactions, catégorie proposée, bouton <em>Valider</em> qui rapproche.</li>
+  <li><strong>Paiements en ligne</strong> <span class="sim">(module de paiement simulé)</span> : demandes envoyées aux familles, relances, bouton <em>Simuler le paiement</em>.</li>
+  <li><strong>Journal</strong> : toutes les écritures ; écriture manuelle possible.</li>
+</ul>
+<h3>Répercussions en chaîne</h3>
+<div class="flow"><b>Valider un rapprochement</b> → crée l'écriture au <b>Journal</b> → met à jour solde, graphiques et <b>Tableau de bord</b>.</div>
+<div class="flow"><b>Paiement en ligne reçu</b> → 4 effets d'un coup : cotisation du licencié mise à jour (fiche + liste), écriture « Cotisations » au Journal, transaction bancaire rapprochée, compteurs du Tableau de bord.</div>
+<div class="flow"><b>Vente boutique</b> (module Stock) → écriture « Boutique » au Journal.</div>
+
+<h2 id="stock">▤ Stock</h2>
+<p class="lead">Multi-pôles : sportif, pharmacie, administratif, buvette — plus deux onglets transverses, <b>Boutique</b> et <b>Dotations</b>. Écriture pour président, éducateur, membre codir ; lecture pour trésorière et secrétaire.</p>
+<h3>Par pôle</h3>
+<ul>
+  <li>Jauge de niveau, badge <em>Sous seuil</em>, péremptions (pharmacie, buvette) avec alerte sous 60 jours (paramétrable).</li>
+  <li><strong>Clic sur une ligne → fiche article</strong> : prix d'achat, prix de vente + marge, EAN, derniers mouvements, bouton <em>Modifier l'article</em> (une correction de quantité trace un mouvement « Correction d'inventaire »).</li>
+  <li>Boutons <em>+ Entrée</em> / <em>− Sortie</em> avec motif ; historique global des mouvements.</li>
+</ul>
+<h3>Boutique</h3>
+<div class="flow"><b>Vendre</b> (quantité, mode de paiement) → stock décrémenté + mouvement + <b>écriture comptable « Boutique »</b> + journal des ventes. Vente aux non-adhérents possible, pas de TVA (asso non assujettie).</div>
+<h3>Dotations</h3>
+<div class="flow"><b>Nouvelle dotation</b> (joueur + article) → stock décrémenté + journal des dotations + onglet <b>Dotation de la fiche du licencié</b>. Les tailles du joueur (short, maillot, pointure) viennent de sa fiche. Tout est donné, pas de gestion de retour.</div>
+<div class="flow">Sous seuil et péremptions remontent au <b>Tableau de bord</b> et en badge sur l'onglet du pôle.</div>
+
+<h2 id="codir">⚖ Codir & AG</h2>
+<p class="lead">Réunions du comité directeur et assemblées générales. Admin pour président et secrétaire, écriture pour trésorière et membre codir.</p>
+<h3>Une réunion = 4 onglets</h3>
+<ul>
+  <li><strong>Préparation</strong> : ordre du jour (ajout/retrait), envoi des convocations <span class="sim">(simulé)</span>, documents joints.</li>
+  <li><strong>Séance</strong> : émargement (codir) ou effectifs AG, calcul du <b>quorum</b> en direct, notes/décisions par point de l'ordre du jour.</li>
+  <li><strong>Votes</strong> : ouvrir un vote, saisir pour/contre/abstention, clore → résolution adoptée ou rejetée ; ajout de résolutions.</li>
+  <li><strong>Compte-rendu</strong> : généré automatiquement à partir du déroulé et des votes ; export PDF et diffusion <span class="sim">(simulés)</span>.</li>
+</ul>
+<h3>Connexions</h3>
+<div class="flow">Les <b>quorums</b> par défaut (AG 25 %, codir 50 %) viennent de <b>Paramètres</b> et s'appliquent aux nouvelles réunions. L'émargement de séance alimente le calcul du quorum, qui conditionne la validité des votes ; le tout se retrouve dans le compte-rendu.</div>
+<div class="flow">Une convocation non envoyée pour une réunion en préparation remonte en alerte au <b>Tableau de bord</b>.</div>
+
+<h2 id="documents">🗂 Documents</h2>
+<p class="lead">La GED du club, avec deux présentations selon le rôle.</p>
+<ul>
+  <li><strong>Rôles bureau</strong> : vue type Drive — dossiers, fil d'Ariane, recherche globale, nouveau dossier, import, fiche fichier (partage, versions).</li>
+  <li><strong>Joueur / parent / éducateur</strong> : vue en <b>cases tactiles</b> (mobile) — « Mes documents » (certificat médical avec alerte, attestation de licence, reçu de cotisation) puis « Documents du club ».</li>
+</ul>
+<h3>Visibilité par audience</h3>
+<div class="flow">Chaque document a un partage : <b>Bureau</b>, <b>Codir</b>, <b>Éducateurs</b> ou <b>Tous les membres</b>. Un joueur ne voit que « Tous les membres » — recherche comprise. Le partage au niveau fichier prime : un dossier réservé au bureau reste visible s'il contient un fichier public, sinon il disparaît. <span class="sim">Version réelle : ce filtrage devra être appliqué côté serveur.</span></div>
+<div class="flow">Les documents « Tous les membres » alimentent aussi la carte Documents de <b>Mon espace</b>.</div>
+
+<h2 id="monespace">🏉 Mon espace <span class="badge" style="vertical-align:middle">joueur / parent uniquement</span></h2>
+<p class="lead">La page d'accueil des adhérents : l'essentiel en 4 cartes + documents.</p>
+<ul>
+  <li><strong>Ma licence</strong> (ou celle de l'enfant pour un parent) : numéro, catégorie, statut FFR.</li>
+  <li><strong>Certificat médical</strong> : validité, consigne si renouvellement nécessaire.</li>
+  <li><strong>Ma cotisation</strong> : réglé/total, bouton <b>Payer en ligne</b> <span class="sim">(simulé)</span>.</li>
+  <li><strong>Prochains événements</strong> : les 2 prochains de sa catégorie, bouton <em>Répondre</em> → module Sportif.</li>
+</ul>
+<div class="flow"><b>Payer ma cotisation</b> → même chaîne que côté trésorière : cotisation à jour, écriture au Journal, transaction bancaire, tableau de bord.</div>
+
+<h2 id="profil">🪪 Mon profil</h2>
+<p class="lead">Page dédiée (clic sur l'utilisateur en haut du menu), indépendante du club affiché.</p>
+<ul>
+  <li>Identité (email, téléphone, modification <span class="sim">simulée</span>).</li>
+  <li><strong>Mes clubs & rôles</strong> : un compte peut appartenir à plusieurs clubs avec un rôle différent dans chacun ; demande de rattachement <span class="sim">(simulée)</span>. Le sélecteur de club (sous le nom, dans le menu) bascule l'interface aux couleurs de l'autre club.</li>
+  <li>Ma licence / licencié rattaché + historique de paiements.</li>
+  <li>Préférences de notifications ; sécurité & sessions (mot de passe, déconnexion <span class="sim">simulés</span>).</li>
+</ul>
+
+<h2 id="parametres">⚙ Paramètres <span class="badge b-adm" style="vertical-align:middle">Président uniquement</span></h2>
+<p class="lead">Le back-office du club — 5 onglets, et la plupart des réglages agissent immédiatement sur le reste de l'application.</p>
+<ul>
+  <li><strong>Identité & couleurs</strong> : nom du club, discipline, logo, couleur du club (« option A » : appliquée aux boutons, onglets et menu actif — jamais aux statuts ni aux graphiques ; assombrie automatiquement si illisible).</li>
+  <li><strong>Utilisateurs</strong> : attribution du rôle par personne — le changement est réellement appliqué (vérifiable via « voir comme ») ; invitation <span class="sim">(simulée)</span>.</li>
+  <li><strong>Droits & rôles</strong> : matrice rôle × module (Aucun / Lecture / Écriture / Admin) qui pilote le menu et les actions de chacun.</li>
+  <li><strong>Alertes & fonctionnement</strong> : délai d'alerte certificats, péremptions, relances, quorums AG/codir, début d'exercice, tarifs par catégorie.</li>
+  <li><strong>Modèles</strong> : convocation, compte-rendu, reçu, relance <span class="sim">(éditeur simulé)</span>.</li>
+</ul>
+<h3>Répercussions</h3>
+<div class="flow"><b>Délai certificat 60 → 120 j</b> → les badges des licenciés, le filtre « expirent sous X j » et les alertes du Tableau de bord se recalculent aussitôt.</div>
+<div class="flow"><b>Quorums</b> → appliqués aux prochaines réunions créées. <b>Tarifs</b> → appliqués aux nouvelles inscriptions (les cotisations émises ne sont pas recalculées).</div>
+<div class="flow"><b>Droits</b> → changer une case de la matrice, puis « voir comme » le rôle concerné : le menu et les boutons changent.</div>
+
+<h2 id="simule">🧪 Ce qui est simulé (et le serait pour de vrai)</h2>
+<div class="table-wrap"><table>
+  <tr><th>Dans la maquette</th><th>Dans la version réelle</th></tr>
+  <tr><td>Données générées, modifications en mémoire (perdues au rechargement)</td><td>Base de données, comptes utilisateurs, historique</td></tr>
+  <tr><td>Synchronisation bancaire fictive</td><td>Agrégateur DSP2 (Bridge, Powens…)</td></tr>
+  <tr><td>Liens et « simuler le paiement »</td><td>Prestataire de paiement (Stripe, HelloAsso…)</td></tr>
+  <tr><td>Convocations, relances, diffusion « envoyées »</td><td>Emails et notifications push réels</td></tr>
+  <tr><td>Licences et mutations saisies à la main</td><td>Lien avec Oval-e / FFR</td></tr>
+  <tr><td>Filtrage des documents côté navigateur</td><td>Droits appliqués côté serveur (sécurité réelle)</td></tr>
+  <tr><td>Exports PDF/CSV (messages)</td><td>Vrais exports (FEC, compte de résultat, feuilles de match)</td></tr>
+  <tr><td>Boutique en ligne au comptoir</td><td>Caisse mobile avec mode hors-ligne (réseau de stade)</td></tr>
+</table></div>
+
+<p style="margin-top:36px;color:var(--ink-3);font-size:12.5px">Guide V5.3 — évolue avec la maquette. Retours bienvenus : chaque remarque de testeur est tracée et traitée version par version.</p>
+</div>
+
+</body>
+</html>

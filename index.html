@@ -3384,6 +3384,220 @@ bindExtra = function (v) {
 
 render();
 </script>
+<script>
+/* ================= V5.3 : ÉDITION COMPLÈTE LICENCIÉ, FIX CRÉATION, ÉDITION ARTICLES ================= */
+
+/* Filet de sécurité : tout licencié incomplet (créé avant ce correctif) est normalisé avant affichage */
+function normaliserLic(l) {
+  l.sexe = l.sexe || 'M';
+  l.nationalite = l.nationalite || 'Française';
+  l.paysNaissance = l.paysNaissance || 'France';
+  l.villeNaissance = l.villeNaissance || l.ville || '—';
+  l.dejaLicencie = l.dejaLicencie ?? false;
+  l.anneesLicence = l.anneesLicence ?? 0;
+  l.ancienClub = l.ancienClub ?? null;
+  l.mutation = l.mutation ?? false;
+  l.pointure = l.pointure ?? 42;
+  l.tailleCm = l.tailleCm ?? 175;
+  l.poids = l.poids ?? 80;
+  l.tailleShort = l.tailleShort || 'M';
+  l.tailleMaillot = l.tailleMaillot || 'M';
+  if (l.stats === undefined) l.stats = l.cat === 'DIR' ? null : { saison: '2025-2026', matchs: 0, essais: 0, cartonsJ: 0, cartonsR: 0 };
+  l.docsLic = l.docsLic || [];
+  l.dotations = l.dotations || [];
+  l.echeances = l.echeances || [];
+  l.modePaiement = l.modePaiement || (l.cot ? 'CB en ligne' : '—');
+  if (l.referents === undefined) l.referents = null;
+  return l;
+}
+const _renderFicheV5 = renderFiche;
+renderFiche = function (id, tab) {
+  const l = state.licencies.find(x => x.id === id);
+  if (l) normaliserLic(l);
+  _renderFicheV5(id, tab);
+};
+
+/* ---- Formulaire licencié complet (création + modification) ---- */
+const TAILLES_TOUTES = ['6 ans','8 ans','10 ans','12 ans','14 ans','XS','S','M','L','XL','XXL'];
+openFormLic = function (id) {
+  const l = id ? normaliserLic(state.licencies.find(x => x.id === id)) : null;
+  const F = (fid, lab, inner) => `<div class="field"><label for="${fid}">${lab}</label>${inner}</div>`;
+  const inp = (fid, val, type = 'text', extra = '') => `<input id="${fid}" type="${type}" value="${esc(String(val ?? ''))}" ${extra}>`;
+  const sel = (fid, opts, cur) => `<select id="${fid}">${opts.map(o => Array.isArray(o) ? `<option value="${o[0]}" ${cur === o[0] ? 'selected' : ''}>${o[1]}</option>` : `<option ${cur === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+  const H = t => `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:18px 0 8px">${t}</h3>`;
+  const r1 = l && l.referents ? l.referents[0] : null;
+  const r2 = l && l.referents ? l.referents[1] : null;
+  const refBlock = (n, r) => `
+    <div class="form-grid" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px">
+      ${F('ref' + n + 'Prenom', `Référent ${n} — prénom`, inp('ref' + n + 'Prenom', r ? r.prenom : ''))}
+      ${F('ref' + n + 'Nom', 'Nom', inp('ref' + n + 'Nom', r ? r.nom : ''))}
+      ${F('ref' + n + 'Lien', 'Lien de parenté', sel('ref' + n + 'Lien', ['Mère','Père','Tutrice','Tuteur','Autre'], r ? r.lien : 'Mère'))}
+      ${F('ref' + n + 'Metier', 'Métier', inp('ref' + n + 'Metier', r ? r.metier : ''))}
+      ${F('ref' + n + 'Email', 'Email', inp('ref' + n + 'Email', r ? r.email : '', 'email'))}
+      ${F('ref' + n + 'Tel', 'Téléphone', inp('ref' + n + 'Tel', r ? r.tel : ''))}
+    </div>`;
+  openModal(l ? 'Modifier le licencié' : 'Nouveau licencié', `
+    ${H('Identité')}
+    <div class="form-grid">
+      ${F('fPrenom', 'Prénom', inp('fPrenom', l ? l.prenom : ''))}
+      ${F('fNom', 'Nom', inp('fNom', l ? l.nom : ''))}
+      ${F('fSexe', 'Sexe', sel('fSexe', [['M','Masculin'],['F','Féminin']], l ? l.sexe : 'M'))}
+      ${F('fNaiss', 'Date de naissance', inp('fNaiss', l ? l.naissance : '2010-01-01', 'date'))}
+      ${F('fNat', 'Nationalité', inp('fNat', l ? l.nationalite : 'Française'))}
+      ${F('fVilleN', 'Ville de naissance', inp('fVilleN', l ? l.villeNaissance : ''))}
+      ${F('fPaysN', 'Pays de naissance', inp('fPaysN', l ? l.paysNaissance : 'France'))}
+      ${F('fVille', 'Commune de résidence', inp('fVille', l ? l.ville : ''))}
+      ${F('fEmail', 'Email', inp('fEmail', l ? l.email : '', 'email'))}
+      ${F('fTel', 'Téléphone', inp('fTel', l ? l.tel : ''))}
+    </div>
+    ${H('Licence & antécédents')}
+    <div class="form-grid">
+      ${F('fCat', 'Catégorie', sel('fCat', CATEGORIES.map(c => [c.code, c.label]), l ? l.cat : 'SEN'))}
+      ${F('fLicStatut', 'Statut licence FFR', sel('fLicStatut', [['attente','En attente FFR'],['validee','Validée'],['a_renouveler','À renouveler']], l ? l.licStatut : 'attente'))}
+      ${F('fCert', 'Fin de validité certificat médical', inp('fCert', l ? l.certFin : '', 'date'))}
+      ${F('fDeja', 'Licencié l\'année précédente ?', sel('fDeja', [['non','Non (première licence)'],['oui','Oui']], l && l.dejaLicencie ? 'oui' : 'non'))}
+      ${F('fAncienClub', 'Ancien club (si oui)', inp('fAncienClub', l ? (l.ancienClub || '') : '', 'text', 'placeholder="laisser vide si même club"'))}
+      ${F('fAnnees', 'Nombre de saisons de licence', inp('fAnnees', l ? l.anneesLicence : 0, 'number', 'min="0"'))}
+    </div>
+    ${H('Mensurations & équipement')}
+    <div class="form-grid">
+      ${F('fTailleCm', 'Taille (cm)', inp('fTailleCm', l ? l.tailleCm : 175, 'number', 'min="80" max="230"'))}
+      ${F('fPoids', 'Poids (kg)', inp('fPoids', l ? l.poids : 80, 'number', 'min="15" max="180"'))}
+      ${F('fPointure', 'Pointure (chaussettes)', inp('fPointure', l ? l.pointure : 42, 'number', 'min="26" max="52"'))}
+      ${F('fTShort', 'Taille short', sel('fTShort', TAILLES_TOUTES, l ? l.tailleShort : 'M'))}
+      ${F('fTMaillot', 'Taille maillot d\'entraînement', sel('fTMaillot', TAILLES_TOUTES, l ? l.tailleMaillot : 'M'))}
+    </div>
+    ${H('Responsables légaux (obligatoire pour les mineurs)')}
+    ${refBlock(1, r1)}
+    ${refBlock(2, r2)}
+    <div class="form-grid">
+      ${F('fFamille', 'Autres membres de la famille licenciés en 2026-2027', inp('fFamille', l ? (l.familleAutres || 'Non') : 'Non'))}
+      ${F('fPrefMail', 'Contact email du parent dirigeant', sel('fPrefMail', ['Référent 1','Référent 2','Les deux'], l ? l.prefMail : 'Les deux'))}
+      ${F('fPrefWa', 'Contact WhatsApp du parent dirigeant', sel('fPrefWa', ['Référent 1','Référent 2','Les deux'], l ? l.prefWhatsapp : 'Les deux'))}
+    </div>
+    ${H('Cotisation')}
+    <div class="form-grid">
+      ${F('fCotPaye', 'Montant réglé (€)', inp('fCotPaye', l ? l.cotPaye : 0, 'number', 'min="0"'))}
+      ${F('fModePai', 'Mode de paiement', sel('fModePai', ['CB en ligne','Virement','Chèque','Chèque (×3)','Espèces','Chèques vacances (ANCV)'], l ? l.modePaiement : 'CB en ligne'))}
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="fSave">${l ? 'Enregistrer' : 'Créer le licencié'}</button>`);
+  $('#fSave').onclick = () => {
+    const cat = CATEGORIES.find(c => c.code === $('#fCat').value);
+    const prenom = $('#fPrenom').value.trim(), nom = $('#fNom').value.trim();
+    if (!prenom || !nom) { toast('Prénom et nom sont obligatoires.'); return; }
+    const lireRef = n => {
+      const p = $('#ref' + n + 'Prenom').value.trim(), nn = $('#ref' + n + 'Nom').value.trim();
+      if (!p && !nn) return null;
+      return { prenom: p, nom: nn, lien: $('#ref' + n + 'Lien').value, metier: $('#ref' + n + 'Metier').value.trim(), email: $('#ref' + n + 'Email').value.trim(), tel: $('#ref' + n + 'Tel').value.trim() };
+    };
+    const refs = [lireRef(1), lireRef(2)].filter(Boolean);
+    const mineur = CATS_MINEURS.includes(cat.code);
+    if (mineur && !refs.length) { toast('Un mineur doit avoir au moins un responsable légal.'); return; }
+    const cotPaye = Math.min(cat.cot, Math.max(0, Number($('#fCotPaye').value) || 0));
+    const deja = $('#fDeja').value === 'oui';
+    const ancienClub = deja ? ($('#fAncienClub').value.trim() || state.params.clubNom) : null;
+    const base = {
+      prenom, nom, sexe: $('#fSexe').value, naissance: $('#fNaiss').value, cat: cat.code,
+      nationalite: $('#fNat').value.trim() || 'Française',
+      villeNaissance: $('#fVilleN').value.trim() || '—', paysNaissance: $('#fPaysN').value.trim() || 'France',
+      ville: $('#fVille').value.trim() || 'Vincennes',
+      email: $('#fEmail').value.trim(), tel: $('#fTel').value.trim(),
+      licStatut: $('#fLicStatut').value, certFin: $('#fCert').value || addDaysIso(TODAY, 365),
+      dejaLicencie: deja, ancienClub, anneesLicence: deja ? Math.max(1, Number($('#fAnnees').value) || 1) : 0,
+      mutation: !!(deja && ancienClub && ancienClub !== state.params.clubNom),
+      tailleCm: Number($('#fTailleCm').value) || 175, poids: Number($('#fPoids').value) || 80,
+      pointure: Number($('#fPointure').value) || 42, tailleShort: $('#fTShort').value, tailleMaillot: $('#fTMaillot').value,
+      referents: refs.length ? refs : null,
+      familleAutres: $('#fFamille').value.trim() || 'Non',
+      prefMail: $('#fPrefMail').value, prefWhatsapp: $('#fPrefWa').value,
+      cot: cat.cot, cotPaye,
+      cotStatut: cat.cot === 0 ? 'exoneree' : cotPaye >= cat.cot ? 'payee' : cotPaye > 0 ? 'partielle' : 'impayee',
+      modePaiement: cat.cot === 0 ? '—' : $('#fModePai').value,
+    };
+    if (l) {
+      Object.assign(l, base);
+      l.echeances = l.echeances || [];
+      toast(`Fiche de ${prenom} ${nom} mise à jour.`);
+    } else {
+      const nouveau = normaliserLic({ id: Date.now(), licence: '2026' + ri(100000, 999999), inscrit: 2026, ...base });
+      if (nouveau.cot > 0) nouveau.echeances = nouveau.cotStatut === 'payee'
+        ? [{ date: TODAY, montant: nouveau.cot, statut: 'reglee' }]
+        : nouveau.cotStatut === 'partielle'
+          ? [{ date: TODAY, montant: cotPaye, statut: 'reglee' }, { date: addDaysIso(TODAY, 30), montant: nouveau.cot - cotPaye, statut: 'a_venir' }]
+          : [{ date: addDaysIso(TODAY, 15), montant: nouveau.cot, statut: 'a_venir' }];
+      state.licencies.push(nouveau);
+      toast(`${prenom} ${nom} ajouté aux licenciés — sa fiche est ouvrable.`);
+    }
+    closeModal(); render();
+  };
+};
+
+/* ---- Articles de stock : création avec prix/EAN + modification ---- */
+openFormArticle = function (artId) {
+  if (typeof artId !== 'number') artId = null;
+  const a = artId ? state.stock.find(x => x.id === artId) : null;
+  openModal(a ? 'Modifier l\'article' : 'Nouvel article', `
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1"><label for="aNom">Désignation</label><input id="aNom" value="${a ? esc(a.nom) : ''}" placeholder="ex. Bouteilles d'eau 50 cl"></div>
+      <div class="field"><label for="aPole">Pôle</label><select id="aPole">${POLES.map(p => `<option value="${p.code}" ${a && a.pole === p.code ? 'selected' : ''}>${p.label}</option>`).join('')}</select></div>
+      <div class="field"><label for="aUnite">Unité</label><input id="aUnite" value="${a ? esc(a.unite) : 'u.'}"></div>
+      <div class="field"><label for="aQte">Quantité ${a ? 'en stock' : 'initiale'}</label><input id="aQte" type="number" min="0" value="${a ? a.qte : 0}"></div>
+      <div class="field"><label for="aSeuil">Seuil d'alerte</label><input id="aSeuil" type="number" min="0" value="${a ? a.seuil : 5}"></div>
+      <div class="field"><label for="aPA">Prix d'achat (€)</label><input id="aPA" type="number" min="0" step="0.01" value="${a ? a.prixAchat : ''}"></div>
+      <div class="field"><label for="aPV">Prix de vente (€) — vide si non vendu</label><input id="aPV" type="number" min="0" step="0.01" value="${a && a.prixVente ? a.prixVente : ''}"></div>
+      <div class="field"><label for="aEan">EAN (code-barres)</label><input id="aEan" value="${a ? esc(a.ean) : ''}" placeholder="généré si vide"></div>
+      <div class="field"><label for="aEmpl">Emplacement</label><input id="aEmpl" value="${a ? esc(a.empl) : ''}" placeholder="ex. Local matériel"></div>
+      <div class="field"><label for="aPeremp">Péremption (optionnel)</label><input id="aPeremp" type="date" value="${a && a.peremption ? a.peremption : ''}"></div>
+      <div class="field" style="grid-column:1/-1;flex-direction:row;gap:18px;align-items:center">
+        <label style="display:flex;gap:7px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" id="aVente" ${a && a.vente ? 'checked' : ''}> Vendu en boutique</label>
+        <label style="display:flex;gap:7px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" id="aDot" ${a && a.dotation ? 'checked' : ''}> Article de dotation joueurs</label>
+      </div>
+    </div>
+    ${a ? '<p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">La correction de quantité crée un mouvement « Correction d\'inventaire » pour garder la traçabilité.</p>' : ''}`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="aSave">${a ? 'Enregistrer' : 'Créer l\'article'}</button>`);
+  $('#aSave').onclick = () => {
+    const nom = $('#aNom').value.trim();
+    if (!nom) { toast('La désignation est obligatoire.'); return; }
+    const pv = $('#aPV').value === '' ? null : Math.max(0, Number($('#aPV').value) || 0);
+    const vals = {
+      nom, pole: $('#aPole').value, unite: $('#aUnite').value.trim() || 'u.',
+      seuil: Math.max(0, Number($('#aSeuil').value) || 0),
+      prixAchat: Math.max(0, Number($('#aPA').value) || 0),
+      prixVente: pv, vente: $('#aVente').checked && pv !== null, dotation: $('#aDot').checked,
+      ean: $('#aEan').value.trim() || '3' + String(ri(100000000000, 999999999999)),
+      empl: $('#aEmpl').value.trim() || '—', peremption: $('#aPeremp').value || null,
+    };
+    const q = Math.max(0, Number($('#aQte').value) || 0);
+    if (a) {
+      if (q !== a.qte) state.mouvements.unshift({ id: Date.now(), date: TODAY, artId: a.id, delta: q - a.qte, motif: 'Correction d\'inventaire', par: state.currentUser.nom });
+      Object.assign(a, vals, { qte: q });
+      toast(`Article « ${nom} » mis à jour.`);
+    } else {
+      state.stock.push({ id: Date.now(), qte: q, ...vals });
+      toast(`Article « ${nom} » créé.`);
+    }
+    closeModal(); render();
+  };
+};
+
+/* Bouton Modifier dans la fiche article */
+const _openFicheArticleV5 = openFicheArticle;
+openFicheArticle = function (id) {
+  _openFicheArticleV5(id);
+  const foot = $('#modalRoot .modal-foot');
+  if (foot && (!window.canW || canW('stock'))) {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = 'Modifier l\'article';
+    b.onclick = () => openFormArticle(id);
+    foot.insertBefore(b, foot.firstChild);
+  }
+};
+
+render();
+</script>
 
 </body>
 </html>
