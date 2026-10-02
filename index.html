@@ -714,6 +714,7 @@ const MODULES = [
   { id:'sportif', label:'Sportif', ico:'🏉' },
   { id:'licencies', label:'Licenciés', ico:'👤' },
   { id:'compta', label:'Comptabilité', ico:'€' },
+  { id:'sponsors', label:'Sponsors & subventions', ico:'🤝' },
   { id:'stock', label:'Stock', ico:'▤' },
   { id:'codir', label:'Codir & AG', ico:'⚖' },
   { id:'ged', label:'Documents', ico:'🗂' },
@@ -749,6 +750,7 @@ function render() {
   else if (state.view === 'mon-espace') v.innerHTML = viewMonEspace();
   else if (state.view === 'profil') v.innerHTML = viewProfil();
   else if (state.view === 'sportif') v.innerHTML = viewSportif();
+  else if (state.view === 'sponsors') v.innerHTML = viewSponsors();
   bindView();
   window.scrollTo(0, 0);
 }
@@ -911,6 +913,7 @@ function viewDashboard() {
   if (aRapprocher) alertes.push({ badge: '<span class="badge b-info"><span class="dot"></span>Banque</span>', txt: `${aRapprocher} transaction(s) bancaire(s) à rapprocher`, go: 'compta' });
   if (prochaine && !prochaine.convocEnvoyee && prochaine.statut === 'preparation')
     alertes.push({ badge: '<span class="badge b-info"><span class="dot"></span>Codir</span>', txt: `Convocations non envoyées pour « ${prochaine.titre} »`, go: 'codir' });
+  if (window.alertesSponsors) alertesSponsors(alertes);
 
   return `
   <div class="page-head">
@@ -1884,6 +1887,7 @@ const MODS_DROITS = [
   { id:'sportif', label:'Sportif' },
   { id:'licencies', label:'Licenciés' },
   { id:'compta', label:'Comptabilité' },
+  { id:'sponsors', label:'Sponsors & subv.' },
   { id:'stock', label:'Stock' },
   { id:'codir', label:'Codir & AG' },
   { id:'ged', label:'Documents' },
@@ -1891,12 +1895,12 @@ const MODS_DROITS = [
 ];
 const NIVEAUX = [['aucun','Aucun'],['lecture','Lecture'],['ecriture','Écriture'],['admin','Admin']];
 state.params.roles = {
-  president:  { sportif:'admin', licencies:'admin', compta:'admin', stock:'admin', codir:'admin', ged:'admin', parametres:'admin' },
-  tresorier:  { sportif:'lecture', licencies:'lecture', compta:'admin', stock:'lecture', codir:'ecriture', ged:'ecriture', parametres:'aucun' },
-  secretaire: { sportif:'ecriture', licencies:'admin', compta:'lecture', stock:'lecture', codir:'admin', ged:'admin', parametres:'aucun' },
-  codir:      { sportif:'lecture', licencies:'lecture', compta:'lecture', stock:'ecriture', codir:'ecriture', ged:'lecture', parametres:'aucun' },
-  educateur:  { sportif:'admin', licencies:'lecture', compta:'aucun', stock:'ecriture', codir:'aucun', ged:'lecture', parametres:'aucun' },
-  adherent:   { sportif:'lecture', licencies:'aucun', compta:'aucun', stock:'aucun', codir:'aucun', ged:'lecture', parametres:'aucun' },
+  president:  { sportif:'admin', licencies:'admin', compta:'admin', sponsors:'admin', stock:'admin', codir:'admin', ged:'admin', parametres:'admin' },
+  tresorier:  { sportif:'lecture', licencies:'lecture', compta:'admin', sponsors:'ecriture', stock:'lecture', codir:'ecriture', ged:'ecriture', parametres:'aucun' },
+  secretaire: { sportif:'ecriture', licencies:'admin', compta:'lecture', sponsors:'ecriture', stock:'lecture', codir:'admin', ged:'admin', parametres:'aucun' },
+  codir:      { sportif:'lecture', licencies:'lecture', compta:'lecture', sponsors:'lecture', stock:'ecriture', codir:'ecriture', ged:'lecture', parametres:'aucun' },
+  educateur:  { sportif:'admin', licencies:'lecture', compta:'aucun', sponsors:'aucun', stock:'ecriture', codir:'aucun', ged:'lecture', parametres:'aucun' },
+  adherent:   { sportif:'lecture', licencies:'aucun', compta:'aucun', sponsors:'aucun', stock:'aucun', codir:'aucun', ged:'lecture', parametres:'aucun' },
 };
 
 /* ---- GED : arborescence de départ ---- */
@@ -3594,6 +3598,991 @@ openFicheArticle = function (id) {
     b.onclick = () => openFormArticle(id);
     foot.insertBefore(b, foot.firstChild);
   }
+};
+
+render();
+</script>
+<script>
+/* ================= V6 : SPONSORS, PARTENARIATS & SUBVENTIONS ================= */
+
+let _spid = 1;
+state.sponsors = [
+  { id:_spid++, nom:'Intermarché Montclar', type:'Sponsor principal', contact:{ nom:'Franck Etcheverry', email:'direction@exemple.fr', tel:'06 41 22 83 90' },
+    montantAnnuel: 2500, statut:'actif', fin:'2027-06-30',
+    contreparties:'Logo maillots école de rugby, panneau bord de terrain (6 m), encart newsletter',
+    versements:[{ date:'2026-09-05', montant:1250 }], attendu: 2500 },
+  { id:_spid++, nom:'Boucherie Arnaud', type:'Partenaire', contact:{ nom:'Pierre Arnaud', email:'contact@exemple.fr', tel:'06 73 15 48 27' },
+    montantAnnuel: 600, statut:'a_renouveler', fin:'2026-10-31',
+    contreparties:'Panneau bord de terrain (3 m), lots pour le loto',
+    versements:[], attendu: 600 },
+  { id:_spid++, nom:'Garage du Pont', type:'Partenaire', contact:{ nom:'Sylvie Delort', email:'garage@exemple.fr', tel:'06 52 90 31 76' },
+    montantAnnuel: 900, statut:'actif', fin:'2027-06-30',
+    contreparties:'Logo shorts seniors, véhicule 9 places prêté pour 3 déplacements',
+    versements:[{ date:'2026-09-12', montant:900 }], attendu: 900 },
+  { id:_spid++, nom:'Menuiserie Roux', type:'Partenaire', contact:{ nom:'Bastien Roux', email:'atelier@exemple.fr', tel:'06 38 77 62 14' },
+    montantAnnuel: 400, statut:'negociation', fin:null,
+    contreparties:'(en discussion) Panneau + banc de touche',
+    versements:[], attendu: 400 },
+];
+let _svid = 1;
+state.subventions = [
+  { id:_svid++, organisme:'Mairie de Vincennes', objet:'Fonctionnement 2026-2027', demande:3500, accorde:3500, statut:'accordee', limite:'2026-06-30', depot:'2026-05-12', versementPrevu:'2026-11-15' },
+  { id:_svid++, organisme:'ANS (Agence nationale du sport)', objet:'Projet école de rugby — matériel pédagogique', demande:2500, accorde:null, statut:'deposee', limite:'2026-09-01', depot:'2026-08-20', versementPrevu:null },
+  { id:_svid++, organisme:'Département', objet:'Équipement sportif (boucliers, sacs de plaquage)', demande:1500, accorde:null, statut:'a_deposer', limite:'2026-11-15', depot:null, versementPrevu:null },
+  { id:_svid++, organisme:'Région — emploi associatif', objet:'Aide à l\'emploi d\'un éducateur', demande:4000, accorde:null, statut:'refusee', limite:'2026-03-31', depot:'2026-03-10', versementPrevu:null },
+];
+subTabs.sponsors = 'partenaires';
+
+const spStatut = s => ({
+  actif: '<span class="badge b-good"><span class="dot"></span>Actif</span>',
+  a_renouveler: '<span class="badge b-serious"><span class="dot"></span>À renouveler</span>',
+  negociation: '<span class="badge b-warn"><span class="dot"></span>En négociation</span>',
+  termine: '<span class="badge">Terminé</span>',
+}[s] || esc(s));
+const svStatut = s => ({
+  a_deposer: '<span class="badge b-warn"><span class="dot"></span>À déposer</span>',
+  deposee: '<span class="badge b-info"><span class="dot"></span>Déposée — en instruction</span>',
+  accordee: '<span class="badge b-good"><span class="dot"></span>Accordée</span>',
+  versee: '<span class="badge b-good"><span class="dot"></span>Versée</span>',
+  refusee: '<span class="badge b-crit"><span class="dot"></span>Refusée</span>',
+}[s] || esc(s));
+const spVerse = s => s.versements.reduce((t, v) => t + v.montant, 0);
+
+function alertesSponsors(alertes) {
+  if (!canSee || !canSee('sponsors')) return;
+  for (const s of state.sponsors.filter(x => x.statut === 'a_renouveler' || (x.fin && x.statut === 'actif' && daysUntil(x.fin) <= 90)))
+    alertes.push({ badge: '<span class="badge b-serious"><span class="dot"></span>Partenariat</span>', txt: `${s.nom} — contrat ${s.statut === 'a_renouveler' ? 'à renouveler' : 'échéance le ' + dfrShort(s.fin)}`, go: 'sponsors' });
+  for (const s of state.subventions.filter(x => x.statut === 'a_deposer' && daysUntil(x.limite) <= 45))
+    alertes.push({ badge: '<span class="badge b-warn"><span class="dot"></span>Subvention</span>', txt: `${s.organisme} — dossier à déposer avant le ${dfrShort(s.limite)} (${daysUntil(s.limite)} j)`, go: 'sponsors' });
+}
+
+function viewSponsors() {
+  const t = subTabs.sponsors;
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Sponsors & subventions</h1>
+    <p class="page-sub">Partenariats privés et financements publics — référente : L. Cantagrel</p></div>
+    <div class="head-actions">
+      ${t === 'partenaires' ? '<button class="btn btn-primary" id="spNew">+ Nouveau partenaire</button>' : '<button class="btn btn-primary" id="svNew">+ Nouvelle demande</button>'}
+    </div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="${t === 'partenaires'}" class="${t === 'partenaires' ? 'active' : ''}" data-sptabx="partenaires">Partenaires privés</button>
+    <button role="tab" aria-selected="${t === 'subventions'}" class="${t === 'subventions' ? 'active' : ''}" data-sptabx="subventions">Subventions publiques</button>
+  </div>
+  <div class="tab-body">${t === 'partenaires' ? sponsorsPartenaires() : sponsorsSubventions()}</div>`;
+}
+
+function sponsorsPartenaires() {
+  const actifs = state.sponsors.filter(s => s.statut === 'actif' || s.statut === 'a_renouveler');
+  const engage = actifs.reduce((t, s) => t + s.montantAnnuel, 0);
+  const verse = state.sponsors.reduce((t, s) => t + spVerse(s), 0);
+  const aRenouveler = state.sponsors.filter(s => s.statut === 'a_renouveler').length;
+  return `
+  <div class="grid kpis">
+    <div class="card"><h3>Engagé sur la saison</h3><div class="kpi-value">${eur(engage)}</div>
+      <div class="kpi-note">${actifs.length} contrat(s) actif(s)</div></div>
+    <div class="card"><h3>Déjà encaissé</h3><div class="kpi-value" style="color:var(--good-text)">${eur(verse)}</div>
+      <div class="kpi-note">reste ${eur(engage - verse)} à percevoir</div></div>
+    <div class="card"><h3>À renouveler</h3><div class="kpi-value">${aRenouveler}</div>
+      <div class="kpi-note">contrat(s) arrivant à échéance</div></div>
+  </div>
+  <div class="card" style="padding:4px 8px;margin-top:14px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Partenaire</th><th>Contreparties</th><th class="num">Montant / an</th><th class="num">Versé</th><th>Échéance</th><th>Statut</th></tr></thead>
+      <tbody>${state.sponsors.map(s => `<tr class="rowlink" data-sponsor="${s.id}" tabindex="0">
+        <td><strong>${esc(s.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(s.type)} · ${esc(s.contact.nom)}</span></td>
+        <td style="max-width:260px;font-size:12.5px;color:var(--ink-2)">${esc(s.contreparties)}</td>
+        <td class="num" style="font-weight:600">${eur(s.montantAnnuel)}</td>
+        <td class="num">${eur(spVerse(s))}</td>
+        <td style="white-space:nowrap">${s.fin ? dfrShort(s.fin) + (s.statut === 'actif' && daysUntil(s.fin) <= 90 ? ' <span class="badge b-warn">' + daysUntil(s.fin) + ' j</span>' : '') : '—'}</td>
+        <td>${spStatut(s.statut)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Chaque versement enregistré crée l'écriture « Sponsors & partenaires » en comptabilité. Les conventions signées ont vocation à être rangées dans Documents → Sponsors & partenaires. Dans la version réelle : rappels automatiques avant échéance, suivi des contreparties (photos des panneaux, parutions).</p>`;
+}
+
+function sponsorsSubventions() {
+  const accorde = state.subventions.filter(s => s.statut === 'accordee' || s.statut === 'versee').reduce((t, s) => t + (s.accorde || 0), 0);
+  const enInstruction = state.subventions.filter(s => s.statut === 'deposee').reduce((t, s) => t + s.demande, 0);
+  const aDeposer = state.subventions.filter(s => s.statut === 'a_deposer');
+  return `
+  <div class="grid kpis">
+    <div class="card"><h3>Accordé 2026-2027</h3><div class="kpi-value" style="color:var(--good-text)">${eur(accorde)}</div>
+      <div class="kpi-note">subventions confirmées</div></div>
+    <div class="card"><h3>En instruction</h3><div class="kpi-value">${eur(enInstruction)}</div>
+      <div class="kpi-note">demandé, réponse attendue</div></div>
+    <div class="card"><h3>Dossiers à déposer</h3><div class="kpi-value">${aDeposer.length}</div>
+      <div class="kpi-note">${aDeposer.length ? 'prochaine limite : ' + dfrShort(aDeposer.sort((a,b) => a.limite.localeCompare(b.limite))[0].limite) : 'rien en attente'}</div></div>
+  </div>
+  <div class="card" style="padding:4px 8px;margin-top:14px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Organisme</th><th>Objet</th><th class="num">Demandé</th><th class="num">Accordé</th><th>Date limite / dépôt</th><th>Statut</th></tr></thead>
+      <tbody>${state.subventions.map(s => `<tr class="rowlink" data-subv="${s.id}" tabindex="0">
+        <td><strong>${esc(s.organisme)}</strong></td>
+        <td style="max-width:260px;font-size:12.5px">${esc(s.objet)}</td>
+        <td class="num">${eur(s.demande)}</td>
+        <td class="num" style="font-weight:600">${s.accorde !== null ? eur(s.accorde) : '—'}</td>
+        <td style="white-space:nowrap">${s.statut === 'a_deposer'
+          ? 'limite ' + dfrShort(s.limite) + (daysUntil(s.limite) <= 45 ? ` <span class="badge b-warn">${daysUntil(s.limite)} j</span>` : '')
+          : (s.depot ? 'déposée le ' + dfrShort(s.depot) : '—')}</td>
+        <td>${svStatut(s.statut)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Le versement d'une subvention crée l'écriture comptable correspondante. Dans la version réelle : pièces du dossier rattachées (budget prévisionnel, statuts, RIB depuis Documents), rappels avant chaque date limite, suivi Compte Asso / Démarches simplifiées.</p>`;
+}
+
+function openFicheSponsor(id) {
+  const s = state.sponsors.find(x => x.id === id);
+  if (!s) return;
+  const ecrit = !window.canW || canW('sponsors');
+  openModal(s.nom, `
+    <div class="form-grid" style="margin-bottom:12px">
+      <div><label>Type</label>${esc(s.type)}</div>
+      <div><label>Statut</label>${spStatut(s.statut)}</div>
+      <div><label>Contact</label>${esc(s.contact.nom)}<br><span style="color:var(--ink-2);font-size:12.5px">${esc(s.contact.email)} · ${esc(s.contact.tel)}</span></div>
+      <div><label>Échéance du contrat</label>${s.fin ? dfr(s.fin) : 'Pas encore signé'}</div>
+      <div style="grid-column:1/-1"><label>Contreparties</label>${esc(s.contreparties)}</div>
+      <div><label>Montant annuel</label><strong>${eur(s.montantAnnuel)}</strong></div>
+      <div><label>Versé / attendu</label>${eur(spVerse(s))} / ${eur(s.attendu)}</div>
+    </div>
+    ${s.versements.length ? `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Versements</h3>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th class="num">Montant</th></tr></thead>
+      <tbody>${s.versements.map(v => `<tr><td>${dfrShort(v.date)}</td><td class="num">${eur(v.montant)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty" style="padding:4px 0">Aucun versement encaissé.</p>'}
+    <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">Convention et logos à ranger dans Documents → Sponsors & partenaires.</p>`, `
+    ${ecrit ? `<button class="btn" id="spVersement">Enregistrer un versement</button>
+    ${s.statut === 'a_renouveler' || (s.fin && daysUntil(s.fin) <= 90) ? `<button class="btn" id="spRenouveler">Marquer renouvelé (+1 an)</button>` : ''}` : ''}
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  const v = $('#spVersement');
+  if (v) v.onclick = () => {
+    const reste = Math.max(0, s.attendu - spVerse(s));
+    openModal('Versement — ' + s.nom, `
+      <div class="form-grid">
+        <div class="field"><label for="vsMontant">Montant (€)</label><input id="vsMontant" type="number" min="1" value="${reste || s.montantAnnuel}"></div>
+        <div class="field"><label for="vsMode">Mode</label><select id="vsMode"><option>Virement</option><option>Chèque</option><option>Espèces</option></select></div>
+      </div>`, `
+      <button class="btn" id="vsBack">Annuler</button><button class="btn btn-primary" id="vsOk">Encaisser</button>`);
+    $('#vsBack').onclick = () => openFicheSponsor(id);
+    $('#vsOk').onclick = () => {
+      const m = Math.max(1, Number($('#vsMontant').value) || 1);
+      s.versements.push({ date: TODAY, montant: m });
+      if (s.statut === 'negociation') { s.statut = 'actif'; s.fin = s.fin || addDaysIso(TODAY, 365); }
+      state.ecritures.unshift({ id: Date.now(), date: TODAY, sens: 'R', cat: 'Sponsors & partenaires', libelle: 'Partenariat ' + s.nom, montant: m });
+      state.bank.unshift({ id: Date.now() + 1, date: TODAY, libelle: ('VIR SEPA ' + s.nom).toUpperCase().slice(0, 30), montant: m, statut: 'rapprochee', ecritureId: null, catProposee: 'Sponsors & partenaires' });
+      toast(`${eur(m)} encaissés — écriture « Sponsors & partenaires » créée.`);
+      closeModal(); render();
+    };
+  };
+  const r = $('#spRenouveler');
+  if (r) r.onclick = () => {
+    s.statut = 'actif';
+    s.fin = addDaysIso(s.fin || TODAY, 365);
+    s.attendu = s.montantAnnuel;
+    toast(`Contrat ${s.nom} renouvelé jusqu'au ${dfrShort(s.fin)}.`);
+    closeModal(); render();
+  };
+}
+
+function openFicheSubvention(id) {
+  const s = state.subventions.find(x => x.id === id);
+  if (!s) return;
+  const ecrit = !window.canW || canW('sponsors');
+  const SUIVANT = { a_deposer: ['deposee', 'Marquer déposée'], deposee: ['accordee', 'Marquer accordée'], accordee: ['versee', 'Marquer versée (→ comptabilité)'] };
+  const nxt = SUIVANT[s.statut];
+  openModal(s.organisme, `
+    <div class="form-grid" style="margin-bottom:12px">
+      <div style="grid-column:1/-1"><label>Objet</label>${esc(s.objet)}</div>
+      <div><label>Statut</label>${svStatut(s.statut)}</div>
+      <div><label>Date limite de dépôt</label>${dfr(s.limite)}${s.statut === 'a_deposer' && daysUntil(s.limite) <= 45 ? ` <span class="badge b-warn">${daysUntil(s.limite)} j restants</span>` : ''}</div>
+      <div><label>Montant demandé</label>${eur(s.demande)}</div>
+      <div><label>Montant accordé</label>${s.accorde !== null ? `<strong>${eur(s.accorde)}</strong>` : 'En attente de réponse'}</div>
+      ${s.depot ? `<div><label>Déposée le</label>${dfr(s.depot)}</div>` : ''}
+      ${s.versementPrevu ? `<div><label>Versement prévu</label>${dfr(s.versementPrevu)}</div>` : ''}
+    </div>
+    <p style="font-size:12px;color:var(--ink-3);margin:0">Pièces habituelles du dossier : statuts, RIB, budget prévisionnel, compte de résultat, projet — à rattacher depuis Documents dans la version réelle.</p>`, `
+    ${ecrit && nxt ? `<button class="btn" id="svNext">${nxt[1]}</button>` : ''}
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  const b = $('#svNext');
+  if (b) b.onclick = () => {
+    if (s.statut === 'a_deposer') { s.statut = 'deposee'; s.depot = TODAY; toast('Dossier marqué déposé.'); }
+    else if (s.statut === 'deposee') {
+      s.statut = 'accordee'; s.accorde = s.accorde ?? s.demande; s.versementPrevu = addDaysIso(TODAY, 60);
+      toast(`Subvention accordée : ${eur(s.accorde)}.`);
+    } else if (s.statut === 'accordee') {
+      s.statut = 'versee';
+      state.ecritures.unshift({ id: Date.now(), date: TODAY, sens: 'R', cat: s.organisme.startsWith('Mairie') ? 'Subvention municipale' : 'Subvention ANS', libelle: 'Subvention — ' + s.organisme + ' (' + s.objet.slice(0, 30) + ')', montant: s.accorde });
+      state.bank.unshift({ id: Date.now() + 1, date: TODAY, libelle: ('VIR ' + s.organisme).toUpperCase().slice(0, 30), montant: s.accorde, statut: 'rapprochee', ecritureId: null, catProposee: 'Subvention municipale' });
+      toast(`${eur(s.accorde)} versés — écriture comptable créée.`);
+    }
+    closeModal(); render();
+  };
+}
+
+/* ---- Liaisons V6 ---- */
+const _bindExtraV53 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV53(v);
+  $$('[data-sptabx]', v).forEach(b => b.onclick = () => { subTabs.sponsors = b.dataset.sptabx; render(); });
+  $$('[data-sponsor]', v).forEach(tr => {
+    const open = () => openFicheSponsor(Number(tr.dataset.sponsor));
+    tr.onclick = open; tr.onkeydown = e => { if (e.key === 'Enter') open(); };
+  });
+  $$('[data-subv]', v).forEach(tr => {
+    const open = () => openFicheSubvention(Number(tr.dataset.subv));
+    tr.onclick = open; tr.onkeydown = e => { if (e.key === 'Enter') open(); };
+  });
+  const spNew = $('#spNew');
+  if (spNew) spNew.onclick = () => {
+    openModal('Nouveau partenaire', `
+      <div class="form-grid">
+        <div class="field" style="grid-column:1/-1"><label for="npNom">Nom de l'entreprise</label><input id="npNom" placeholder="ex. Pharmacie du Centre"></div>
+        <div class="field"><label for="npType">Type</label><select id="npType"><option>Partenaire</option><option>Sponsor principal</option><option>Mécène</option></select></div>
+        <div class="field"><label for="npMontant">Montant annuel (€)</label><input id="npMontant" type="number" min="0" value="500"></div>
+        <div class="field"><label for="npContact">Contact</label><input id="npContact" placeholder="Nom du contact"></div>
+        <div class="field"><label for="npFin">Échéance du contrat</label><input id="npFin" type="date" value="2027-06-30"></div>
+        <div class="field" style="grid-column:1/-1"><label for="npContre">Contreparties</label><input id="npContre" placeholder="ex. Panneau bord de terrain, logo maillots"></div>
+      </div>`, `
+      <button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="npOk">Créer</button>`);
+    $('#npOk').onclick = () => {
+      const nom = $('#npNom').value.trim();
+      if (!nom) { toast('Le nom est obligatoire.'); return; }
+      state.sponsors.push({ id: Date.now(), nom, type: $('#npType').value, contact: { nom: $('#npContact').value.trim() || '—', email: '—', tel: '—' },
+        montantAnnuel: Number($('#npMontant').value) || 0, statut: 'negociation', fin: $('#npFin').value || null,
+        contreparties: $('#npContre').value.trim() || '—', versements: [], attendu: Number($('#npMontant').value) || 0 });
+      toast(`Partenaire « ${nom} » créé (en négociation).`);
+      closeModal(); render();
+    };
+  };
+  const svNew = $('#svNew');
+  if (svNew) svNew.onclick = () => {
+    openModal('Nouvelle demande de subvention', `
+      <div class="form-grid">
+        <div class="field"><label for="nsOrg">Organisme</label><select id="nsOrg"><option>Mairie de Vincennes</option><option>ANS (Agence nationale du sport)</option><option>Département</option><option>Région</option><option>FFR / Ligue</option></select></div>
+        <div class="field"><label for="nsMontant">Montant demandé (€)</label><input id="nsMontant" type="number" min="0" value="1000"></div>
+        <div class="field" style="grid-column:1/-1"><label for="nsObjet">Objet de la demande</label><input id="nsObjet" placeholder="ex. Renouvellement du matériel école de rugby"></div>
+        <div class="field"><label for="nsLimite">Date limite de dépôt</label><input id="nsLimite" type="date" value="${addDaysIso(TODAY, 60)}"></div>
+      </div>`, `
+      <button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="nsOk">Créer le dossier</button>`);
+    $('#nsOk').onclick = () => {
+      const objet = $('#nsObjet').value.trim();
+      if (!objet) { toast('L\'objet est obligatoire.'); return; }
+      state.subventions.push({ id: Date.now(), organisme: $('#nsOrg').value, objet, demande: Number($('#nsMontant').value) || 0, accorde: null, statut: 'a_deposer', limite: $('#nsLimite').value, depot: null, versementPrevu: null });
+      toast('Dossier de subvention créé — à déposer.');
+      closeModal(); render();
+    };
+  };
+};
+
+render();
+</script>
+<style>
+/* ---------- V6.1 : CRM partenaires ---------- */
+.filtres-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 12px; }
+.filtres-chips button {
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2);
+  border-radius: 18px; padding: 5px 12px; font: 600 12.5px/1 system-ui, sans-serif; cursor: pointer;
+}
+.filtres-chips button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rappel-due { color: var(--critical-text); font-weight: 600; }
+.suivi-item { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; align-items: baseline; }
+.suivi-item:last-child { border-bottom: 0; }
+.suivi-item .t { flex: none; width: 52px; }
+.suivi-item .when { margin-left: auto; color: var(--ink-3); font-size: 11.5px; white-space: nowrap; }
+</style>
+<script>
+/* ================= V6.1 : CRM PARTENAIRES — PROSPECTS, ANCIENS, RAPPELS, SUIVI ================= */
+
+const SP_STATUTS = {
+  prospect: ['Prospect', 'badge'],
+  contact: ['Contacté', 'badge b-info'],
+  negociation: ['En négociation', 'badge b-warn'],
+  actif: ['Actif', 'badge b-good'],
+  a_renouveler: ['À renouveler', 'badge b-serious'],
+  termine: ['Ancien partenaire', 'badge'],
+  perdu: ['Perdu', 'badge b-crit'],
+};
+const spBadge = s => { const [l, c] = SP_STATUTS[s] || [s, 'badge']; return `<span class="${c}"><span class="dot"></span>${l}</span>`; };
+const SP_PROSPECTION = ['prospect', 'contact', 'negociation'];
+const SP_ACTIFS = ['actif', 'a_renouveler'];
+subTabs.spFiltre = 'tous';
+
+/* Enrichissement des partenaires existants + anciens et prospects */
+(function enrichirSponsors() {
+  for (const s of state.sponsors) { s.suivis = s.suivis || []; s.rappel = s.rappel || null; }
+  const byNom = n => state.sponsors.find(x => x.nom === n);
+  const men = byNom('Menuiserie Roux');
+  if (men) {
+    men.rappel = { date: addDaysIso(TODAY, 4), objet: 'Relancer après envoi de la proposition panneau + banc' };
+    men.suivis = [
+      { date: addDaysIso(TODAY, -12), type: 'RDV', note: 'Rencontre à l\'atelier — intéressé par le panneau, hésite sur le banc de touche.' },
+      { date: addDaysIso(TODAY, -5), type: 'Email', note: 'Proposition envoyée : panneau 3 m + banc, 400 €/an.' },
+    ];
+  }
+  const ba = byNom('Boucherie Arnaud');
+  if (ba) ba.rappel = { date: addDaysIso(TODAY, -2), objet: 'Renouvellement : passer à la boucherie avec la convention 2026-2027' };
+  let id = Date.now();
+  state.sponsors.push(
+    { id: ++id, nom: 'Pharmacie du Marché', type: 'Prospect', contact: { nom: 'Claire Besson', email: 'pharmacie@exemple.fr', tel: '06 24 81 55 09' },
+      montantAnnuel: 500, statut: 'prospect', fin: null, contreparties: '(à proposer) Panneau + encart santé dans la newsletter',
+      versements: [], attendu: 0, rappel: { date: addDaysIso(TODAY, 6), objet: 'Premier contact — déposer la plaquette partenaires' }, suivis: [] },
+    { id: ++id, nom: 'Crédit Mutuel Vincennes', type: 'Prospect', contact: { nom: 'Hugo Lemaire', email: 'agence@exemple.fr', tel: '01 48 00 00 00' },
+      montantAnnuel: 1500, statut: 'contact', fin: null, contreparties: '(en discussion) Sponsor maillots M14 + loto',
+      versements: [], attendu: 0, rappel: { date: addDaysIso(TODAY, 9), objet: 'RDV agence 14 h — apporter budget et fréquentation des matchs' },
+      suivis: [{ date: addDaysIso(TODAY, -7), type: 'Appel', note: 'Directeur ouvert à un partenariat jeunes, veut des chiffres de fréquentation.' }] },
+    { id: ++id, nom: 'Brasserie du Château', type: 'Partenaire', contact: { nom: 'Marc Teyssier', email: 'brasserie@exemple.fr', tel: '06 90 12 44 31' },
+      montantAnnuel: 800, statut: 'termine', fin: '2026-06-30', contreparties: 'Panneau + fûts à tarif réduit (saisons 2023 à 2026)',
+      versements: [{ date: '2025-09-15', montant: 800 }], attendu: 0, rappel: { date: '2027-05-01', objet: 'Recontacter pour la saison 2027-2028 (fermé à la reconduction cette année, pas fâché)' }, suivis: [] },
+    { id: ++id, nom: 'Optique Rivoli', type: 'Prospect', contact: { nom: '—', email: '—', tel: '—' },
+      montantAnnuel: 400, statut: 'perdu', fin: null, contreparties: '—',
+      versements: [], attendu: 0, rappel: null, suivis: [{ date: addDaysIso(TODAY, -30), type: 'Note', note: 'A choisi de sponsoriser le club de basket. Ne pas relancer avant un an.' }] }
+  );
+})();
+
+function rappelsSponsors() {
+  return state.sponsors.filter(s => s.rappel).map(s => ({ s, ...s.rappel }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* Alertes tableau de bord : échéances + rappels dus */
+alertesSponsors = function (alertes) {
+  if (!canSee || !canSee('sponsors')) return;
+  for (const s of state.sponsors.filter(x => x.statut === 'a_renouveler' || (x.fin && x.statut === 'actif' && daysUntil(x.fin) <= 90)))
+    alertes.push({ badge: '<span class="badge b-serious"><span class="dot"></span>Partenariat</span>', txt: `${s.nom} — contrat ${s.statut === 'a_renouveler' ? 'à renouveler' : 'échéance le ' + dfrShort(s.fin)}`, go: 'sponsors' });
+  for (const r of rappelsSponsors().filter(r => daysUntil(r.date) <= 7))
+    alertes.push({ badge: '<span class="badge b-warn"><span class="dot"></span>Rappel</span>', txt: `${r.s.nom} — ${r.objet}${daysUntil(r.date) < 0 ? ' (en retard)' : ' (' + dfrShort(r.date) + ')'}`, go: 'sponsors' });
+  for (const s of state.subventions.filter(x => x.statut === 'a_deposer' && daysUntil(x.limite) <= 45))
+    alertes.push({ badge: '<span class="badge b-warn"><span class="dot"></span>Subvention</span>', txt: `${s.organisme} — dossier à déposer avant le ${dfrShort(s.limite)} (${daysUntil(s.limite)} j)`, go: 'sponsors' });
+};
+
+/* Onglet partenaires façon CRM */
+sponsorsPartenaires = function () {
+  const f = subTabs.spFiltre;
+  const FILTRES = [
+    ['tous', 'Tous', () => true],
+    ['actifs', 'Actifs', s => SP_ACTIFS.includes(s.statut)],
+    ['prospection', 'En prospection', s => SP_PROSPECTION.includes(s.statut)],
+    ['anciens', 'Anciens & perdus', s => s.statut === 'termine' || s.statut === 'perdu'],
+  ];
+  const fd = FILTRES.find(x => x[0] === f) || FILTRES[0];
+  const rows = state.sponsors.filter(fd[2]).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  const actifs = state.sponsors.filter(s => SP_ACTIFS.includes(s.statut));
+  const engage = actifs.reduce((t, s) => t + s.montantAnnuel, 0);
+  const verse = actifs.reduce((t, s) => t + spVerse(s), 0);
+  const pipeline = state.sponsors.filter(s => SP_PROSPECTION.includes(s.statut)).reduce((t, s) => t + s.montantAnnuel, 0);
+  const rappels = rappelsSponsors().filter(r => daysUntil(r.date) <= 30);
+  const enRetard = rappels.filter(r => daysUntil(r.date) < 0).length;
+  return `
+  <div class="grid kpis">
+    <div class="card"><h3>Engagé (contrats actifs)</h3><div class="kpi-value">${eur(engage)}</div>
+      <div class="kpi-note">${eur(verse)} encaissés · reste ${eur(engage - verse)}</div></div>
+    <div class="card"><h3>Pipeline prospection</h3><div class="kpi-value">${eur(pipeline)}</div>
+      <div class="kpi-note">${state.sponsors.filter(s => SP_PROSPECTION.includes(s.statut)).length} piste(s) en cours</div></div>
+    <div class="card"><h3>Rappels sous 30 jours</h3><div class="kpi-value" ${enRetard ? 'style="color:var(--critical-text)"' : ''}>${rappels.length}</div>
+      <div class="kpi-note">${enRetard ? enRetard + ' en retard' : 'aucun en retard'}</div></div>
+  </div>
+  <div class="grid two-col">
+    <div>
+      <div class="filtres-chips">${FILTRES.map(([id, lab, fn]) => `<button class="${f === id ? 'on' : ''}" data-spfiltre="${id}">${lab} (${state.sponsors.filter(fn).length})</button>`).join('')}</div>
+      <div class="card" style="padding:4px 8px">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Partenaire</th><th class="num">Montant / an</th><th>${f === 'actifs' ? 'Échéance' : f === 'prospection' ? 'Prochain rappel' : 'Échéance / rappel'}</th><th>Statut</th></tr></thead>
+          <tbody>${rows.length ? rows.map(s => `<tr class="rowlink" data-sponsor="${s.id}" tabindex="0">
+            <td><strong>${esc(s.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(s.contact.nom)}${s.suivis.length ? ' · ' + s.suivis.length + ' échange(s)' : ''}</span></td>
+            <td class="num" style="font-weight:600">${eur(s.montantAnnuel)}${SP_ACTIFS.includes(s.statut) ? '<br><span style="font-weight:400;color:var(--ink-3);font-size:11.5px">' + eur(spVerse(s)) + ' versés</span>' : ''}</td>
+            <td style="white-space:nowrap">${SP_ACTIFS.includes(s.statut) && s.fin
+              ? dfrShort(s.fin) + (daysUntil(s.fin) <= 90 ? ` <span class="badge b-warn">${daysUntil(s.fin)} j</span>` : '')
+              : s.rappel ? `<span class="${daysUntil(s.rappel.date) < 0 ? 'rappel-due' : ''}">${dfrShort(s.rappel.date)}</span>` : '<span style="color:var(--ink-3)">—</span>'}</td>
+            <td>${spBadge(s.statut)}</td>
+          </tr>`).join('') : '<tr><td colspan="4" class="empty">Aucun partenaire dans ce filtre.</td></tr>'}</tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Rappels à venir</h3>
+      ${rappelsSponsors().slice(0, 7).map(r => `<div class="alert-line" style="cursor:pointer" data-sponsor-rappel="${r.s.id}">
+        <span style="min-width:0"><strong>${esc(r.s.nom)}</strong><br><span style="font-size:12px;color:var(--ink-2)">${esc(r.objet)}</span></span>
+        <span class="when ${daysUntil(r.date) < 0 ? 'rappel-due' : ''}">${daysUntil(r.date) < 0 ? 'en retard' : dfrShort(r.date)}</span>
+      </div>`).join('') || '<p class="empty" style="padding:4px 0">Aucun rappel planifié.</p>'}
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Les rappels dus sous 7 jours remontent aussi dans « À traiter » du tableau de bord. Version réelle : notification email/push à la référente.</p>
+    </div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Cycle : prospect → contacté → en négociation → actif → à renouveler / ancien. Chaque fiche garde l'historique des échanges (appels, emails, RDV) et un rappel daté.</p>`;
+};
+
+/* Fiche partenaire enrichie : statut, rappel, suivi */
+openFicheSponsor = function (id) {
+  const s = state.sponsors.find(x => x.id === id);
+  if (!s) return;
+  const ecrit = !window.canW || canW('sponsors');
+  const peutEncaisser = ['actif', 'a_renouveler', 'negociation'].includes(s.statut);
+  openModal(s.nom, `
+    <div class="form-grid" style="margin-bottom:12px">
+      <div><label>Statut</label>${ecrit
+        ? `<select id="spStatutSel">${Object.entries(SP_STATUTS).map(([v, [l]]) => `<option value="${v}" ${s.statut === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`
+        : spBadge(s.statut)}</div>
+      <div><label>Contact</label>${esc(s.contact.nom)}<br><span style="color:var(--ink-2);font-size:12.5px">${esc(s.contact.email)} · ${esc(s.contact.tel)}</span></div>
+      <div><label>Montant annuel ${SP_PROSPECTION.includes(s.statut) ? '(espéré)' : ''}</label><strong>${eur(s.montantAnnuel)}</strong></div>
+      <div><label>Versé / attendu</label>${eur(spVerse(s))} / ${eur(s.attendu)}</div>
+      <div style="grid-column:1/-1"><label>Contreparties</label>${esc(s.contreparties)}</div>
+      ${s.fin ? `<div><label>Échéance du contrat</label>${dfr(s.fin)}</div>` : ''}
+    </div>
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Rappel</h3>
+    ${s.rappel ? `<p style="margin:0 0 8px"><span class="${daysUntil(s.rappel.date) < 0 ? 'rappel-due' : ''}">📅 ${dfr(s.rappel.date)}</span> — ${esc(s.rappel.objet)}
+      ${ecrit ? ' <button class="btn btn-sm" id="spRappelFait">Fait ✓</button>' : ''}</p>` : '<p class="empty" style="padding:0 0 8px">Aucun rappel planifié.</p>'}
+    ${ecrit ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:14px">
+      <div class="field"><label for="spRapDate">Date</label><input id="spRapDate" type="date" value="${s.rappel ? s.rappel.date : addDaysIso(TODAY, 7)}"></div>
+      <div class="field" style="flex:1;min-width:180px"><label for="spRapObjet">Objet</label><input id="spRapObjet" value="${s.rappel ? esc(s.rappel.objet) : ''}" placeholder="ex. Relancer après le devis"></div>
+      <button class="btn btn-sm" id="spRappelSave">${s.rappel ? 'Modifier' : 'Planifier'}</button>
+    </div>` : ''}
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Suivi (${s.suivis.length})</h3>
+    ${s.suivis.length ? [...s.suivis].reverse().map(u => `<div class="suivi-item">
+      <span class="t"><span class="badge">${esc(u.type)}</span></span><span style="min-width:0">${esc(u.note)}</span><span class="when">${dfrShort(u.date)}</span>
+    </div>`).join('') : '<p class="empty" style="padding:0 0 6px">Aucun échange enregistré.</p>'}
+    ${ecrit ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px">
+      <div class="field"><label for="spSuiviType">Type</label><select id="spSuiviType"><option>Appel</option><option>Email</option><option>RDV</option><option>Note</option></select></div>
+      <div class="field" style="flex:1;min-width:180px"><label for="spSuiviNote">Note</label><input id="spSuiviNote" placeholder="ex. Appel : veut voir le panneau avant de signer"></div>
+      <button class="btn btn-sm" id="spSuiviAdd">Ajouter</button>
+    </div>` : ''}
+    ${s.versements.length ? `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:16px 0 8px">Versements</h3>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th class="num">Montant</th></tr></thead>
+      <tbody>${s.versements.map(v => `<tr><td>${dfrShort(v.date)}</td><td class="num">${eur(v.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}`, `
+    ${ecrit && peutEncaisser ? `<button class="btn" id="spVersement">Enregistrer un versement</button>` : ''}
+    ${ecrit && (s.statut === 'a_renouveler' || (s.fin && SP_ACTIFS.includes(s.statut) && daysUntil(s.fin) <= 90)) ? `<button class="btn" id="spRenouveler">Marquer renouvelé (+1 an)</button>` : ''}
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  const sel = $('#spStatutSel');
+  if (sel) sel.onchange = () => {
+    s.statut = sel.value;
+    if (s.statut === 'actif' && !s.fin) s.fin = addDaysIso(TODAY, 365);
+    if (s.statut === 'actif') s.attendu = s.montantAnnuel;
+    toast(`${s.nom} → ${SP_STATUTS[s.statut][0]}.`);
+    openFicheSponsor(id); render();
+  };
+  const rs = $('#spRappelSave');
+  if (rs) rs.onclick = () => {
+    const objet = $('#spRapObjet').value.trim();
+    if (!objet) { toast('Donne un objet au rappel.'); return; }
+    s.rappel = { date: $('#spRapDate').value || addDaysIso(TODAY, 7), objet };
+    toast(`Rappel planifié le ${dfrShort(s.rappel.date)}.`);
+    openFicheSponsor(id); render();
+  };
+  const rf = $('#spRappelFait');
+  if (rf) rf.onclick = () => {
+    s.suivis.push({ date: TODAY, type: 'Note', note: 'Rappel traité : ' + s.rappel.objet });
+    s.rappel = null;
+    toast('Rappel marqué fait — tracé dans le suivi.');
+    openFicheSponsor(id); render();
+  };
+  const sa = $('#spSuiviAdd');
+  if (sa) sa.onclick = () => {
+    const note = $('#spSuiviNote').value.trim();
+    if (!note) { toast('Écris une note.'); return; }
+    s.suivis.push({ date: TODAY, type: $('#spSuiviType').value, note });
+    if (s.statut === 'prospect') s.statut = 'contact';
+    toast('Échange ajouté au suivi.');
+    openFicheSponsor(id); render();
+  };
+  const v = $('#spVersement');
+  if (v) v.onclick = () => {
+    const reste = Math.max(0, s.attendu - spVerse(s));
+    openModal('Versement — ' + s.nom, `
+      <div class="form-grid">
+        <div class="field"><label for="vsMontant">Montant (€)</label><input id="vsMontant" type="number" min="1" value="${reste || s.montantAnnuel}"></div>
+        <div class="field"><label for="vsMode">Mode</label><select id="vsMode"><option>Virement</option><option>Chèque</option><option>Espèces</option></select></div>
+      </div>`, `
+      <button class="btn" id="vsBack">Annuler</button><button class="btn btn-primary" id="vsOk">Encaisser</button>`);
+    $('#vsBack').onclick = () => openFicheSponsor(id);
+    $('#vsOk').onclick = () => {
+      const m = Math.max(1, Number($('#vsMontant').value) || 1);
+      s.versements.push({ date: TODAY, montant: m });
+      if (SP_PROSPECTION.includes(s.statut)) { s.statut = 'actif'; s.fin = s.fin || addDaysIso(TODAY, 365); s.attendu = s.montantAnnuel; }
+      state.ecritures.unshift({ id: Date.now(), date: TODAY, sens: 'R', cat: 'Sponsors & partenaires', libelle: 'Partenariat ' + s.nom, montant: m });
+      state.bank.unshift({ id: Date.now() + 1, date: TODAY, libelle: ('VIR SEPA ' + s.nom).toUpperCase().slice(0, 30), montant: m, statut: 'rapprochee', ecritureId: null, catProposee: 'Sponsors & partenaires' });
+      toast(`${eur(m)} encaissés — écriture « Sponsors & partenaires » créée.`);
+      closeModal(); render();
+    };
+  };
+  const r = $('#spRenouveler');
+  if (r) r.onclick = () => {
+    s.statut = 'actif';
+    s.fin = addDaysIso(s.fin || TODAY, 365);
+    s.attendu = s.montantAnnuel;
+    s.suivis.push({ date: TODAY, type: 'Note', note: 'Contrat renouvelé jusqu\'au ' + dfrShort(s.fin) + '.' });
+    toast(`Contrat ${s.nom} renouvelé jusqu'au ${dfrShort(s.fin)}.`);
+    closeModal(); render();
+  };
+};
+
+const _bindExtraV6 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV6(v);
+  $$('[data-spfiltre]', v).forEach(b => b.onclick = () => { subTabs.spFiltre = b.dataset.spfiltre; render(); });
+  $$('[data-sponsor-rappel]', v).forEach(el => el.onclick = () => openFicheSponsor(Number(el.dataset.sponsorRappel)));
+};
+
+render();
+</script>
+<style>
+/* ---------- V7 : pipeline, contreparties, contacts, réseau ---------- */
+.pipe { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 4px; }
+.pipe button {
+  flex: 1 1 120px; min-width: 118px; text-align: left; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px;
+  padding: 9px 11px; position: relative;
+}
+.pipe button.on { border-color: var(--accent); background: var(--accent-soft); }
+.pipe .pv { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: var(--ink); }
+.pipe .pl { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-2); font-weight: 600; display: block; margin-bottom: 4px; }
+.pipe .pe { font-size: 11px; color: var(--ink-3); }
+.todo-line { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.todo-line:last-child { border-bottom: 0; }
+.todo-line input[type="checkbox"] { margin-top: 3px; }
+.todo-line.fait .tt { text-decoration: line-through; color: var(--ink-3); }
+.rgpd {
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--line));
+  border-radius: 10px; padding: 10px 14px; font-size: 12.5px; color: var(--ink-2); margin: 0 0 14px;
+}
+</style>
+<script>
+/* ================= V7 : CRM COMPLET — CONTACTS, DONATEURS, PIPELINE, CONTREPARTIES, RÉSEAU ================= */
+
+/* ---- Pipeline : les 5 étapes demandées + sorties ---- */
+const SP_ETAPES = [
+  ['a_contacter', 'À contacter'],
+  ['proposition', 'Proposition'],
+  ['signe', 'Signé'],
+  ['recompense', 'Récompensé'],
+  ['a_renouveler', 'À renouveler'],
+];
+const SP_SORTIES = { termine: 'Ancien partenaire', perdu: 'Perdu' };
+const spBadge7 = s => {
+  const e = SP_ETAPES.find(x => x[0] === s);
+  if (e) return `<span class="badge ${{ a_contacter:'', proposition:'b-info', signe:'b-good', recompense:'b-good', a_renouveler:'b-serious' }[s]}"><span class="dot"></span>${e[1]}</span>`;
+  return `<span class="badge ${s === 'perdu' ? 'b-crit' : ''}"><span class="dot"></span>${SP_SORTIES[s] || esc(s)}</span>`;
+};
+const SP_EN_COURS = ['signe', 'recompense', 'a_renouveler'];
+const SP_PIPELINE_AMONT = ['a_contacter', 'proposition'];
+
+/* ---- Migration des données V6.1 + contacts multiples ---- */
+(function migrerV7() {
+  const MAP = { prospect: 'a_contacter', contact: 'a_contacter', negociation: 'proposition', actif: 'signe' };
+  for (const s of state.sponsors) {
+    s.statut = MAP[s.statut] || s.statut;
+    s.contacts = s.contacts || (s.contact && s.contact.nom !== '—' ? [{ id: Date.now() + ri(1, 99999), nom: s.contact.nom, fonction: 'Contact principal', email: s.contact.email, tel: s.contact.tel, cibleDonateur: false, dons: [] }] : []);
+  }
+  const g = state.sponsors.find(x => x.nom === 'Garage du Pont');
+  if (g) g.statut = 'recompense';
+  const im = state.sponsors.find(x => x.nom === 'Intermarché Montclar');
+  if (im) im.contacts.push({ id: Date.now() + ri(1, 99999), nom: 'Nadia Benkacem', fonction: 'Responsable communication', email: 'com@exemple.fr', tel: '06 17 42 90 35', cibleDonateur: true, dons: [] });
+})();
+
+/* ---- Contreparties : to-do par partenaire ---- */
+let _ctid = 1;
+state.ctodos = [];
+(function seedCtodos() {
+  const add = (nomSp, titre, fait, echeance, resp) => {
+    const sp = state.sponsors.find(x => x.nom === nomSp);
+    if (sp) state.ctodos.push({ id: _ctid++, spId: sp.id, titre, fait, echeance: echeance || null, resp: resp || '—', faitLe: fait ? addDaysIso(TODAY, -ri(5, 30)) : null });
+  };
+  add('Intermarché Montclar', 'Poser le panneau 6 m bord de terrain', true, null, 'P. Gayraud');
+  add('Intermarché Montclar', 'Commander les maillots EDR floqués', false, addDaysIso(TODAY, 12), 'P. Gayraud');
+  add('Intermarché Montclar', 'Publier l\'encart dans la newsletter d\'octobre', false, addDaysIso(TODAY, 8), 'S. Vialar');
+  add('Garage du Pont', 'Flocage des shorts seniors', true, null, 'P. Gayraud');
+  add('Garage du Pont', 'Caler le prêt du 9 places (déplacement M16)', true, null, 'K. Bensaïd');
+  add('Boucherie Arnaud', 'Reposer le panneau 3 m après peinture du local', false, addDaysIso(TODAY, -3), 'P. Gayraud');
+})();
+function majRecompense(spId) {
+  const sp = state.sponsors.find(x => x.id === spId);
+  if (!sp || sp.statut !== 'signe') return;
+  const todos = state.ctodos.filter(t => t.spId === spId);
+  if (todos.length && todos.every(t => t.fait)) {
+    sp.statut = 'recompense';
+    toast(`${sp.nom} : toutes les contreparties sont délivrées → statut « Récompensé ».`);
+  }
+}
+
+/* ---- Réseau du club (déclaratif, avec consentement) ---- */
+state.reseau = [];
+(function seedReseau() {
+  const seniors = state.licencies.filter(l => l.cat === 'SEN');
+  const parents = state.licencies.filter(l => l.referents && l.referents.length).slice(0, 12);
+  const POSTES = [
+    ['BTP Vaillant & Fils', 'Conducteur de travaux', 'BTP', 'Décide des sponsorings locaux avec le gérant'],
+    ['Intermarché Montclar', 'Chef de rayon', 'Grande distribution', 'Peut appuyer le renouvellement en interne'],
+    ['Mairie de Vincennes', 'Service des sports', 'Public', 'Connaît les circuits de subvention'],
+    ['Cabinet Experlia', 'Expert-comptable', 'Services', 'Clientèle de commerçants du centre-ville'],
+    ['Agence Lutèce Immo', 'Négociateur', 'Immobilier', 'L\'agence cherche de la visibilité locale'],
+    ['Électricité P. Morand', 'Artisan à son compte', 'Artisanat', 'Décideur direct'],
+    ['Transports Keller', 'Responsable d\'exploitation', 'Transport', 'Peut proposer un tarif cars + sponsoring'],
+    ['Brasserie du Château', 'Second de cuisine', 'Restauration', 'Ancien partenaire — peut rouvrir la porte'],
+  ];
+  let i = 0;
+  for (const l of seniors.slice(0, 5)) {
+    const [entreprise, poste, secteur, ouverture] = POSTES[i++ % POSTES.length];
+    state.reseau.push({ id: i, nom: l.prenom + ' ' + l.nom, lien: 'Joueur senior', entreprise, poste, secteur, ouverture, consent: true, statut: 'non_sollicite' });
+  }
+  for (const l of parents.slice(0, 4)) {
+    const r = l.referents[0];
+    const [entreprise, poste, secteur, ouverture] = POSTES[i++ % POSTES.length];
+    state.reseau.push({ id: i + 100, nom: r.prenom + ' ' + r.nom, lien: `Parent (${l.cat})`, entreprise, poste: r.metier || poste, secteur, ouverture, consent: true, statut: 'non_sollicite' });
+  }
+  if (state.reseau[1]) state.reseau[1].statut = 'sollicite';
+  if (state.reseau[2]) { state.reseau[2].statut = 'donateur'; state.reseau[2].don = 50; }
+})();
+if (!CAT_RECETTES.includes('Dons & mécénat')) CAT_RECETTES.push('Dons & mécénat');
+
+/* ---- Vue du module : 5 onglets ---- */
+subTabs.sponsors = 'partenaires';
+subTabs.spFiltre = 'pipeline';
+viewSponsors = function () {
+  const t = subTabs.sponsors;
+  const nbTodo = state.ctodos.filter(x => !x.fait).length;
+  const tabs = [
+    ['partenaires', 'Partenaires'],
+    ['contreparties', `Contreparties${nbTodo ? ' (' + nbTodo + ')' : ''}`],
+    ['contacts', 'Contacts & donateurs'],
+    ['reseau', 'Réseau du club'],
+    ['subventions', 'Subventions'],
+  ];
+  let body = '';
+  if (t === 'partenaires') body = sponsorsPartenaires();
+  else if (t === 'contreparties') body = sponsorsContreparties();
+  else if (t === 'contacts') body = sponsorsContacts();
+  else if (t === 'reseau') body = sponsorsReseau();
+  else body = sponsorsSubventions();
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Sponsors & subventions</h1>
+    <p class="page-sub">Partenariats privés, dons et financements publics — référente : L. Cantagrel</p></div>
+    <div class="head-actions">
+      ${t === 'partenaires' ? '<button class="btn btn-primary" id="spNew">+ Nouveau partenaire</button>' : ''}
+      ${t === 'subventions' ? '<button class="btn btn-primary" id="svNew">+ Nouvelle demande</button>' : ''}
+      ${t === 'contreparties' ? '<button class="btn btn-primary" id="ctNew">+ Ajouter une contrepartie</button>' : ''}
+    </div>
+  </div>
+  <div class="tabs" role="tablist">${tabs.map(([id, lab]) => `<button role="tab" aria-selected="${t === id}" class="${t === id ? 'active' : ''}" data-sptabx="${id}">${lab}</button>`).join('')}</div>
+  <div class="tab-body">${body}</div>`;
+};
+
+/* ---- Onglet Partenaires : pipeline visuel ---- */
+sponsorsPartenaires = function () {
+  const f = subTabs.spFiltre;
+  const parEtape = Object.fromEntries(SP_ETAPES.map(([k]) => [k, state.sponsors.filter(s => s.statut === k)]));
+  const sortis = state.sponsors.filter(s => s.statut === 'termine' || s.statut === 'perdu');
+  let rows;
+  if (f === 'pipeline') rows = state.sponsors.filter(s => s.statut !== 'termine' && s.statut !== 'perdu');
+  else if (f === 'sortis') rows = sortis;
+  else rows = parEtape[f] || state.sponsors;
+  rows = [...rows].sort((a, b) => SP_ETAPES.findIndex(e => e[0] === a.statut) - SP_ETAPES.findIndex(e => e[0] === b.statut) || a.nom.localeCompare(b.nom, 'fr'));
+  const rappels = rappelsSponsors().filter(r => daysUntil(r.date) <= 30);
+  return `
+  <div class="pipe">
+    ${SP_ETAPES.map(([k, lab]) => `<button class="${f === k ? 'on' : ''}" data-spfiltre="${k}">
+      <span class="pl">${lab}</span><span class="pv">${parEtape[k].length}</span>
+      <span class="pe"> · ${eur(parEtape[k].reduce((t, s) => t + s.montantAnnuel, 0))}</span>
+    </button>`).join('')}
+  </div>
+  <div class="filtres-chips" style="margin-top:8px">
+    <button class="${f === 'pipeline' ? 'on' : ''}" data-spfiltre="pipeline">Tout le pipeline (${state.sponsors.length - sortis.length})</button>
+    <button class="${f === 'sortis' ? 'on' : ''}" data-spfiltre="sortis">Anciens & perdus (${sortis.length})</button>
+  </div>
+  <div class="grid two-col">
+    <div class="card" style="padding:4px 8px">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Partenaire</th><th class="num">Montant / an</th><th>Échéance / rappel</th><th>Étape</th></tr></thead>
+        <tbody>${rows.length ? rows.map(s => `<tr class="rowlink" data-sponsor="${s.id}" tabindex="0">
+          <td><strong>${esc(s.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${s.contacts.length ? esc(s.contacts[0].nom) + (s.contacts.length > 1 ? ' +' + (s.contacts.length - 1) : '') : '—'}${s.suivis.length ? ' · ' + s.suivis.length + ' échange(s)' : ''}</span></td>
+          <td class="num" style="font-weight:600">${eur(s.montantAnnuel)}${SP_EN_COURS.includes(s.statut) ? '<br><span style="font-weight:400;color:var(--ink-3);font-size:11.5px">' + eur(spVerse(s)) + ' versés</span>' : ''}</td>
+          <td style="white-space:nowrap">${SP_EN_COURS.includes(s.statut) && s.fin
+            ? dfrShort(s.fin) + (daysUntil(s.fin) <= 90 ? ` <span class="badge b-warn">${daysUntil(s.fin)} j</span>` : '')
+            : s.rappel ? `<span class="${daysUntil(s.rappel.date) < 0 ? 'rappel-due' : ''}">${dfrShort(s.rappel.date)}</span>` : '<span style="color:var(--ink-3)">—</span>'}</td>
+          <td>${spBadge7(s.statut)}</td>
+        </tr>`).join('') : '<tr><td colspan="4" class="empty">Aucun partenaire à cette étape.</td></tr>'}</tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>Rappels à venir</h3>
+      ${rappelsSponsors().slice(0, 7).map(r => `<div class="alert-line" style="cursor:pointer" data-sponsor-rappel="${r.s.id}">
+        <span style="min-width:0"><strong>${esc(r.s.nom)}</strong><br><span style="font-size:12px;color:var(--ink-2)">${esc(r.objet)}</span></span>
+        <span class="when ${daysUntil(r.date) < 0 ? 'rappel-due' : ''}">${daysUntil(r.date) < 0 ? 'en retard' : dfrShort(r.date)}</span>
+      </div>`).join('') || '<p class="empty" style="padding:4px 0">Aucun rappel planifié.</p>'}
+    </div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Le passage « Signé → Récompensé » est automatique quand toutes les contreparties du partenaire sont cochées dans l'onglet Contreparties. Un versement encaissé fait passer une piste à « Signé ».</p>`;
+};
+
+/* ---- Onglet Contreparties (to-do) ---- */
+function sponsorsContreparties() {
+  const spNom = id => { const s = state.sponsors.find(x => x.id === id); return s ? s.nom : '—'; };
+  const aFaire = state.ctodos.filter(t => !t.fait).sort((a, b) => (a.echeance || '9999').localeCompare(b.echeance || '9999'));
+  const faits = state.ctodos.filter(t => t.fait);
+  const enRetard = aFaire.filter(t => t.echeance && daysUntil(t.echeance) < 0).length;
+  const ligne = t => `<div class="todo-line ${t.fait ? 'fait' : ''}">
+    <input type="checkbox" data-ctodo="${t.id}" ${t.fait ? 'checked' : ''} ${(!window.canW || canW('sponsors')) ? '' : 'disabled'} aria-label="Contrepartie faite">
+    <div style="min-width:0;flex:1">
+      <span class="tt"><strong>${esc(t.titre)}</strong></span><br>
+      <span style="font-size:12px;color:var(--ink-2)">${esc(spNom(t.spId))} · resp. ${esc(t.resp)}</span>
+    </div>
+    <span class="when" style="white-space:nowrap;font-size:12px;color:var(--ink-3)">${t.fait
+      ? 'fait le ' + dfrShort(t.faitLe)
+      : t.echeance ? (daysUntil(t.echeance) < 0 ? '<span class="rappel-due">en retard (' + dfrShort(t.echeance) + ')</span>' : 'pour le ' + dfrShort(t.echeance)) : 'sans échéance'}</span>
+  </div>`;
+  return `
+  <div class="grid kpis">
+    <div class="card"><h3>À faire</h3><div class="kpi-value">${aFaire.length}</div>
+      <div class="kpi-note">${enRetard ? `<span class="rappel-due">${enRetard} en retard</span>` : 'rien en retard'}</div></div>
+    <div class="card"><h3>Délivrées</h3><div class="kpi-value" style="color:var(--good-text)">${faits.length}</div>
+      <div class="kpi-note">contreparties honorées</div></div>
+    <div class="card"><h3>Pourquoi c'est important</h3>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:0">Un partenaire se renouvelle quand le club a tenu ses promesses. Quand tout est coché pour un partenaire signé, il passe automatiquement « Récompensé ».</p></div>
+  </div>
+  <div class="grid two-col" style="margin-top:14px">
+    <div class="card"><h3>À faire</h3>${aFaire.length ? aFaire.map(ligne).join('') : '<p class="empty" style="padding:4px 0">Tout est délivré.</p>'}</div>
+    <div class="card"><h3>Fait</h3>${faits.length ? faits.map(ligne).join('') : '<p class="empty" style="padding:4px 0">Rien encore.</p>'}</div>
+  </div>`;
+}
+
+/* ---- Onglet Contacts & donateurs ---- */
+function sponsorsContacts() {
+  const rows = [];
+  for (const s of state.sponsors) for (const c of s.contacts) rows.push({ c, s });
+  const cibles = rows.filter(r => r.c.cibleDonateur);
+  const totalDons = rows.reduce((t, r) => t + r.c.dons.reduce((u, d) => u + d.montant, 0), 0)
+    + state.reseau.filter(p => p.statut === 'donateur').reduce((t, p) => t + (p.don || 0), 0);
+  return `
+  <div class="grid kpis">
+    <div class="card"><h3>Contacts</h3><div class="kpi-value">${rows.length}</div><div class="kpi-note">rattachés à ${state.sponsors.filter(s => s.contacts.length).length} partenaire(s)</div></div>
+    <div class="card"><h3>Cibles donateurs</h3><div class="kpi-value">${cibles.length + state.reseau.filter(p => p.statut !== 'donateur').length}</div><div class="kpi-note">contacts + réseau du club</div></div>
+    <div class="card"><h3>Dons collectés</h3><div class="kpi-value" style="color:var(--good-text)">${eur(totalDons)}</div><div class="kpi-note">catégorie comptable « Dons & mécénat »</div></div>
+  </div>
+  <div class="card" style="padding:4px 8px;margin-top:14px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Contact</th><th>Entreprise / partenaire</th><th>Coordonnées</th><th>Cible donateur</th><th class="num">Dons</th><th></th></tr></thead>
+      <tbody>${rows.length ? rows.map(({ c, s }) => `<tr>
+        <td><strong>${esc(c.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(c.fonction)}</span></td>
+        <td>${esc(s.nom)}</td>
+        <td style="font-size:12.5px;color:var(--ink-2)">${esc(c.email)}<br>${esc(c.tel)}</td>
+        <td>${c.cibleDonateur ? '<span class="badge b-info"><span class="dot"></span>Oui</span>' : '<span class="badge">Non</span>'}</td>
+        <td class="num">${c.dons.length ? eur(c.dons.reduce((t, d) => t + d.montant, 0)) : '—'}</td>
+        <td style="white-space:nowrap">${(!window.canW || canW('sponsors')) ? `<button class="btn btn-sm" data-contact-don="${s.id}:${c.id}">Don</button> <button class="btn btn-sm" data-contact-cible="${s.id}:${c.id}">${c.cibleDonateur ? 'Retirer cible' : 'Cible don'}</button>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty">Aucun contact. Ajoute-les depuis la fiche d\'un partenaire.</td></tr>'}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Un don enregistré crée l'écriture « Dons & mécénat » en comptabilité. Dans la version réelle : reçu fiscal automatique (CERFA 11580) — c'est l'argument n°1 pour transformer un contact en donateur.</p>`;
+}
+
+/* ---- Onglet Réseau du club ---- */
+function sponsorsReseau() {
+  const vol = state.reseau;
+  const secteurs = [...new Set(vol.map(p => p.secteur))];
+  const stChip = s => ({ non_sollicite: '<span class="badge">À solliciter</span>', sollicite: '<span class="badge b-info"><span class="dot"></span>Sollicité</span>', donateur: '<span class="badge b-good"><span class="dot"></span>Donateur</span>', piste: '<span class="badge b-warn"><span class="dot"></span>Piste créée</span>' }[s] || s);
+  return `
+  <div class="rgpd">⚖ <strong>Données déclaratives et volontaires.</strong> Chaque personne listée ici a renseigné elle-même son entreprise/poste et coché « j'accepte d'être sollicité(e) pour aider le club à trouver des partenaires » dans son profil. Visible uniquement du bureau. Pas de collecte automatique, pas de données sur des tiers non consentants.</div>
+  <div class="grid kpis">
+    <div class="card"><h3>Volontaires</h3><div class="kpi-value">${vol.length}</div><div class="kpi-note">joueurs seniors et parents ayant ouvert leur réseau</div></div>
+    <div class="card"><h3>Secteurs couverts</h3><div class="kpi-value">${secteurs.length}</div><div class="kpi-note">${secteurs.slice(0, 4).map(esc).join(' · ')}…</div></div>
+    <div class="card"><h3>Pistes générées</h3><div class="kpi-value">${vol.filter(p => p.statut === 'piste').length}</div><div class="kpi-note">transformées en partenaires « à contacter »</div></div>
+  </div>
+  <div class="card" style="padding:4px 8px;margin-top:14px">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Personne</th><th>Lien avec le club</th><th>Entreprise & poste</th><th>Ce qu'il/elle peut ouvrir</th><th>Statut</th><th></th></tr></thead>
+      <tbody>${vol.map(p => `<tr>
+        <td><strong>${esc(p.nom)}</strong></td>
+        <td style="white-space:nowrap">${esc(p.lien)}</td>
+        <td><strong>${esc(p.entreprise)}</strong><br><span style="color:var(--ink-2);font-size:12.5px">${esc(p.poste)} · ${esc(p.secteur)}</span></td>
+        <td style="font-size:12.5px;color:var(--ink-2);max-width:220px">${esc(p.ouverture)}</td>
+        <td>${stChip(p.statut)}${p.statut === 'donateur' && p.don ? '<br><span style="font-size:11.5px;color:var(--ink-3)">' + eur(p.don) + '</span>' : ''}</td>
+        <td style="white-space:nowrap">${(!window.canW || canW('sponsors')) && p.statut !== 'piste' ? `<button class="btn btn-sm btn-primary" data-reseau-piste="${p.id}">Créer une piste</button>` : ''}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">« Créer une piste » ajoute l'entreprise dans le pipeline à l'étape « À contacter », avec la mention « mise en relation par … » dans le suivi. Dans la version réelle : la case de consentement vit dans Mon profil, révocable à tout moment, et la liste se vide des personnes qui la décochent.</p>`;
+}
+
+/* ---- Fiche partenaire V7 : contacts multiples + statuts pipeline ---- */
+const _openFicheSponsorV61 = openFicheSponsor;
+openFicheSponsor = function (id) {
+  const s = state.sponsors.find(x => x.id === id);
+  if (!s) return;
+  const ecrit = !window.canW || canW('sponsors');
+  const peutEncaisser = ['proposition', 'signe', 'recompense', 'a_renouveler'].includes(s.statut);
+  const todos = state.ctodos.filter(t => t.spId === id);
+  openModal(s.nom, `
+    <div class="form-grid" style="margin-bottom:12px">
+      <div><label>Étape du pipeline</label>${ecrit
+        ? `<select id="spStatutSel">${[...SP_ETAPES, ['termine', 'Ancien partenaire'], ['perdu', 'Perdu']].map(([v, l]) => `<option value="${v}" ${s.statut === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`
+        : spBadge7(s.statut)}</div>
+      <div><label>Montant annuel ${SP_PIPELINE_AMONT.includes(s.statut) ? '(espéré)' : ''}</label><strong>${eur(s.montantAnnuel)}</strong> · versé ${eur(spVerse(s))}</div>
+      <div style="grid-column:1/-1"><label>Contreparties prévues</label>${esc(s.contreparties)}${todos.length ? ` — <span style="color:var(--ink-2)">${todos.filter(t => t.fait).length}/${todos.length} délivrée(s) (onglet Contreparties)</span>` : ''}</div>
+      ${s.fin ? `<div><label>Échéance du contrat</label>${dfr(s.fin)}</div>` : ''}
+    </div>
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Contacts (${s.contacts.length})</h3>
+    ${s.contacts.length ? s.contacts.map(c => `<div class="alert-line">
+      <span style="min-width:0"><strong>${esc(c.nom)}</strong> — ${esc(c.fonction)}${c.cibleDonateur ? ' <span class="badge b-info">cible donateur</span>' : ''}<br>
+      <span style="font-size:12px;color:var(--ink-2)">${esc(c.email)} · ${esc(c.tel)}</span></span>
+    </div>`).join('') : '<p class="empty" style="padding:0 0 6px">Aucun contact.</p>'}
+    ${ecrit ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:10px 0 14px">
+      <div class="field"><label for="spCtNom">Nom</label><input id="spCtNom" placeholder="Prénom Nom"></div>
+      <div class="field"><label for="spCtFonction">Fonction</label><input id="spCtFonction" placeholder="ex. Gérante"></div>
+      <button class="btn btn-sm" id="spCtAdd">+ Ajouter le contact</button>
+    </div>` : ''}
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Rappel</h3>
+    ${s.rappel ? `<p style="margin:0 0 8px"><span class="${daysUntil(s.rappel.date) < 0 ? 'rappel-due' : ''}">📅 ${dfr(s.rappel.date)}</span> — ${esc(s.rappel.objet)}
+      ${ecrit ? ' <button class="btn btn-sm" id="spRappelFait">Fait ✓</button>' : ''}</p>` : '<p class="empty" style="padding:0 0 8px">Aucun rappel planifié.</p>'}
+    ${ecrit ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:14px">
+      <div class="field"><label for="spRapDate">Date</label><input id="spRapDate" type="date" value="${s.rappel ? s.rappel.date : addDaysIso(TODAY, 7)}"></div>
+      <div class="field" style="flex:1;min-width:180px"><label for="spRapObjet">Objet</label><input id="spRapObjet" value="${s.rappel ? esc(s.rappel.objet) : ''}" placeholder="ex. Relancer après le devis"></div>
+      <button class="btn btn-sm" id="spRappelSave">${s.rappel ? 'Modifier' : 'Planifier'}</button>
+    </div>` : ''}
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:0 0 8px">Suivi (${s.suivis.length})</h3>
+    ${s.suivis.length ? [...s.suivis].reverse().slice(0, 6).map(u => `<div class="suivi-item">
+      <span class="t"><span class="badge">${esc(u.type)}</span></span><span style="min-width:0">${esc(u.note)}</span><span class="when">${dfrShort(u.date)}</span>
+    </div>`).join('') : '<p class="empty" style="padding:0 0 6px">Aucun échange enregistré.</p>'}
+    ${ecrit ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px">
+      <div class="field"><label for="spSuiviType">Type</label><select id="spSuiviType"><option>Appel</option><option>Email</option><option>RDV</option><option>Note</option></select></div>
+      <div class="field" style="flex:1;min-width:180px"><label for="spSuiviNote">Note</label><input id="spSuiviNote" placeholder="ex. Proposition envoyée"></div>
+      <button class="btn btn-sm" id="spSuiviAdd">Ajouter</button>
+    </div>` : ''}`, `
+    ${ecrit && peutEncaisser ? `<button class="btn" id="spVersement">Enregistrer un versement</button>` : ''}
+    ${ecrit && s.statut === 'a_renouveler' ? `<button class="btn" id="spRenouveler">Marquer renouvelé (+1 an)</button>` : ''}
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  const sel = $('#spStatutSel');
+  if (sel) sel.onchange = () => {
+    s.statut = sel.value;
+    if (['signe', 'recompense'].includes(s.statut)) { s.fin = s.fin || addDaysIso(TODAY, 365); s.attendu = s.montantAnnuel; }
+    toast(`${s.nom} → ${(SP_ETAPES.find(e => e[0] === s.statut) || [0, SP_SORTIES[s.statut]])[1]}.`);
+    openFicheSponsor(id); render();
+  };
+  const ctAdd = $('#spCtAdd');
+  if (ctAdd) ctAdd.onclick = () => {
+    const nom = $('#spCtNom').value.trim();
+    if (!nom) { toast('Le nom du contact est obligatoire.'); return; }
+    s.contacts.push({ id: Date.now(), nom, fonction: $('#spCtFonction').value.trim() || '—', email: '—', tel: '—', cibleDonateur: false, dons: [] });
+    toast(`Contact ${nom} ajouté.`);
+    openFicheSponsor(id); render();
+  };
+  const rs = $('#spRappelSave');
+  if (rs) rs.onclick = () => {
+    const objet = $('#spRapObjet').value.trim();
+    if (!objet) { toast('Donne un objet au rappel.'); return; }
+    s.rappel = { date: $('#spRapDate').value || addDaysIso(TODAY, 7), objet };
+    toast(`Rappel planifié le ${dfrShort(s.rappel.date)}.`);
+    openFicheSponsor(id); render();
+  };
+  const rf = $('#spRappelFait');
+  if (rf) rf.onclick = () => {
+    s.suivis.push({ date: TODAY, type: 'Note', note: 'Rappel traité : ' + s.rappel.objet });
+    s.rappel = null;
+    toast('Rappel marqué fait — tracé dans le suivi.');
+    openFicheSponsor(id); render();
+  };
+  const sa = $('#spSuiviAdd');
+  if (sa) sa.onclick = () => {
+    const note = $('#spSuiviNote').value.trim();
+    if (!note) { toast('Écris une note.'); return; }
+    s.suivis.push({ date: TODAY, type: $('#spSuiviType').value, note });
+    if (s.statut === 'a_contacter') s.statut = 'proposition';
+    toast('Échange ajouté au suivi.');
+    openFicheSponsor(id); render();
+  };
+  const v = $('#spVersement');
+  if (v) v.onclick = () => {
+    const reste = Math.max(0, s.attendu - spVerse(s));
+    openModal('Versement — ' + s.nom, `
+      <div class="form-grid">
+        <div class="field"><label for="vsMontant">Montant (€)</label><input id="vsMontant" type="number" min="1" value="${reste || s.montantAnnuel}"></div>
+        <div class="field"><label for="vsMode">Mode</label><select id="vsMode"><option>Virement</option><option>Chèque</option><option>Espèces</option></select></div>
+      </div>`, `
+      <button class="btn" id="vsBack">Annuler</button><button class="btn btn-primary" id="vsOk">Encaisser</button>`);
+    $('#vsBack').onclick = () => openFicheSponsor(id);
+    $('#vsOk').onclick = () => {
+      const m = Math.max(1, Number($('#vsMontant').value) || 1);
+      s.versements.push({ date: TODAY, montant: m });
+      if (SP_PIPELINE_AMONT.includes(s.statut)) { s.statut = 'signe'; s.fin = s.fin || addDaysIso(TODAY, 365); s.attendu = s.montantAnnuel; }
+      state.ecritures.unshift({ id: Date.now(), date: TODAY, sens: 'R', cat: 'Sponsors & partenaires', libelle: 'Partenariat ' + s.nom, montant: m });
+      state.bank.unshift({ id: Date.now() + 1, date: TODAY, libelle: ('VIR SEPA ' + s.nom).toUpperCase().slice(0, 30), montant: m, statut: 'rapprochee', ecritureId: null, catProposee: 'Sponsors & partenaires' });
+      toast(`${eur(m)} encaissés — écriture créée, partenaire « Signé ».`);
+      closeModal(); render();
+    };
+  };
+  const r = $('#spRenouveler');
+  if (r) r.onclick = () => {
+    s.statut = 'signe';
+    s.fin = addDaysIso(s.fin || TODAY, 365);
+    s.attendu = s.montantAnnuel;
+    s.suivis.push({ date: TODAY, type: 'Note', note: 'Contrat renouvelé jusqu\'au ' + dfrShort(s.fin) + '.' });
+    toast(`Contrat ${s.nom} renouvelé jusqu'au ${dfrShort(s.fin)}.`);
+    closeModal(); render();
+  };
+};
+
+/* ---- Liaisons V7 ---- */
+const _bindExtraV61b = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV61b(v);
+  $$('[data-ctodo]', v).forEach(c => c.onchange = () => {
+    const t = state.ctodos.find(x => x.id === Number(c.dataset.ctodo));
+    if (!t) return;
+    t.fait = c.checked;
+    t.faitLe = c.checked ? TODAY : null;
+    if (c.checked) majRecompense(t.spId);
+    render();
+  });
+  const ctNew = $('#ctNew');
+  if (ctNew) ctNew.onclick = () => {
+    openModal('Nouvelle contrepartie', `
+      <div class="form-grid">
+        <div class="field"><label for="ncSp">Partenaire</label><select id="ncSp">${state.sponsors.filter(s => !['termine','perdu'].includes(s.statut)).map(s => `<option value="${s.id}">${esc(s.nom)}</option>`).join('')}</select></div>
+        <div class="field"><label for="ncEch">Échéance</label><input id="ncEch" type="date" value="${addDaysIso(TODAY, 21)}"></div>
+        <div class="field" style="grid-column:1/-1"><label for="ncTitre">À faire</label><input id="ncTitre" placeholder="ex. Poser la banderole au gymnase"></div>
+        <div class="field"><label for="ncResp">Responsable</label><input id="ncResp" value="P. Gayraud"></div>
+      </div>`, `
+      <button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="ncOk">Ajouter</button>`);
+    $('#ncOk').onclick = () => {
+      const titre = $('#ncTitre').value.trim();
+      if (!titre) { toast('Décris la contrepartie.'); return; }
+      state.ctodos.push({ id: Date.now(), spId: Number($('#ncSp').value), titre, fait: false, echeance: $('#ncEch').value || null, resp: $('#ncResp').value.trim() || '—', faitLe: null });
+      toast('Contrepartie ajoutée à la to-do.');
+      closeModal(); render();
+    };
+  };
+  $$('[data-contact-don]', v).forEach(b => b.onclick = () => {
+    const [spId, cId] = b.dataset.contactDon.split(':').map(Number);
+    const s = state.sponsors.find(x => x.id === spId);
+    const c = s && s.contacts.find(x => x.id === cId);
+    if (!c) return;
+    openModal('Don — ' + c.nom, `
+      <div class="field"><label for="donM">Montant du don (€)</label><input id="donM" type="number" min="1" value="50"></div>
+      <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">Version réelle : reçu fiscal CERFA envoyé automatiquement (66 % déductibles pour un particulier).</p>`, `
+      <button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="donOk">Enregistrer</button>`);
+    $('#donOk').onclick = () => {
+      const m = Math.max(1, Number($('#donM').value) || 1);
+      c.dons.push({ date: TODAY, montant: m });
+      c.cibleDonateur = true;
+      state.ecritures.unshift({ id: Date.now(), date: TODAY, sens: 'R', cat: 'Dons & mécénat', libelle: 'Don — ' + c.nom, montant: m });
+      toast(`Don de ${eur(m)} enregistré — écriture « Dons & mécénat » créée.`);
+      closeModal(); render();
+    };
+  });
+  $$('[data-contact-cible]', v).forEach(b => b.onclick = () => {
+    const [spId, cId] = b.dataset.contactCible.split(':').map(Number);
+    const s = state.sponsors.find(x => x.id === spId);
+    const c = s && s.contacts.find(x => x.id === cId);
+    if (c) { c.cibleDonateur = !c.cibleDonateur; toast(c.cibleDonateur ? `${c.nom} marqué(e) comme cible donateur.` : 'Cible retirée.'); render(); }
+  });
+  $$('[data-reseau-piste]', v).forEach(b => b.onclick = () => {
+    const p = state.reseau.find(x => x.id === Number(b.dataset.reseauPiste));
+    if (!p) return;
+    state.sponsors.push({ id: Date.now(), nom: p.entreprise, type: 'Prospect', contacts: [], contact: { nom: '—', email: '—', tel: '—' },
+      montantAnnuel: 500, statut: 'a_contacter', fin: null, contreparties: '(à définir)', versements: [], attendu: 0,
+      rappel: { date: addDaysIso(TODAY, 7), objet: `Contacter via ${p.nom} (${p.lien.toLowerCase()})` },
+      suivis: [{ date: TODAY, type: 'Note', note: `Piste ouverte — mise en relation possible par ${p.nom} (${p.poste}).` }] });
+    p.statut = 'piste';
+    subTabs.sponsors = 'partenaires'; subTabs.spFiltre = 'a_contacter';
+    toast(`Piste « ${p.entreprise} » créée dans le pipeline, rappel planifié.`);
+    render();
+  });
 };
 
 render();

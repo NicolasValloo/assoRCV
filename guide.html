@@ -92,12 +92,12 @@ a { color: var(--info-text); }
 <div class="wrap">
 <header class="doc">
   <h1>Guide Ovalie Gestion</h1>
-  <p class="sub">Maquette V5.3 · septembre 2026 · données 100 % fictives — ce guide décrit chaque module, les vues selon le rôle connecté, les actions possibles et leurs répercussions dans le reste de l'application.</p>
+  <p class="sub">Maquette V7 · septembre 2026 · données 100 % fictives — ce guide décrit chaque module, les vues selon le rôle connecté, les actions possibles et leurs répercussions dans le reste de l'application.</p>
 </header>
 
 <div class="toc">
   <a href="#roles">Rôles & vues</a><a href="#dashboard">Tableau de bord</a><a href="#sportif">Sportif</a>
-  <a href="#licencies">Licenciés</a><a href="#compta">Comptabilité</a><a href="#stock">Stock</a>
+  <a href="#licencies">Licenciés</a><a href="#compta">Comptabilité</a><a href="#sponsors">Sponsors & subv.</a><a href="#stock">Stock</a>
   <a href="#codir">Codir & AG</a><a href="#documents">Documents</a><a href="#monespace">Mon espace</a>
   <a href="#profil">Mon profil</a><a href="#parametres">Paramètres</a><a href="#simule">Ce qui est simulé</a>
 </div>
@@ -170,6 +170,40 @@ a { color: var(--info-text); }
 <div class="flow"><b>Valider un rapprochement</b> → crée l'écriture au <b>Journal</b> → met à jour solde, graphiques et <b>Tableau de bord</b>.</div>
 <div class="flow"><b>Paiement en ligne reçu</b> → 4 effets d'un coup : cotisation du licencié mise à jour (fiche + liste), écriture « Cotisations » au Journal, transaction bancaire rapprochée, compteurs du Tableau de bord.</div>
 <div class="flow"><b>Vente boutique</b> (module Stock) → écriture « Boutique » au Journal.</div>
+
+<h2 id="sponsors">🤝 Sponsors & subventions</h2>
+<p class="lead">Les financements du club, privés et publics, en deux onglets. Admin pour le président, écriture pour trésorière et secrétaire, lecture pour les membres du codir ; absent pour éducateur, joueur, parent.</p>
+<h3>Partenaires — un vrai CRM en 4 onglets internes</h3>
+<ul>
+  <li><strong>Pipeline visuel en 5 étapes</strong> : À contacter → Proposition → Signé → Récompensé → À renouveler (chaque étape affiche son nombre et son montant, clic = filtre), plus « Anciens & perdus » à part. Automatismes : un échange noté sur « À contacter » passe le partenaire en « Proposition » ; un versement encaissé le passe « Signé » ; toutes ses contreparties cochées le passent « Récompensé ».</li>
+  <li><strong>Contacts multiples par partenaire</strong> : chaque fiche porte ses interlocuteurs (nom, fonction, coordonnées), ajoutables depuis la fiche. Un contact peut être marqué <b>cible donateur</b>.</li>
+  <li><strong>Rappels datés</strong> (planifier, modifier, « Fait ✓ » tracé dans le suivi) + encart « Rappels à venir » ; rappels dus sous 7 jours → alertes du Tableau de bord.</li>
+  <li><strong>Historique des échanges</strong> par fiche (appel, email, RDV, note).</li>
+</ul>
+<h3>Contreparties — la to-do des promesses</h3>
+<ul>
+  <li>Chaque contrepartie promise (poser le panneau, floquer les maillots, publier l'encart…) est une tâche avec responsable et échéance, à cocher quand c'est fait — colonnes « À faire » (retards en rouge) et « Fait ».</li>
+  <li>Quand tout est coché pour un partenaire signé → statut « Récompensé » automatiquement : le club sait qu'il a tenu ses promesses avant de demander le renouvellement.</li>
+</ul>
+<h3>Contacts & donateurs</h3>
+<ul>
+  <li>Annuaire de tous les contacts physiques rattachés aux partenaires, avec marquage « cible donateur » et enregistrement de dons → écriture <b>« Dons & mécénat »</b> en comptabilité. <span class="sim">Version réelle : reçu fiscal CERFA automatique.</span></li>
+</ul>
+<h3>Réseau du club</h3>
+<ul>
+  <li>Cartographie <b>déclarative et consentie</b> du réseau des adhérents : joueurs seniors et parents volontaires qui ont renseigné leur entreprise/poste et accepté d'être sollicités. Visible du bureau uniquement.</li>
+  <li>Chaque ligne dit ce que la personne « peut ouvrir » ; « Créer une piste » ajoute l'entreprise au pipeline en « À contacter » avec la mention de la mise en relation et un rappel planifié.</li>
+  <li><span class="sim">Version réelle : la case de consentement vit dans Mon profil et reste révocable ; aucune collecte automatique de relations.</span></li>
+</ul>
+<h3>Subventions publiques</h3>
+<ul>
+  <li>Indicateurs : accordé sur la saison, en instruction, dossiers à déposer (avec prochaine date limite).</li>
+  <li>Cycle de vie d'un dossier : <em>à déposer → déposée → accordée → versée</em> (ou refusée), piloté depuis la fiche ; <em>+ Nouvelle demande</em>.</li>
+</ul>
+<h3>Connexions</h3>
+<div class="flow"><b>Versement partenaire</b> ou <b>subvention versée</b> → écriture au <b>Journal comptable</b> (« Sponsors & partenaires » / « Subvention ») + transaction bancaire → solde et Tableau de bord à jour.</div>
+<div class="flow"><b>Contrat à échéance ≤ 90 j</b>, <b>rappel dû sous 7 j</b> et <b>dossier à déposer ≤ 45 j</b> de la date limite → alertes « À traiter » du <b>Tableau de bord</b>.</div>
+<div class="flow">Conventions et dossiers ont vocation à être rangés dans <b>Documents</b> (dossier Sponsors & partenaires). <span class="sim">Version réelle : rappels automatiques, pièces rattachées (RIB, budget prévisionnel), suivi Compte Asso.</span></div>
 
 <h2 id="stock">▤ Stock</h2>
 <p class="lead">Multi-pôles : sportif, pharmacie, administratif, buvette — plus deux onglets transverses, <b>Boutique</b> et <b>Dotations</b>. Écriture pour président, éducateur, membre codir ; lecture pour trésorière et secrétaire.</p>
@@ -254,7 +288,7 @@ a { color: var(--info-text); }
   <tr><td>Boutique en ligne au comptoir</td><td>Caisse mobile avec mode hors-ligne (réseau de stade)</td></tr>
 </table></div>
 
-<p style="margin-top:36px;color:var(--ink-3);font-size:12.5px">Guide V5.3 — évolue avec la maquette. Retours bienvenus : chaque remarque de testeur est tracée et traitée version par version.</p>
+<p style="margin-top:36px;color:var(--ink-3);font-size:12.5px">Guide V7 — évolue avec la maquette. Retours bienvenus : chaque remarque de testeur est tracée et traitée version par version.</p>
 </div>
 
 </body>
