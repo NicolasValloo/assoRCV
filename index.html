@@ -13,7 +13,7 @@
   --surface-2: #eef1ed;
   --ink: #182019;
   --ink-2: #5a635c;
-  --ink-3: #8b938d;
+  --ink-3: #6e766f;
   --line: #e2e6e1;
   --line-strong: #c9cfc9;
   --accent: #1e5c42;
@@ -25,11 +25,11 @@
   --good: #0ca30c;
   --good-text: #006300;
   --warning: #fab219;
-  --warning-text: #8a5b00;
+  --warning-text: #7a5000;
   --serious: #ec835a;
   --serious-text: #a34312;
   --critical: #d03b3b;
-  --critical-text: #b02a2a;
+  --critical-text: #9c1f1f;
   --chart-s1: #2a78d6;
   --chart-s2: #eb6834;
   --chart-s3: #1baf7a;
@@ -131,7 +131,7 @@ h1,h2,h3,h4 { text-wrap: balance; }
   font-weight: 700; font-size: 20px; letter-spacing: .4px; color: var(--side-ink-strong);
   line-height: 1.05;
 }
-.brand-sub { font-size: 11px; color: var(--side-ink); letter-spacing: .3px; }
+.brand-sub { font-size:12px; color: var(--side-ink); letter-spacing: .3px; }
 .nav { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
 .nav button {
   display: flex; align-items: center; gap: 10px;
@@ -146,7 +146,7 @@ h1,h2,h3,h4 { text-wrap: balance; }
 }
 .nav .ico { width: 18px; flex: none; text-align: center; }
 .side-note {
-  margin-top: auto; font-size: 11px; line-height: 1.45; color: var(--side-ink);
+  margin-top: auto; font-size:12px; line-height: 1.45; color: var(--side-ink);
   border-top: 1px solid rgba(255,255,255,.12); padding: 12px 8px 0;
 }
 
@@ -189,7 +189,7 @@ h1,h2,h3,h4 { text-wrap: balance; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
 th {
-  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .7px;
+  text-align: left; font-size:12px; text-transform: uppercase; letter-spacing: .7px;
   color: var(--ink-3); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line-strong);
   white-space: nowrap;
 }
@@ -202,7 +202,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 /* ---------- Badges & status ---------- */
 .badge {
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11.5px; font-weight: 600; letter-spacing: .2px;
+  font-size:12px; font-weight: 600; letter-spacing: .2px;
   padding: 2px 8px; border-radius: 20px; white-space: nowrap;
   background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line);
 }
@@ -367,6 +367,7 @@ label { font-size: 12px; font-weight: 600; color: var(--ink-2); display: block; 
     </div>
     <div id="userBox"></div>
     <nav class="nav" id="mainNav" aria-label="Modules"></nav>
+    <a class="nav-guide" href="https://nicolasvalloo.github.io/assoRCV/guide.html" target="_blank" rel="noopener">📖 Guide d'utilisation</a>
     <div id="demoBox"></div>
     <div class="side-note">
       Maquette de démonstration.<br>
@@ -375,7 +376,7 @@ label { font-size: 12px; font-weight: 600; color: var(--ink-2); display: block; 
   </aside>
 
   <main class="main">
-    <div class="demo-banner">⚠ Maquette — toutes les données sont fictives et générées pour test. Les modifications vivent le temps de la session.</div>
+    <div class="demo-banner">⚠ <span class="db-long">Maquette — toutes les données sont fictives et générées pour test. Les modifications vivent le temps de la session.</span><span class="db-short" hidden>Maquette — données 100 % fictives</span></div>
     <div id="view"></div>
   </main>
 </div>
@@ -580,7 +581,8 @@ const CAT_DEPENSES = ['Équipement sportif','Déplacements','Affiliation & licen
     } else if (l.cotStatut === 'partielle') {
       state.paiements.push({ id: pid++, licId: l.id, objet: 'Solde cotisation 2026-2027', montant: l.cot - l.cotPaye, statut: rnd() < 0.5 ? 'envoyee' : 'relancee', creee: addDaysIso(TODAY, -ri(10, 30)), payee: null, relances: rnd() < 0.5 ? 1 : 2 });
     } else if (l.cotStatut === 'impayee' && rnd() < 0.7) {
-      state.paiements.push({ id: pid++, licId: l.id, objet: 'Cotisation 2026-2027', montant: l.cot, statut: rnd() < 0.6 ? 'envoyee' : 'relancee', creee: addDaysIso(TODAY, -ri(5, 25)), payee: null, relances: ri(0, 2) });
+      const st = rnd() < 0.6 ? 'envoyee' : 'relancee';
+      state.paiements.push({ id: pid++, licId: l.id, objet: 'Cotisation 2026-2027', montant: l.cot, statut: st, creee: addDaysIso(TODAY, -ri(5, 25)), payee: null, relances: st === 'relancee' ? ri(1, 2) : 0 });
     }
   }
 })();
@@ -735,8 +737,10 @@ function render() {
   if (window.renderUser) renderUser();
   if (window.visibleModules) {
     const mods = visibleModules();
-    if (state.view !== 'profil' && !mods.some(m => m.id === state.view)) state.view = mods[0].id;
-    document.body.classList.toggle('mod-ro', window.canW ? !canW(state.view) : false);
+    const PAGES_LIBRES = ['profil', 'licencie', 'licencie-form', 'partenaire'];
+    if (!PAGES_LIBRES.includes(state.view) && !mods.some(m => m.id === state.view)) state.view = mods[0].id;
+    const MOD_PARENT = { licencie: 'licencies', 'licencie-form': 'licencies', partenaire: 'sponsors' };
+    document.body.classList.toggle('mod-ro', window.canW ? !canW(MOD_PARENT[state.view] || state.view) : false);
   }
   renderNav();
   const v = $('#view');
@@ -751,6 +755,9 @@ function render() {
   else if (state.view === 'profil') v.innerHTML = viewProfil();
   else if (state.view === 'sportif') v.innerHTML = viewSportif();
   else if (state.view === 'sponsors') v.innerHTML = viewSponsors();
+  else if (state.view === 'licencie') v.innerHTML = viewFicheLicencie();
+  else if (state.view === 'licencie-form') v.innerHTML = viewFormLicencie();
+  else if (state.view === 'partenaire') v.innerHTML = viewFichePartenaire();
   bindView();
   window.scrollTo(0, 0);
 }
@@ -938,8 +945,14 @@ function viewDashboard() {
     </div>
     <div class="card">
       <h3>À traiter</h3>
-      ${alertes.length ? alertes.map(a => `<div class="alert-line">${a.badge}<span>${esc(a.txt)}</span>
-        <button class="btn btn-sm" data-goto="${a.go}">Voir</button></div>`).join('') : '<p class="empty">Rien à signaler.</p>'}
+      ${(() => {
+        const sev = a => a.badge.includes('b-crit') ? 0 : a.badge.includes('b-serious') ? 1 : a.badge.includes('b-warn') ? 2 : 3;
+        const tri = [...alertes].sort((a, b) => sev(a) - sev(b));
+        const vis = tri.slice(0, 6);
+        return (vis.length ? vis.map(a => `<div class="alert-line">${a.badge}<span>${esc(a.txt)}</span>
+          <button class="btn btn-sm" data-goto="${a.go}">Voir</button></div>`).join('') : '<p class="empty">Rien à signaler.</p>')
+          + (tri.length > 6 ? `<p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">+ ${tri.length - 6} autre(s) point(s), visibles dans leurs modules — les plus urgents sont affichés en premier.</p>` : '');
+      })()}
     </div>
   </div>
   <div class="grid two-col">
@@ -983,7 +996,7 @@ function viewLicencies() {
   if (f.cot) rows = rows.filter(l => l.cotStatut === f.cot);
   if (f.cert === 'ko') rows = rows.filter(l => daysUntil(l.certFin) < 0);
   if (f.cert === 'bientot') rows = rows.filter(l => { const d = daysUntil(l.certFin); return d >= 0 && d <= state.params.certJours; });
-  rows = [...rows].sort((a, b) => (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
+  rows = window.trierLicencies ? trierLicencies(rows) : [...rows].sort((a, b) => (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
 
   return `
   <div class="page-head">
@@ -997,7 +1010,7 @@ function viewLicencies() {
   <div class="toolbar">
     <input type="search" id="licQ" placeholder="Rechercher un nom, un n° de licence…" value="${esc(f.q)}" aria-label="Recherche">
     <select id="licCat" aria-label="Filtrer par catégorie">
-      <option value="">Toutes catégories</option>
+      <option value="">Catégorie : toutes</option>
       ${CATEGORIES.map(c => `<option value="${c.code}" ${f.cat === c.code ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}
     </select>
     <select id="licCot" aria-label="Filtrer par cotisation">
@@ -1014,18 +1027,17 @@ function viewLicencies() {
     <span class="count-note">${rows.length} affiché(s)</span>
   </div>
   <div class="card" style="padding:4px 8px">
-    <div class="table-wrap">
+    <div class="table-wrap m-cards">
     <table>
-      <thead><tr><th>Nom</th><th>Catégorie</th><th>Licence FFR</th><th>Certificat / attestation</th><th>Cotisation</th><th class="num">Réglé</th></tr></thead>
+      <thead><tr><th class="th-tri" data-tri="lic:nom">Nom${window.triFleche ? triFleche('lic', 'nom') : ''}</th><th class="th-tri" data-tri="lic:cat">Catégorie${window.triFleche ? triFleche('lic', 'cat') : ''}</th><th>Licence FFR</th><th class="th-tri" data-tri="lic:statut">Statut${window.triFleche ? triFleche('lic', 'statut') : ''}</th><th class="num th-tri" data-tri="lic:regle">Réglé${window.triFleche ? triFleche('lic', 'regle') : ''}</th></tr></thead>
       <tbody>
-        ${rows.length ? rows.map(l => `<tr class="rowlink" data-lic="${l.id}" tabindex="0">
+        ${rows.length ? rows.map(l => { const st = window.statutLic ? statutLic(l) : null; return `<tr class="rowlink" data-lic="${l.id}" tabindex="0">
           <td><strong>${esc(l.nom.toUpperCase())}</strong> ${esc(l.prenom)}<br><span style="color:var(--ink-3);font-size:12px">${l.naissance.slice(0,4)} · ${esc(l.ville)}</span></td>
           <td>${esc(catLabel(l.cat))}</td>
-          <td>${l.licence}<br>${licBadge(l.licStatut)}${l.mutation && l.licStatut !== 'validee' ? ' <span class="badge b-warn"><span class="dot"></span>Mutation</span>' : ''}</td>
-          <td>${certBadge(l)}</td>
-          <td>${cotBadge(l.cotStatut)}</td>
-          <td class="num">${l.cot ? `${eur(l.cotPaye)} / ${eur(l.cot)}` : '—'}</td>
-        </tr>`).join('') : '<tr><td colspan="6" class="empty">Aucun licencié ne correspond aux filtres.</td></tr>'}
+          <td data-label="Licence">${l.licence}${l.mutation && l.licStatut !== 'validee' ? '<br><span class="badge b-warn"><span class="dot"></span>Mutation</span>' : ''}</td>
+          <td>${st ? `<span class="badge ${st.cls}" title="${window.titreStatut ? titreStatut(l) : ''}"><span class="dot"></span>${st.label}</span>` : licBadge(l.licStatut)}</td>
+          <td class="num" data-label="Réglé">${l.cot ? `${eur(l.cotPaye)} / ${eur(l.cot)}` : '—'}</td>
+        </tr>`; }).join('') : '<tr><td colspan="5" class="empty">Aucun licencié ne correspond aux filtres.</td></tr>'}
       </tbody>
     </table>
     </div>
@@ -1193,7 +1205,7 @@ function comptaBanque() {
         <td>${b.statut === 'rapprochee' ? '<span class="badge b-good"><span class="dot"></span>Rapprochée</span>' : '<span class="badge b-warn"><span class="dot"></span>À rapprocher</span>'}</td>
         <td>${b.statut === 'rapprochee' ? esc(b.catProposee) : `<select data-cat-for="${b.id}" aria-label="Catégorie">
             ${[...CAT_RECETTES, ...CAT_DEPENSES].map(c => `<option ${c === b.catProposee ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`}</td>
-        <td>${b.statut === 'a_rapprocher' ? `<button class="btn btn-sm btn-primary" data-rappro="${b.id}">Valider</button>` : ''}</td>
+        <td>${b.statut === 'a_rapprocher' ? `<button class="btn btn-sm" data-rappro="${b.id}">Valider</button>` : ''}</td>
       </tr>`).join('')}</tbody>
     </table></div>
   </div>
@@ -1233,16 +1245,13 @@ function comptaPaiements() {
   const totAttente = enAttente.reduce((s, p) => s + p.montant, 0);
   const totMois = payes.filter(p => p.payee >= '2026-09-01').reduce((s, p) => s + p.montant, 0);
   const licName = id => { const l = state.licencies.find(x => x.id === id); return l ? `${l.prenom} ${l.nom}` : '—'; };
-  const ligne = p => `<tr>
+  const ligne = p => `<tr class="rowlink" data-pay="${p.id}" tabindex="0">
     <td><strong>${esc(licName(p.licId))}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(p.objet)}</span></td>
     <td>${dfrShort(p.creee)}</td>
     <td>${p.statut === 'paye' ? '<span class="badge b-good"><span class="dot"></span>Payé le ' + dfrShort(p.payee) + '</span>'
-        : p.statut === 'relancee' ? `<span class="badge b-serious"><span class="dot"></span>Relancé ×${p.relances}</span>`
+        : p.statut === 'relancee' ? `<span class="badge b-serious"><span class="dot"></span>Relancé${p.relances > 0 ? ' ×' + p.relances : ''}</span>`
         : '<span class="badge b-warn"><span class="dot"></span>Lien envoyé</span>'}</td>
-    <td class="num" style="font-weight:600">${eur(p.montant)}</td>
-    <td style="white-space:nowrap">${p.statut !== 'paye' ? `
-      <button class="btn btn-sm" data-relance="${p.id}">Relancer</button>
-      <button class="btn btn-sm btn-primary" data-simulpay="${p.id}" title="Simule le paiement par la famille">Simuler le paiement</button>` : ''}</td>
+    <td class="num" data-label="Montant" style="font-weight:600">${eur(p.montant)}</td>
   </tr>`;
   return `
   <div class="grid kpis">
@@ -1259,11 +1268,11 @@ function comptaPaiements() {
   </div>
   <div class="card" style="padding:4px 8px">
     <div class="table-wrap"><table>
-      <thead><tr><th>Licencié</th><th>Créée</th><th>Statut</th><th class="num">Montant</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Licencié</th><th>Créée</th><th>Statut</th><th class="num">Montant</th></tr></thead>
       <tbody>
         ${enAttente.map(ligne).join('')}
         ${payes.slice(0, 12).map(ligne).join('')}
-        ${!state.paiements.length ? '<tr><td colspan="5" class="empty">Aucune demande de paiement.</td></tr>' : ''}
+        ${!state.paiements.length ? '<tr><td colspan="4" class="empty">Aucune demande de paiement.</td></tr>' : ''}
       </tbody>
     </table></div>
   </div>`;
@@ -1307,10 +1316,10 @@ function comptaJournal() {
   return `
   <div class="card" style="padding:4px 8px;margin-top:2px">
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th class="num">Recette</th><th class="num">Dépense</th></tr></thead>
-      <tbody>${state.ecritures.slice(0, 60).map(e => `<tr>
+      <thead><tr><th class="th-tri" data-tri="jr:date">Date${window.triFleche ? triFleche('jr', 'date') : ''}</th><th>Libellé</th><th>Catégorie</th><th class="num th-tri" data-tri="jr:montant">Recette${window.triFleche ? triFleche('jr', 'montant') : ''}</th><th class="num th-tri" data-tri="jr:montant">Dépense</th></tr></thead>
+      <tbody>${(window.trierEcritures ? trierEcritures() : state.ecritures).slice(0, 60).map(e => `<tr class="rowlink" data-ecriture="${e.id}" tabindex="0">
         <td style="white-space:nowrap">${dfrShort(e.date)}</td>
-        <td>${esc(e.libelle)}</td>
+        <td>${esc(e.libelle)}${e.cpOf ? ' <span class="badge">contre-passation</span>' : e.cpId ? ' <span class="badge b-warn"><span class="dot"></span>contre-passée</span>' : ''}</td>
         <td><span class="badge">${esc(e.cat)}</span></td>
         <td class="num" style="color:var(--good-text)">${e.sens === 'R' ? eur(e.montant) : ''}</td>
         <td class="num" style="color:var(--critical-text)">${e.sens === 'D' ? eur(e.montant) : ''}</td>
@@ -1346,11 +1355,12 @@ function openFormEcriture() {
 
 function viewStock() {
   const f = state.filtres.stock;
-  const pole = subTabs.stockPole;
-  if (window.viewBoutique && pole === 'boutique') return viewBoutique();
-  if (window.viewDotations && pole === 'dotations') return viewDotations();
+  if (window.viewBoutique && subTabs.stockSection === 'boutique') return viewBoutique();
+  if (window.viewDotations && subTabs.stockSection === 'dotations') return viewDotations();
+  const pole = ['boutique', 'dotations'].includes(subTabs.stockPole) ? 'tous' : subTabs.stockPole;
   let rows = pole === 'tous' ? state.stock : state.stock.filter(a => a.pole === pole);
   if (f.alerte) rows = rows.filter(a => a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= state.params.peremptionJours));
+  rows = window.trierStock ? trierStock(rows) : rows;
   const { sousSeuil, perimes } = alertesStock();
   const poleLabel = c => (POLES.find(p => p.code === c) || {label:c}).label;
   const nbAlertes = c => state.stock.filter(a => a.pole === c && (a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= state.params.peremptionJours))).length;
@@ -1358,7 +1368,7 @@ function viewStock() {
   const gauge = a => {
     const ratio = a.seuil ? a.qte / (a.seuil * 2) : 1;
     const cls = a.qte <= a.seuil ? 'low' : a.qte <= a.seuil * 1.4 ? 'mid' : '';
-    return `<div class="gauge ${cls}" role="img" aria-label="${a.qte} ${a.unite} pour un seuil de ${a.seuil}"><i style="width:${Math.min(100, ratio * 100).toFixed(0)}%"></i></div>`;
+    return `<div class="gauge ${cls}" role="img" title="${a.qte} ${a.unite} en stock — seuil d'alerte à ${a.seuil}" aria-label="${a.qte} ${a.unite} pour un seuil de ${a.seuil}"><i style="width:${Math.min(100, ratio * 100).toFixed(0)}%"></i></div>`;
   };
   const peremp = a => {
     if (!a.peremption) return '<span style="color:var(--ink-3)">—</span>';
@@ -1377,11 +1387,10 @@ function viewStock() {
       <button class="btn btn-primary" id="btnNewArt">+ Nouvel article</button>
     </div>
   </div>
-  <div class="tabs" role="tablist">
-    <button role="tab" aria-selected="${pole === 'tous'}" class="${pole === 'tous' ? 'active' : ''}" data-pole="tous">Tous les pôles</button>
-    ${POLES.map(p => `<button role="tab" aria-selected="${pole === p.code}" class="${pole === p.code ? 'active' : ''}" data-pole="${p.code}">${p.label}${nbAlertes(p.code) ? ` <span class="badge b-serious" style="margin-left:4px">${nbAlertes(p.code)}</span>` : ''}</button>`).join('')}
-    <button role="tab" aria-selected="false" data-pole="boutique">🛒 Boutique</button>
-    <button role="tab" aria-selected="false" data-pole="dotations">🎽 Dotations</button>
+  ${window.stockSectionTabs ? stockSectionTabs('inv') : ''}
+  <div class="filtres-chips">
+    <button class="${pole === 'tous' ? 'on' : ''}" data-pole="tous">Tous les pôles</button>
+    ${POLES.map(p => { const n = p.label.replace('Pôle ', ''); return `<button class="${pole === p.code ? 'on' : ''}" data-pole="${p.code}">${n[0].toUpperCase() + n.slice(1)}${nbAlertes(p.code) ? ` · ⚠ ${nbAlertes(p.code)}` : ''}</button>`; }).join('')}
   </div>
   <div class="toolbar">
     <label style="display:flex;align-items:center;gap:7px;margin:0;font-size:13px;font-weight:500;color:var(--ink)">
@@ -1389,24 +1398,20 @@ function viewStock() {
     <span class="count-note">${rows.length} référence(s)</span>
   </div>
   <div class="card" style="padding:4px 8px">
-    <div class="table-wrap"><table>
-      <thead><tr><th>Article</th>${pole === 'tous' ? '<th>Pôle</th>' : ''}<th class="num">Quantité</th><th>Niveau</th><th class="num">Seuil</th><th>Péremption</th><th>Emplacement</th><th>Mouvement</th></tr></thead>
+    <div class="table-wrap m-cards"><table>
+      <thead><tr><th class="th-tri" data-tri="stock:nom">Article${window.triFleche ? triFleche('stock', 'nom') : ''}</th>${pole === 'tous' ? '<th>Pôle</th>' : ''}<th class="num th-tri" data-tri="stock:qte">Quantité${window.triFleche ? triFleche('stock', 'qte') : ''}</th><th>Niveau</th><th class="num">Seuil</th><th class="th-tri" data-tri="stock:peremption">Péremption${window.triFleche ? triFleche('stock', 'peremption') : ''}</th><th>Emplacement</th></tr></thead>
       <tbody>${rows.length ? rows.map(a => `<tr class="rowlink" data-artfiche="${a.id}" tabindex="0">
         <td><strong>${esc(a.nom)}</strong>${a.qte <= a.seuil ? ' <span class="badge b-crit" style="margin-left:4px"><span class="dot"></span>Sous seuil</span>' : ''}</td>
         ${pole === 'tous' ? `<td><span class="badge">${esc(poleLabel(a.pole))}</span></td>` : ''}
         <td class="num" style="font-weight:600">${a.qte} <span style="color:var(--ink-3);font-weight:400">${esc(a.unite)}</span></td>
         <td>${gauge(a)}</td>
-        <td class="num" style="color:var(--ink-3)">${a.seuil}</td>
-        <td>${peremp(a)}</td>
+        <td class="num" data-label="Seuil" style="color:var(--ink-3)">${a.seuil}</td>
+        <td data-label="Péremption">${peremp(a)}</td>
         <td style="color:var(--ink-2)">${esc(a.empl)}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-sm" data-mv="-" data-art="${a.id}" aria-label="Sortie de stock">− Sortie</button>
-          <button class="btn btn-sm" data-mv="+" data-art="${a.id}" aria-label="Entrée en stock">+ Entrée</button>
-        </td>
-      </tr>`).join('') : '<tr><td colspan="8" class="empty">Aucun article dans ce pôle.</td></tr>'}</tbody>
+      </tr>`).join('') : '<tr><td colspan="7" class="empty">Aucun article dans ce pôle.</td></tr>'}</tbody>
     </table></div>
   </div>
-  <p style="font-size:12.5px;color:var(--ink-2)">Dans la version réelle : inventaires annuels avec écarts, affectation par équipe (jeu de maillots M16 → resp. catégorie), commandes fournisseurs générées depuis les seuils, scan code-barres pour la buvette.</p>`;
+  <p style="font-size:12.5px;color:var(--ink-2)">Jauge de niveau : <span style="color:var(--good-text)">vert</span> = confortable, <span style="color:var(--warning-text)">orange</span> = proche du seuil, <span style="color:var(--critical-text)">rouge</span> = sous le seuil. Clique sur un article pour sa fiche (prix, EAN, mouvements, entrées/sorties). Dans la version réelle : inventaires annuels avec écarts, commandes fournisseurs générées depuis les seuils, scan code-barres.</p>`;
 }
 
 function openMouvement(artId, sens) {
@@ -1451,7 +1456,7 @@ function openHistoStock() {
 function openFormArticle() {
   openModal('Nouvel article', `
     <div class="form-grid">
-      <div class="field" style="grid-column:1/-1"><label for="aNom">Désignation</label><input id="aNom" placeholder="ex. Bouteilles d'eau 50 cl"></div>
+      <div class="field" style="grid-column:1/-1"><label for="aNom">Désignation <span class="req">*</span></label><input id="aNom" placeholder="ex. Bouteilles d'eau 50 cl"></div>
       <div class="field"><label for="aPole">Pôle</label><select id="aPole">${POLES.map(p => `<option value="${p.code}">${p.label}</option>`).join('')}</select></div>
       <div class="field"><label for="aUnite">Unité</label><input id="aUnite" value="u."></div>
       <div class="field"><label for="aQte">Quantité initiale</label><input id="aQte" type="number" min="0" value="0"></div>
@@ -1592,7 +1597,7 @@ function reunionSeance(r) {
     </div>
     <div>
       <div class="card" style="margin-bottom:14px">
-        <h3>Quorum</h3>
+        <h3 title="Quorum : nombre minimal de présents (ou représentés) pour que les délibérations soient valides — ici ${r.quorumPct} % des ${r.convoquees} convoqués">Quorum</h3>
         ${r.statut === 'terminee'
           ? `<p style="margin:0"><strong>${r.presents} présents</strong>${r.pouvoirs ? ` + ${r.pouvoirs} pouvoirs` : ''} sur ${r.convoquees} convoqués.<br>
              <span class="badge ${quorumOk ? 'b-good' : 'b-crit'}" style="margin-top:6px"><span class="dot"></span>Quorum ${quorumOk ? 'atteint' : 'non atteint'} (min. ${quorumMin})</span></p>`
@@ -1625,6 +1630,7 @@ function reunionVotes(r) {
     </div>`;
   };
   return `
+  ${r.crDiffuse ? '<p style="margin:0 0 12px"><span class="badge b-good"><span class="dot"></span>Compte-rendu diffusé — les votes sont verrouillés</span></p>' : ''}
   <div class="grid" style="grid-template-columns:1fr;max-width:760px">
     ${r.votes.map(v => `<div class="card">
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
@@ -1645,7 +1651,7 @@ function reunionVotes(r) {
               <button class="btn btn-primary" data-vclose="${v.id}">Clore le vote</button>
             </div>
             <p style="font-size:12px;color:var(--ink-3);margin:8px 0 0">Saisie par le secrétaire (main levée) — la version réelle permettrait aussi le vote sur smartphone de chaque membre, avec anonymat configurable.</p>`
-          : bar(v)}
+          : bar(v) + (v.statut === 'clos' && r.statut !== 'terminee' && !r.crDiffuse && (!window.canW || canW('codir')) ? `<div style="margin-top:10px"><button class="btn btn-sm" data-vreopen="${v.id}">Rouvrir le vote</button></div>` : '')}
       </div>
     </div>`).join('')}
     ${r.statut !== 'terminee' ? `
@@ -1688,7 +1694,7 @@ function reunionCR(r) {
 function openFormReunion() {
   openModal('Planifier une réunion', `
     <div class="form-grid">
-      <div class="field" style="grid-column:1/-1"><label for="rTitre">Titre</label><input id="rTitre" placeholder="ex. Comité directeur de novembre"></div>
+      <div class="field" style="grid-column:1/-1"><label for="rTitre">Titre <span class="req">*</span></label><input id="rTitre" placeholder="ex. Comité directeur de novembre"></div>
       <div class="field"><label for="rType">Type</label><select id="rType"><option value="Codir">Comité directeur</option><option value="AG">Assemblée générale</option></select></div>
       <div class="field"><label for="rLieu">Lieu</label><input id="rLieu" value="Club house"></div>
       <div class="field"><label for="rDate">Date</label><input id="rDate" type="date" value="${addDaysIso(TODAY, 30)}"></div>
@@ -1783,7 +1789,13 @@ function bindView() {
       toast('Point ajouté à l\'ordre du jour.');
       render();
     };
-    $$('[data-delodj]', v).forEach(b => b.onclick = () => { r.odj = r.odj.filter(o => o.id !== Number(b.dataset.delodj)); render(); });
+    $$('[data-delodj]', v).forEach(b => b.onclick = () => {
+      const o = r.odj.find(x => x.id === Number(b.dataset.delodj));
+      if (!o) return;
+      const retirer = () => { r.odj = r.odj.filter(x => x.id !== o.id); toast('Point retiré de l\'ordre du jour.'); render(); };
+      if (window.confirmer) confirmer('Retirer ce point ?', `<p style="margin:0">Retirer « <strong>${esc(o.titre)}</strong> » de l'ordre du jour ?</p>`, 'Retirer', retirer);
+      else retirer();
+    });
     const btnConvoc = $('#btnConvoc');
     if (btnConvoc) btnConvoc.onclick = () => { r.convocEnvoyee = true; toast(`Convocations envoyées à ${r.convoquees} membre(s) par email (simulé).`); render(); };
     const btnDoc = $('#btnDocAdd');
@@ -1805,14 +1817,23 @@ function bindView() {
     $$('[data-vclose]', v).forEach(b => b.onclick = () => {
       const vt = r.votes.find(x => x.id === Number(b.dataset.vclose));
       if (!vt) return;
-      vt.pour = Math.max(0, Number($('#vp' + vt.id).value) || 0);
-      vt.contre = Math.max(0, Number($('#vc' + vt.id).value) || 0);
-      vt.abst = Math.max(0, Number($('#va' + vt.id).value) || 0);
-      if (!vt.pour && !vt.contre && !vt.abst) { toast('Saisis au moins un vote avant de clore.'); return; }
-      vt.statut = 'clos';
-      vt.resultat = vt.pour > vt.contre ? 'adopte' : 'rejete';
-      toast(`Vote clos — résolution ${vt.resultat === 'adopte' ? 'adoptée' : 'rejetée'}.`);
-      render();
+      const pour = Math.max(0, Number($('#vp' + vt.id).value) || 0);
+      const contre = Math.max(0, Number($('#vc' + vt.id).value) || 0);
+      const abst = Math.max(0, Number($('#va' + vt.id).value) || 0);
+      if (!pour && !contre && !abst) { toast('Saisis au moins un vote avant de clore.'); return; }
+      const clore = () => {
+        vt.pour = pour; vt.contre = contre; vt.abst = abst;
+        vt.statut = 'clos';
+        vt.resultat = pour > contre ? 'adopte' : 'rejete';
+        toast(`Vote clos — résolution ${vt.resultat === 'adopte' ? 'adoptée' : 'rejetée'}.`);
+        render();
+      };
+      if (window.confirmer) confirmer('Clore le vote',
+        `<p style="margin:0 0 10px"><strong>${esc(vt.titre)}</strong></p>
+         <p style="margin:0 0 10px;font-size:15px">Pour <strong>${pour}</strong> · Contre <strong>${contre}</strong> · Abstention <strong>${abst}</strong> — la résolution sera <strong>${pour > contre ? 'adoptée' : 'rejetée'}</strong>.</p>
+         <p style="margin:0;font-size:12.5px;color:var(--ink-2)">Le résultat sera inscrit au compte-rendu. Tant que le CR n'est pas diffusé, le vote pourra être rouvert.</p>`,
+        'Clore définitivement', clore);
+      else clore();
     });
     const vAdd = $('#vAdd');
     if (vAdd) vAdd.onclick = () => {
@@ -1823,7 +1844,7 @@ function bindView() {
       render();
     };
     const crPdf = $('#btnCrPdf'); if (crPdf) crPdf.onclick = () => toast('PDF du compte-rendu généré (simulé).');
-    const crMail = $('#btnCrMail'); if (crMail) crMail.onclick = () => toast('Compte-rendu diffusé aux membres (simulé).');
+    const crMail = $('#btnCrMail'); if (crMail) crMail.onclick = () => { r.crDiffuse = true; toast('Compte-rendu diffusé aux membres (simulé) — les votes de cette réunion sont verrouillés.'); render(); };
   }
 }
 
@@ -1836,7 +1857,7 @@ render();
 .crumb .sep { color: var(--ink-3); }
 .crumb .here { font-weight: 600; }
 .ged-ico { font-size: 17px; width: 24px; display: inline-block; text-align: center; }
-.chip { display: inline-block; font-size: 11px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 1px 8px; margin: 1px 2px 1px 0; color: var(--ink-2); }
+.chip { display: inline-block; font-size:12px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 1px 8px; margin: 1px 2px 1px 0; color: var(--ink-2); }
 /* ---------- Paramètres ---------- */
 .color-preview { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
 .swatch-btn { pointer-events: none; }
@@ -2091,11 +2112,12 @@ function paramDroits() {
   return `
   <div class="card" style="padding:4px 8px">
     <div class="table-wrap roles-table"><table>
-      <thead><tr><th>Rôle</th>${MODS_DROITS.map(m => `<th>${m.label}</th>`).join('')}</tr></thead>
+      <thead><tr><th>Rôle</th>${MODS_DROITS.map(m => `<th>${m.label}</th>`).join('')}<th>Aperçu</th></tr></thead>
       <tbody>${ROLES.map(r => `<tr>
         <td><strong>${r.label}</strong></td>
         ${MODS_DROITS.map(m => `<td><select data-droit="${r.id}:${m.id}" aria-label="${r.label} — ${m.label}">
           ${NIVEAUX.map(([v, l]) => `<option value="${v}" ${roles[r.id][m.id] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>`).join('')}
+        <td><button class="btn btn-sm" data-voircomme="${r.id}" title="Basculer la démo sur un utilisateur de ce rôle">Voir</button></td>
       </tr>`).join('')}</tbody>
     </table></div>
   </div>
@@ -2222,8 +2244,13 @@ function bindExtra(v) {
   }
   $$('[data-droit]', v).forEach(s => s.onchange = () => {
     const [r, m] = s.dataset.droit.split(':');
+    if (r === 'president' && m === 'parametres' && s.value !== 'admin') {
+      s.value = 'admin';
+      toast('Refusé : retirer les Paramètres au président verrouillerait le back-office pour tout le monde.');
+      return;
+    }
     state.params.roles[r][m] = s.value;
-    toast('Droit mis à jour (illustratif dans la maquette).');
+    toast('Droit mis à jour — vérifiable via « voir comme ».');
   });
   const saveF = $('#pSaveFonct');
   if (saveF) saveF.onclick = () => {
@@ -2265,14 +2292,14 @@ render();
   display: grid; place-items: center; font-weight: 700; font-size: 13px; letter-spacing: .5px;
 }
 .user-nom { font-weight: 600; font-size: 13.5px; color: var(--side-ink-strong); line-height: 1.15; }
-.user-role { font-size: 11.5px; color: var(--side-ink); }
+.user-role { font-size:12px; color: var(--side-ink); }
 .user-card select {
   width: 100%; margin-top: 8px; font-size: 12px; padding: 5px 6px;
   background: rgba(255,255,255,.08); color: var(--side-ink-strong);
   border: 1px solid rgba(255,255,255,.15); border-radius: 7px;
 }
 .user-card select option { color: #14241c; background: #fff; }
-.user-card .demo-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--side-ink); margin-top: 8px; display: block; }
+.user-card .demo-tag { font-size:12px; text-transform: uppercase; letter-spacing: .8px; color: var(--side-ink); margin-top: 8px; display: block; }
 /* Lecture seule : les actions d'écriture disparaissent */
 body.mod-ro #view .btn-primary,
 body.mod-ro #view [data-mv], body.mod-ro #view [data-rappro], body.mod-ro #view [data-relance],
@@ -2628,8 +2655,8 @@ render();
   background: var(--accent-soft); color: var(--accent); padding: 7px 4px 6px;
 }
 .evt-date .d { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 24px; line-height: 1; }
-.evt-date .m { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
-.evt-date .wd { font-size: 10px; color: var(--ink-3); }
+.evt-date .m { font-size:12px; text-transform: uppercase; letter-spacing: .6px; }
+.evt-date .wd { font-size:12px; color: var(--ink-3); }
 .evt-main { flex: 1; min-width: 0; }
 .evt-title { font-weight: 600; font-size: 14.5px; }
 .evt-meta { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
@@ -2650,7 +2677,7 @@ render();
 .tile:hover { background: var(--surface-2); }
 .tile .t-ico { font-size: 30px; line-height: 1; }
 .tile .t-nom { font-size: 12.5px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
-.tile .t-meta { font-size: 11px; color: var(--ink-3); margin-top: auto; }
+.tile .t-meta { font-size:12px; color: var(--ink-3); margin-top: auto; }
 .tile-section { margin: 18px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--ink-2); font-weight: 600; }
 </style>
 <script>
@@ -2762,7 +2789,7 @@ function viewSportif() {
   </div>
   <div class="toolbar">
     <select id="spCat" aria-label="Filtrer par catégorie">
-      <option value="">Toutes les catégories</option>
+      <option value="">Catégorie : toutes</option>
       ${CATS_SPORT.map(c => `<option value="${c}" ${cat === c ? 'selected' : ''}>${esc(catLabel(c))}</option>`).join('')}
     </select>
     <span class="count-note">${evts.length} événement(s)</span>
@@ -2963,7 +2990,7 @@ render();
 .stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; }
 .stat-tile { background: var(--surface-2); border-radius: 10px; padding: 12px 10px; text-align: center; }
 .stat-tile .v { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 26px; line-height: 1; }
-.stat-tile .l { font-size: 11px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .5px; margin-top: 5px; }
+.stat-tile .l { font-size:12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .5px; margin-top: 5px; }
 .ean { font-family: ui-monospace, monospace; font-size: 12px; color: var(--ink-2); }
 </style>
 <script>
@@ -3204,12 +3231,7 @@ function renderFiche(id, tab) {
 
 /* ---- Boutique ---- */
 function stockTabsHtml(active) {
-  return `<div class="tabs" role="tablist">
-    <button role="tab" aria-selected="false" data-pole="tous">Tous les pôles</button>
-    ${POLES.map(p => `<button role="tab" aria-selected="false" data-pole="${p.code}">${p.label}</button>`).join('')}
-    <button role="tab" aria-selected="${active === 'boutique'}" class="${active === 'boutique' ? 'active' : ''}" data-pole="boutique">🛒 Boutique</button>
-    <button role="tab" aria-selected="${active === 'dotations'}" class="${active === 'dotations' ? 'active' : ''}" data-pole="dotations">🎽 Dotations</button>
-  </div>`;
+  return window.stockSectionTabs ? stockSectionTabs(active) : '';
 }
 function viewBoutique() {
   const arts = state.stock.filter(a => a.vente).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
@@ -3443,10 +3465,10 @@ openFormLic = function (id) {
   openModal(l ? 'Modifier le licencié' : 'Nouveau licencié', `
     ${H('Identité')}
     <div class="form-grid">
-      ${F('fPrenom', 'Prénom', inp('fPrenom', l ? l.prenom : ''))}
-      ${F('fNom', 'Nom', inp('fNom', l ? l.nom : ''))}
+      ${F('fPrenom', 'Prénom <span class="req">*</span>', inp('fPrenom', l ? l.prenom : ''))}
+      ${F('fNom', 'Nom <span class="req">*</span>', inp('fNom', l ? l.nom : ''))}
       ${F('fSexe', 'Sexe', sel('fSexe', [['M','Masculin'],['F','Féminin']], l ? l.sexe : 'M'))}
-      ${F('fNaiss', 'Date de naissance', inp('fNaiss', l ? l.naissance : '2010-01-01', 'date'))}
+      ${F('fNaiss', 'Date de naissance <span class="req">*</span>', inp('fNaiss', l ? l.naissance : '2010-01-01', 'date'))}
       ${F('fNat', 'Nationalité', inp('fNat', l ? l.nationalite : 'Française'))}
       ${F('fVilleN', 'Ville de naissance', inp('fVilleN', l ? l.villeNaissance : ''))}
       ${F('fPaysN', 'Pays de naissance', inp('fPaysN', l ? l.paysNaissance : 'France'))}
@@ -3456,7 +3478,7 @@ openFormLic = function (id) {
     </div>
     ${H('Licence & antécédents')}
     <div class="form-grid">
-      ${F('fCat', 'Catégorie', sel('fCat', CATEGORIES.map(c => [c.code, c.label]), l ? l.cat : 'SEN'))}
+      ${F('fCat', 'Catégorie <span class="req">*</span>', sel('fCat', CATEGORIES.map(c => [c.code, c.label]), l ? l.cat : 'SEN'))}
       ${F('fLicStatut', 'Statut licence FFR', sel('fLicStatut', [['attente','En attente FFR'],['validee','Validée'],['a_renouveler','À renouveler']], l ? l.licStatut : 'attente'))}
       ${F('fCert', 'Fin de validité certificat médical', inp('fCert', l ? l.certFin : '', 'date'))}
       ${F('fDeja', 'Licencié l\'année précédente ?', sel('fDeja', [['non','Non (première licence)'],['oui','Oui']], l && l.dejaLicencie ? 'oui' : 'non'))}
@@ -3543,7 +3565,7 @@ openFormArticle = function (artId) {
   const a = artId ? state.stock.find(x => x.id === artId) : null;
   openModal(a ? 'Modifier l\'article' : 'Nouvel article', `
     <div class="form-grid">
-      <div class="field" style="grid-column:1/-1"><label for="aNom">Désignation</label><input id="aNom" value="${a ? esc(a.nom) : ''}" placeholder="ex. Bouteilles d'eau 50 cl"></div>
+      <div class="field" style="grid-column:1/-1"><label for="aNom">Désignation <span class="req">*</span></label><input id="aNom" value="${a ? esc(a.nom) : ''}" placeholder="ex. Bouteilles d'eau 50 cl"></div>
       <div class="field"><label for="aPole">Pôle</label><select id="aPole">${POLES.map(p => `<option value="${p.code}" ${a && a.pole === p.code ? 'selected' : ''}>${p.label}</option>`).join('')}</select></div>
       <div class="field"><label for="aUnite">Unité</label><input id="aUnite" value="${a ? esc(a.unite) : 'u.'}"></div>
       <div class="field"><label for="aQte">Quantité ${a ? 'en stock' : 'initiale'}</label><input id="aQte" type="number" min="0" value="${a ? a.qte : 0}"></div>
@@ -3717,14 +3739,14 @@ function sponsorsSubventions() {
       <div class="kpi-note">${aDeposer.length ? 'prochaine limite : ' + dfrShort(aDeposer.sort((a,b) => a.limite.localeCompare(b.limite))[0].limite) : 'rien en attente'}</div></div>
   </div>
   <div class="card" style="padding:4px 8px;margin-top:14px">
-    <div class="table-wrap"><table>
+    <div class="table-wrap m-cards"><table>
       <thead><tr><th>Organisme</th><th>Objet</th><th class="num">Demandé</th><th class="num">Accordé</th><th>Date limite / dépôt</th><th>Statut</th></tr></thead>
       <tbody>${state.subventions.map(s => `<tr class="rowlink" data-subv="${s.id}" tabindex="0">
         <td><strong>${esc(s.organisme)}</strong></td>
         <td style="max-width:260px;font-size:12.5px">${esc(s.objet)}</td>
-        <td class="num">${eur(s.demande)}</td>
-        <td class="num" style="font-weight:600">${s.accorde !== null ? eur(s.accorde) : '—'}</td>
-        <td style="white-space:nowrap">${s.statut === 'a_deposer'
+        <td class="num" data-label="Demandé">${eur(s.demande)}</td>
+        <td class="num" data-label="Accordé" style="font-weight:600">${s.accorde !== null ? eur(s.accorde) : '—'}</td>
+        <td data-label="Dépôt" style="white-space:nowrap">${s.statut === 'a_deposer'
           ? 'limite ' + dfrShort(s.limite) + (daysUntil(s.limite) <= 45 ? ` <span class="badge b-warn">${daysUntil(s.limite)} j</span>` : '')
           : (s.depot ? 'déposée le ' + dfrShort(s.depot) : '—')}</td>
         <td>${svStatut(s.statut)}</td>
@@ -3837,7 +3859,7 @@ bindExtra = function (v) {
   if (spNew) spNew.onclick = () => {
     openModal('Nouveau partenaire', `
       <div class="form-grid">
-        <div class="field" style="grid-column:1/-1"><label for="npNom">Nom de l'entreprise</label><input id="npNom" placeholder="ex. Pharmacie du Centre"></div>
+        <div class="field" style="grid-column:1/-1"><label for="npNom">Nom de l'entreprise <span class="req">*</span></label><input id="npNom" placeholder="ex. Pharmacie du Centre"></div>
         <div class="field"><label for="npType">Type</label><select id="npType"><option>Partenaire</option><option>Sponsor principal</option><option>Mécène</option></select></div>
         <div class="field"><label for="npMontant">Montant annuel (€)</label><input id="npMontant" type="number" min="0" value="500"></div>
         <div class="field"><label for="npContact">Contact</label><input id="npContact" placeholder="Nom du contact"></div>
@@ -3861,7 +3883,7 @@ bindExtra = function (v) {
       <div class="form-grid">
         <div class="field"><label for="nsOrg">Organisme</label><select id="nsOrg"><option>Mairie de Vincennes</option><option>ANS (Agence nationale du sport)</option><option>Département</option><option>Région</option><option>FFR / Ligue</option></select></div>
         <div class="field"><label for="nsMontant">Montant demandé (€)</label><input id="nsMontant" type="number" min="0" value="1000"></div>
-        <div class="field" style="grid-column:1/-1"><label for="nsObjet">Objet de la demande</label><input id="nsObjet" placeholder="ex. Renouvellement du matériel école de rugby"></div>
+        <div class="field" style="grid-column:1/-1"><label for="nsObjet">Objet de la demande <span class="req">*</span></label><input id="nsObjet" placeholder="ex. Renouvellement du matériel école de rugby"></div>
         <div class="field"><label for="nsLimite">Date limite de dépôt</label><input id="nsLimite" type="date" value="${addDaysIso(TODAY, 60)}"></div>
       </div>`, `
       <button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="nsOk">Créer le dossier</button>`);
@@ -3889,7 +3911,7 @@ render();
 .suivi-item { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; align-items: baseline; }
 .suivi-item:last-child { border-bottom: 0; }
 .suivi-item .t { flex: none; width: 52px; }
-.suivi-item .when { margin-left: auto; color: var(--ink-3); font-size: 11.5px; white-space: nowrap; }
+.suivi-item .when { margin-left: auto; color: var(--ink-3); font-size:12px; white-space: nowrap; }
 </style>
 <script>
 /* ================= V6.1 : CRM PARTENAIRES — PROSPECTS, ANCIENS, RAPPELS, SUIVI ================= */
@@ -3990,7 +4012,7 @@ sponsorsPartenaires = function () {
           <thead><tr><th>Partenaire</th><th class="num">Montant / an</th><th>${f === 'actifs' ? 'Échéance' : f === 'prospection' ? 'Prochain rappel' : 'Échéance / rappel'}</th><th>Statut</th></tr></thead>
           <tbody>${rows.length ? rows.map(s => `<tr class="rowlink" data-sponsor="${s.id}" tabindex="0">
             <td><strong>${esc(s.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(s.contact.nom)}${s.suivis.length ? ' · ' + s.suivis.length + ' échange(s)' : ''}</span></td>
-            <td class="num" style="font-weight:600">${eur(s.montantAnnuel)}${SP_ACTIFS.includes(s.statut) ? '<br><span style="font-weight:400;color:var(--ink-3);font-size:11.5px">' + eur(spVerse(s)) + ' versés</span>' : ''}</td>
+            <td class="num" style="font-weight:600">${eur(s.montantAnnuel)}${SP_ACTIFS.includes(s.statut) ? '<br><span style="font-weight:400;color:var(--ink-3);font-size:12px">' + eur(spVerse(s)) + ' versés</span>' : ''}</td>
             <td style="white-space:nowrap">${SP_ACTIFS.includes(s.statut) && s.fin
               ? dfrShort(s.fin) + (daysUntil(s.fin) <= 90 ? ` <span class="badge b-warn">${daysUntil(s.fin)} j</span>` : '')
               : s.rappel ? `<span class="${daysUntil(s.rappel.date) < 0 ? 'rappel-due' : ''}">${dfrShort(s.rappel.date)}</span>` : '<span style="color:var(--ink-3)">—</span>'}</td>
@@ -4133,8 +4155,8 @@ render();
 }
 .pipe button.on { border-color: var(--accent); background: var(--accent-soft); }
 .pipe .pv { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: var(--ink); }
-.pipe .pl { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-2); font-weight: 600; display: block; margin-bottom: 4px; }
-.pipe .pe { font-size: 11px; color: var(--ink-3); }
+.pipe .pl { font-size:12px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-2); font-weight: 600; display: block; margin-bottom: 4px; }
+.pipe .pe { font-size:12px; color: var(--ink-3); }
 .todo-line { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .todo-line:last-child { border-bottom: 0; }
 .todo-line input[type="checkbox"] { margin-top: 3px; }
@@ -4274,11 +4296,11 @@ sponsorsPartenaires = function () {
   if (f === 'pipeline') rows = state.sponsors.filter(s => s.statut !== 'termine' && s.statut !== 'perdu');
   else if (f === 'sortis') rows = sortis;
   else rows = parEtape[f] || state.sponsors;
-  rows = [...rows].sort((a, b) => SP_ETAPES.findIndex(e => e[0] === a.statut) - SP_ETAPES.findIndex(e => e[0] === b.statut) || a.nom.localeCompare(b.nom, 'fr'));
+  rows = window.trierSponsors ? trierSponsors(rows) : [...rows].sort((a, b) => SP_ETAPES.findIndex(e => e[0] === a.statut) - SP_ETAPES.findIndex(e => e[0] === b.statut) || a.nom.localeCompare(b.nom, 'fr'));
   const rappels = rappelsSponsors().filter(r => daysUntil(r.date) <= 30);
   return `
   <div class="pipe">
-    ${SP_ETAPES.map(([k, lab]) => `<button class="${f === k ? 'on' : ''}" data-spfiltre="${k}">
+    ${SP_ETAPES.map(([k, lab]) => `<button class="${f === k ? 'on' : ''}" data-spfiltre="${k}" title="${(window.SP_TITRES || {})[k] || ''}">
       <span class="pl">${lab}</span><span class="pv">${parEtape[k].length}</span>
       <span class="pe"> · ${eur(parEtape[k].reduce((t, s) => t + s.montantAnnuel, 0))}</span>
     </button>`).join('')}
@@ -4289,12 +4311,12 @@ sponsorsPartenaires = function () {
   </div>
   <div class="grid two-col">
     <div class="card" style="padding:4px 8px">
-      <div class="table-wrap"><table>
-        <thead><tr><th>Partenaire</th><th class="num">Montant / an</th><th>Échéance / rappel</th><th>Étape</th></tr></thead>
+      <div class="table-wrap m-cards"><table>
+        <thead><tr><th class="th-tri" data-tri="sp:nom">Partenaire${window.triFleche ? triFleche('sp', 'nom') : ''}</th><th class="num th-tri" data-tri="sp:montant">Montant / an${window.triFleche ? triFleche('sp', 'montant') : ''}</th><th class="th-tri" data-tri="sp:echeance">Échéance / rappel${window.triFleche ? triFleche('sp', 'echeance') : ''}</th><th>Étape</th></tr></thead>
         <tbody>${rows.length ? rows.map(s => `<tr class="rowlink" data-sponsor="${s.id}" tabindex="0">
           <td><strong>${esc(s.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${s.contacts.length ? esc(s.contacts[0].nom) + (s.contacts.length > 1 ? ' +' + (s.contacts.length - 1) : '') : '—'}${s.suivis.length ? ' · ' + s.suivis.length + ' échange(s)' : ''}</span></td>
-          <td class="num" style="font-weight:600">${eur(s.montantAnnuel)}${SP_EN_COURS.includes(s.statut) ? '<br><span style="font-weight:400;color:var(--ink-3);font-size:11.5px">' + eur(spVerse(s)) + ' versés</span>' : ''}</td>
-          <td style="white-space:nowrap">${SP_EN_COURS.includes(s.statut) && s.fin
+          <td class="num" data-label="Montant / an" style="font-weight:600">${eur(s.montantAnnuel)}${SP_EN_COURS.includes(s.statut) ? '<br><span style="font-weight:400;color:var(--ink-3);font-size:12px">' + eur(spVerse(s)) + ' versés</span>' : ''}</td>
+          <td data-label="Échéance / rappel" style="white-space:nowrap">${SP_EN_COURS.includes(s.statut) && s.fin
             ? dfrShort(s.fin) + (daysUntil(s.fin) <= 90 ? ` <span class="badge b-warn">${daysUntil(s.fin)} j</span>` : '')
             : s.rappel ? `<span class="${daysUntil(s.rappel.date) < 0 ? 'rappel-due' : ''}">${dfrShort(s.rappel.date)}</span>` : '<span style="color:var(--ink-3)">—</span>'}</td>
           <td>${spBadge7(s.statut)}</td>
@@ -4392,7 +4414,7 @@ function sponsorsReseau() {
         <td style="white-space:nowrap">${esc(p.lien)}</td>
         <td><strong>${esc(p.entreprise)}</strong><br><span style="color:var(--ink-2);font-size:12.5px">${esc(p.poste)} · ${esc(p.secteur)}</span></td>
         <td style="font-size:12.5px;color:var(--ink-2);max-width:220px">${esc(p.ouverture)}</td>
-        <td>${stChip(p.statut)}${p.statut === 'donateur' && p.don ? '<br><span style="font-size:11.5px;color:var(--ink-3)">' + eur(p.don) + '</span>' : ''}</td>
+        <td>${stChip(p.statut)}${p.statut === 'donateur' && p.don ? '<br><span style="font-size:12px;color:var(--ink-3)">' + eur(p.don) + '</span>' : ''}</td>
         <td style="white-space:nowrap">${(!window.canW || canW('sponsors')) && p.statut !== 'piste' ? `<button class="btn btn-sm btn-primary" data-reseau-piste="${p.id}">Créer une piste</button>` : ''}</td>
       </tr>`).join('')}</tbody>
     </table></div>
@@ -4535,7 +4557,7 @@ bindExtra = function (v) {
       <div class="form-grid">
         <div class="field"><label for="ncSp">Partenaire</label><select id="ncSp">${state.sponsors.filter(s => !['termine','perdu'].includes(s.statut)).map(s => `<option value="${s.id}">${esc(s.nom)}</option>`).join('')}</select></div>
         <div class="field"><label for="ncEch">Échéance</label><input id="ncEch" type="date" value="${addDaysIso(TODAY, 21)}"></div>
-        <div class="field" style="grid-column:1/-1"><label for="ncTitre">À faire</label><input id="ncTitre" placeholder="ex. Poser la banderole au gymnase"></div>
+        <div class="field" style="grid-column:1/-1"><label for="ncTitre">À faire <span class="req">*</span></label><input id="ncTitre" placeholder="ex. Poser la banderole au gymnase"></div>
         <div class="field"><label for="ncResp">Responsable</label><input id="ncResp" value="P. Gayraud"></div>
       </div>`, `
       <button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="ncOk">Ajouter</button>`);
@@ -4585,6 +4607,735 @@ bindExtra = function (v) {
   });
 };
 
+render();
+</script>
+<style>
+/* ---------- V8 : tables en cartes (mobile) ---------- */
+@media (max-width: 760px) {
+  .m-cards table, .m-cards tbody, .m-cards tr, .m-cards td { display: block; width: 100%; }
+  .m-cards thead { display: none; }
+  .m-cards tr {
+    border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+    margin: 8px 2px; padding: 10px 12px;
+  }
+  .m-cards td { border: 0; padding: 2px 0; }
+  .m-cards td.num { text-align: left; }
+  .m-cards td:empty { display: none; }
+}
+/* ---------- V8 : pages de détail ---------- */
+.fiche-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.sec-title { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 19px; letter-spacing: .3px; margin: 0 0 10px; }
+</style>
+<script>
+/* ================= V8 : REFONTE UX — PAGES DE DÉTAIL, STATUT SYNTHÉTIQUE, SECTIONS STOCK ================= */
+
+/* ---- Lot A : statut synthétique d'un licencié ---- */
+function statutLic(l) {
+  normaliserLic(l);
+  const probs = [], warns = [];
+  if (daysUntil(l.certFin) < 0) probs.push('Certificat expiré');
+  else if (daysUntil(l.certFin) <= state.params.certJours) warns.push('Certificat à renouveler');
+  if (l.cotStatut === 'impayee') probs.push('Cotisation impayée');
+  else if (l.cotStatut === 'partielle') warns.push('Cotisation partielle');
+  if (l.licStatut === 'a_renouveler') warns.push('Licence à renouveler');
+  else if (l.licStatut === 'attente') warns.push('En attente FFR');
+  const extra = n => n > 1 ? ` +${n - 1}` : '';
+  if (probs.length) return { cls: 'b-crit', label: probs[0] + extra(probs.length + warns.length) };
+  if (warns.length) return { cls: 'b-warn', label: warns[0] + extra(warns.length) };
+  return { cls: 'b-good', label: 'À jour' };
+}
+
+/* ---- Lot C : sections du module Stock ---- */
+subTabs.stockSection = 'inv';
+function stockSectionTabs(active) {
+  const tabs = [['inv', 'Inventaire'], ['boutique', '🛒 Boutique'], ['dotations', '🎽 Dotations']];
+  return `<div class="tabs" role="tablist">${tabs.map(([k, lab]) => `<button role="tab" aria-selected="${active === k}" class="${active === k ? 'active' : ''}" data-stocksec="${k}">${lab}</button>`).join('')}</div>`;
+}
+
+/* ---- Lot A : entrées/sorties depuis la fiche article ---- */
+const _openFicheArticleV7 = openFicheArticle;
+openFicheArticle = function (id) {
+  _openFicheArticleV7(id);
+  const foot = $('#modalRoot .modal-foot');
+  if (foot && (!window.canW || canW('stock'))) {
+    for (const [lab, sens] of [['+ Entrée', '+'], ['− Sortie', '-']]) {
+      const b = document.createElement('button');
+      b.className = 'btn'; b.textContent = lab;
+      b.onclick = () => openMouvement(id, sens);
+      foot.insertBefore(b, foot.firstChild);
+    }
+  }
+};
+
+/* ---- Lot B.1 : fiche licencié = page ---- */
+state.licFicheId = null;
+openFicheLic = function (id) { state.licFicheId = id; subTabs.fiche = 'general'; state.view = 'licencie'; render(); };
+renderFiche = function (id, tab) { state.licFicheId = id; if (tab) subTabs.fiche = tab; state.view = 'licencie'; render(); };
+
+function ficheLicBody(l, t) {
+  const G = (lab, val) => `<div><label>${lab}</label>${val}</div>`;
+  if (t === 'general') return `<div class="card"><div class="form-grid">
+    ${G('Catégorie', esc(catLabel(l.cat)))}
+    ${G('Sexe', l.sexe === 'F' ? 'Féminin' : 'Masculin')}
+    ${G('Né(e) le', dfr(l.naissance) + ' — ' + esc(l.villeNaissance) + ' (' + esc(l.paysNaissance) + ')')}
+    ${G('Nationalité', esc(l.nationalite))}
+    ${G('Licence FFR', l.licence + ' — ' + licBadge(l.licStatut))}
+    ${G('Certificat médical', certBadge(l))}
+    ${G('Licencié précédemment', (l.dejaLicencie ? `Oui — ${l.anneesLicence} saison(s), ${esc(l.ancienClub)}` : 'Non (première licence)') + (l.mutation ? ` <span class="badge b-warn"><span class="dot"></span>Mutation FFR${l.licStatut === 'attente' ? ' — dossier en cours' : l.licStatut === 'validee' ? ' — effectuée' : ''}</span>` : ''))}
+    ${G('Commune', esc(l.ville))}
+    ${l.referents ? '' : G('Email', esc(l.email)) + G('Téléphone', esc(l.tel))}
+    ${G('Taille / poids', l.tailleCm + ' cm · ' + l.poids + ' kg')}
+    ${G('Pointure (chaussettes)', l.pointure)}
+    ${G('Taille short', esc(l.tailleShort))}
+    ${G('Taille maillot d\'entraînement', esc(l.tailleMaillot))}
+    ${G('Au club depuis', l.inscrit)}
+  </div></div>`;
+  if (t === 'responsable') return `
+    ${(l.referents || []).map((r, i) => `<div class="card" style="margin-bottom:12px">
+      <h3>Référent ${i + 1} — ${esc(r.lien)}</h3>
+      <div class="form-grid">
+        ${G('Nom', esc(r.prenom + ' ' + r.nom))}
+        ${G('Métier', esc(r.metier))}
+        ${G('Email', esc(r.email))}
+        ${G('Téléphone', esc(r.tel))}
+      </div>
+    </div>`).join('')}
+    <div class="card"><div class="form-grid">
+      ${G('Autres membres de la famille licenciés en 2026-2027', esc(l.familleAutres || 'Non'))}
+      ${G('Contact email du parent dirigeant', esc(l.prefMail || '—'))}
+      ${G('Contact WhatsApp du parent dirigeant', esc(l.prefWhatsapp || '—'))}
+    </div></div>`;
+  if (t === 'rugby') return `<div class="card">
+    <p style="margin:0 0 10px;font-size:12.5px;color:var(--ink-2)">Saison ${l.stats.saison} — dans la version réelle : matchs joués dérivés automatiquement des feuilles de match du module Sportif ; essais et cartons complétés par le coach à la saisie du résultat.</p>
+    <div class="stat-tiles">
+      <div class="stat-tile"><div class="v">${l.stats.matchs}</div><div class="l">Matchs joués</div></div>
+      <div class="stat-tile"><div class="v">${l.stats.essais}</div><div class="l">Essais</div></div>
+      <div class="stat-tile"><div class="v" style="color:${l.stats.cartonsJ ? 'var(--warning-text)' : 'inherit'}">${l.stats.cartonsJ}</div><div class="l">Cartons jaunes</div></div>
+      <div class="stat-tile"><div class="v" style="color:${l.stats.cartonsR ? 'var(--critical-text)' : 'inherit'}">${l.stats.cartonsR}</div><div class="l">Cartons rouges</div></div>
+    </div></div>`;
+  if (t === 'documents') return `<div class="card">
+    ${daysUntil(l.certFin) < 0 ? '<p style="margin:0 0 10px"><span class="badge b-crit"><span class="dot"></span>Certificat médical expiré — licence bloquée tant qu\'il n\'est pas redéposé</span></p>' : ''}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Document</th><th>Type</th><th>Déposé le</th><th></th></tr></thead>
+      <tbody>${l.docsLic.length ? l.docsLic.map((d, i) => `<tr>
+        <td>📄 ${esc(d.nom)}</td><td><span class="badge">${esc(d.type)}</span></td><td style="white-space:nowrap">${dfrShort(d.date)}</td>
+        <td style="white-space:nowrap"><button class="btn btn-sm" data-fdocren="${i}">Renommer</button> <button class="btn btn-sm" data-fdocdl="${i}">⬇</button></td>
+      </tr>`).join('') : '<tr><td colspan="4" class="empty">Aucun document déposé.</td></tr>'}</tbody>
+    </table></div>
+    <div style="margin-top:12px"><button class="btn btn-sm" id="fdocAdd">+ Déposer un document (simulé)</button></div></div>`;
+  if (t === 'paiement') {
+    const pays = state.paiements.filter(p => p.licId === l.id);
+    const echBadge = s => s === 'reglee' ? '<span class="badge b-good"><span class="dot"></span>Réglée</span>' : s === 'a_venir' ? '<span class="badge"><span class="dot"></span>À venir</span>' : '<span class="badge b-crit"><span class="dot"></span>En retard</span>';
+    return `<div class="card">
+    <div class="form-grid" style="margin-bottom:12px">
+      ${G('État de la licence', licBadge(l.licStatut))}
+      ${G('Cotisation', cotBadge(l.cotStatut))}
+      ${G('Montant réglé', l.cot ? `${eur(l.cotPaye)} sur ${eur(l.cot)}` : 'Exonéré')}
+      ${G('Mode de paiement', esc(l.modePaiement))}
+    </div>
+    ${l.echeances.length ? `<h3>Échéancier</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Échéance</th><th class="num">Montant</th><th>Statut</th></tr></thead>
+      <tbody>${l.echeances.map(e => `<tr><td>${dfrShort(e.date)}</td><td class="num">${eur(e.montant)}</td><td>${echBadge(e.statut)}</td></tr>`).join('')}</tbody>
+    </table></div>` : ''}
+    ${pays.length ? `<h3 style="margin-top:14px">Demandes de paiement en ligne</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Objet</th><th>Créée</th><th>Statut</th><th class="num">Montant</th></tr></thead>
+      <tbody>${pays.map(p => `<tr><td>${esc(p.objet)}</td><td>${dfrShort(p.creee)}</td>
+        <td>${p.statut === 'paye' ? '<span class="badge b-good"><span class="dot"></span>Payé le ' + dfrShort(p.payee) + '</span>' : p.statut === 'relancee' ? '<span class="badge b-serious"><span class="dot"></span>Relancé ×' + p.relances + '</span>' : '<span class="badge b-warn"><span class="dot"></span>Lien envoyé</span>'}</td>
+        <td class="num">${eur(p.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>`;
+  }
+  // dotation
+  return `<div class="card">
+    ${l.dotations.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Article reçu</th><th class="num">Qté</th><th>Date</th></tr></thead>
+      <tbody>${l.dotations.map(d => `<tr><td>🎽 ${esc(d.article)}</td><td class="num">${d.qte}</td><td>${dfrShort(d.date)}</td></tr>`).join('')}</tbody>
+    </table></div>` : '<p class="empty" style="padding:6px 0">Aucune dotation reçue du club.</p>'}
+    ${(!window.canW || canW('stock')) ? `<div style="margin-top:12px"><button class="btn btn-sm" id="fdotAdd">+ Attribuer une dotation</button></div>` : ''}
+    <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">La dotation décrémente le stock du pôle sportif (tailles de la fiche : short ${esc(l.tailleShort)}, maillot ${esc(l.tailleMaillot)}, pointure ${l.pointure}).</p></div>`;
+}
+
+function viewFicheLicencie() {
+  const l = state.licencies.find(x => x.id === state.licFicheId);
+  if (!l) { state.view = 'licencies'; return viewLicencies(); }
+  normaliserLic(l);
+  const t = subTabs.fiche;
+  const tabs = [
+    ['general', 'Général'],
+    ...(l.referents ? [['responsable', 'Responsable légal']] : []),
+    ...(l.stats ? [['rugby', 'Rugby']] : []),
+    ['documents', `Documents (${l.docsLic.length})`],
+    ['paiement', 'Paiement'],
+    ['dotation', `Dotation (${l.dotations.length})`],
+  ];
+  const ecrit = !window.canW || canW('licencies');
+  return `
+  <div class="page-head">
+    <div>
+      <p class="page-sub" style="margin:0 0 4px"><button class="btn btn-sm" data-back="licencies">← Licenciés</button></p>
+      <h1 class="page-title">${esc(l.prenom + ' ' + l.nom)}</h1>
+      <p class="page-sub">${esc(catLabel(l.cat))} · licence ${l.licence} · ${esc(l.ville)}</p>
+      <div class="fiche-badges">${licBadge(l.licStatut)} ${certBadge(l)} ${cotBadge(l.cotStatut)}${l.mutation && l.licStatut !== 'validee' ? ' <span class="badge b-warn"><span class="dot"></span>Mutation FFR</span>' : ''}</div>
+    </div>
+    <div class="head-actions">
+      ${l.cotStatut !== 'payee' && l.cot && ecrit ? `<button class="btn" id="fpLien">Envoyer un lien de paiement</button>` : ''}
+      ${ecrit ? `<button class="btn btn-primary" id="fpEdit">Modifier</button>` : ''}
+    </div>
+  </div>
+  <div class="tabs" role="tablist">${tabs.map(([id2, lab]) => `<button role="tab" aria-selected="${t === id2}" class="${t === id2 ? 'active' : ''}" data-ftab2="${id2}">${lab}</button>`).join('')}</div>
+  <div class="tab-body" style="max-width:860px">${ficheLicBody(l, t)}</div>`;
+}
+
+/* ---- Lot B.3 : formulaire licencié = page ---- */
+state.licFormId = null;
+openFormLic = function (id) { state.licFormId = id || null; state.view = 'licencie-form'; render(); };
+
+function viewFormLicencie() {
+  const l = state.licFormId ? normaliserLic(state.licencies.find(x => x.id === state.licFormId)) : null;
+  const F = (fid, lab, inner) => `<div class="field"><label for="${fid}">${lab}</label>${inner}</div>`;
+  const inp = (fid, val, type = 'text', extra = '') => `<input id="${fid}" type="${type}" value="${esc(String(val ?? ''))}" ${extra}>`;
+  const sel = (fid, opts, cur) => `<select id="${fid}">${opts.map(o => Array.isArray(o) ? `<option value="${o[0]}" ${cur === o[0] ? 'selected' : ''}>${o[1]}</option>` : `<option ${cur === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+  const r1 = l && l.referents ? l.referents[0] : null;
+  const r2 = l && l.referents ? l.referents[1] : null;
+  const refBlock = (n, r) => `<div class="card" style="margin-bottom:12px"><h3>Référent ${n}</h3>
+    <div class="form-grid">
+      ${F('ref' + n + 'Prenom', 'Prénom', inp('ref' + n + 'Prenom', r ? r.prenom : ''))}
+      ${F('ref' + n + 'Nom', 'Nom', inp('ref' + n + 'Nom', r ? r.nom : ''))}
+      ${F('ref' + n + 'Lien', 'Lien de parenté', sel('ref' + n + 'Lien', ['Mère','Père','Tutrice','Tuteur','Autre'], r ? r.lien : 'Mère'))}
+      ${F('ref' + n + 'Metier', 'Métier', inp('ref' + n + 'Metier', r ? r.metier : ''))}
+      ${F('ref' + n + 'Email', 'Email', inp('ref' + n + 'Email', r ? r.email : '', 'email'))}
+      ${F('ref' + n + 'Tel', 'Téléphone', inp('ref' + n + 'Tel', r ? r.tel : ''))}
+    </div></div>`;
+  const btns = `<button class="btn" data-back="${l ? 'licencie' : 'licencies'}">Annuler</button>
+      <button class="btn btn-primary fsave2">${l ? 'Enregistrer' : 'Créer le licencié'}</button>`;
+  return `
+  <div class="page-head">
+    <div>
+      <p class="page-sub" style="margin:0 0 4px"><button class="btn btn-sm" data-back="${l ? 'licencie' : 'licencies'}">← ${l ? esc(l.prenom + ' ' + l.nom) : 'Licenciés'}</button></p>
+      <h1 class="page-title">${l ? 'Modifier — ' + esc(l.prenom + ' ' + l.nom) : 'Nouveau licencié'}</h1>
+      <p class="page-sub"><span class="req">*</span> champs obligatoires</p>
+    </div>
+    <div class="head-actions">${btns}</div>
+  </div>
+  <div style="max-width:860px">
+    <div class="card" style="margin-bottom:14px"><h3>Identité</h3><div class="form-grid">
+      ${F('fPrenom', 'Prénom <span class="req">*</span>', inp('fPrenom', l ? l.prenom : ''))}
+      ${F('fNom', 'Nom <span class="req">*</span>', inp('fNom', l ? l.nom : ''))}
+      ${F('fSexe', 'Sexe', sel('fSexe', [['M','Masculin'],['F','Féminin']], l ? l.sexe : 'M'))}
+      ${F('fNaiss', 'Date de naissance <span class="req">*</span>', inp('fNaiss', l ? l.naissance : '2010-01-01', 'date'))}
+      ${F('fNat', 'Nationalité', inp('fNat', l ? l.nationalite : 'Française'))}
+      ${F('fVilleN', 'Ville de naissance', inp('fVilleN', l ? l.villeNaissance : ''))}
+      ${F('fPaysN', 'Pays de naissance', inp('fPaysN', l ? l.paysNaissance : 'France'))}
+      ${F('fVille', 'Commune de résidence', inp('fVille', l ? l.ville : ''))}
+      ${F('fEmail', 'Email', inp('fEmail', l ? l.email : '', 'email'))}
+      ${F('fTel', 'Téléphone', inp('fTel', l ? l.tel : ''))}
+    </div></div>
+    <div class="card" style="margin-bottom:14px"><h3>Licence & antécédents</h3><div class="form-grid">
+      ${F('fCat', 'Catégorie <span class="req">*</span>', sel('fCat', CATEGORIES.map(c => [c.code, c.label]), l ? l.cat : 'SEN'))}
+      ${F('fLicStatut', 'Statut licence FFR', sel('fLicStatut', [['attente','En attente FFR'],['validee','Validée'],['a_renouveler','À renouveler']], l ? l.licStatut : 'attente'))}
+      ${F('fCert', 'Fin de validité certificat médical', inp('fCert', l ? l.certFin : '', 'date'))}
+      ${F('fDeja', 'Licencié l\'année précédente ?', sel('fDeja', [['non','Non (première licence)'],['oui','Oui']], l && l.dejaLicencie ? 'oui' : 'non'))}
+      ${F('fAncienClub', 'Ancien club (si oui)', inp('fAncienClub', l ? (l.ancienClub || '') : '', 'text', 'placeholder="laisser vide si même club"'))}
+      ${F('fAnnees', 'Nombre de saisons de licence', inp('fAnnees', l ? l.anneesLicence : 0, 'number', 'min="0"'))}
+    </div></div>
+    <div class="card" style="margin-bottom:14px"><h3>Mensurations & équipement</h3><div class="form-grid">
+      ${F('fTailleCm', 'Taille (cm)', inp('fTailleCm', l ? l.tailleCm : 175, 'number', 'min="80" max="230"'))}
+      ${F('fPoids', 'Poids (kg)', inp('fPoids', l ? l.poids : 80, 'number', 'min="15" max="180"'))}
+      ${F('fPointure', 'Pointure (chaussettes)', inp('fPointure', l ? l.pointure : 42, 'number', 'min="26" max="52"'))}
+      ${F('fTShort', 'Taille short', sel('fTShort', TAILLES_TOUTES, l ? l.tailleShort : 'M'))}
+      ${F('fTMaillot', 'Taille maillot d\'entraînement', sel('fTMaillot', TAILLES_TOUTES, l ? l.tailleMaillot : 'M'))}
+    </div></div>
+    <div class="card" id="secRefs" style="margin-bottom:14px"><h3>Responsables légaux <span id="refObligBadge" class="badge b-warn" ${(l ? CATS_MINEURS.includes(l.cat) : false) ? '' : 'hidden'}><span class="dot"></span>obligatoire pour cette catégorie</span></h3>
+      ${refBlock(1, r1)}${refBlock(2, r2)}
+      <div class="form-grid">
+        ${F('fFamille', 'Autres membres de la famille licenciés en 2026-2027', inp('fFamille', l ? (l.familleAutres || 'Non') : 'Non'))}
+        ${F('fPrefMail', 'Contact email du parent dirigeant', sel('fPrefMail', ['Référent 1','Référent 2','Les deux'], l ? l.prefMail : 'Les deux'))}
+        ${F('fPrefWa', 'Contact WhatsApp du parent dirigeant', sel('fPrefWa', ['Référent 1','Référent 2','Les deux'], l ? l.prefWhatsapp : 'Les deux'))}
+      </div></div>
+    <div class="card" style="margin-bottom:14px"><h3>Cotisation</h3><div class="form-grid">
+      ${F('fCotPaye', 'Montant réglé (€)', inp('fCotPaye', l ? l.cotPaye : 0, 'number', 'min="0"'))}
+      ${F('fModePai', 'Mode de paiement', sel('fModePai', ['CB en ligne','Virement','Chèque','Chèque (×3)','Espèces','Chèques vacances (ANCV)'], l ? l.modePaiement : 'CB en ligne'))}
+    </div></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">${btns}</div>
+  </div>`;
+}
+
+function sauverFormLicencie() {
+  const l = state.licFormId ? state.licencies.find(x => x.id === state.licFormId) : null;
+  const cat = CATEGORIES.find(c => c.code === $('#fCat').value);
+  const prenom = $('#fPrenom').value.trim(), nom = $('#fNom').value.trim();
+  if (!prenom) { toast('Le prénom est obligatoire.'); if (window.champErreur) champErreur('fPrenom', 'Champ obligatoire'); return; }
+  if (!nom) { toast('Le nom est obligatoire.'); if (window.champErreur) champErreur('fNom', 'Champ obligatoire'); return; }
+  if (!$('#fNaiss').value) { toast('La date de naissance est obligatoire.'); if (window.champErreur) champErreur('fNaiss', 'Champ obligatoire'); return; }
+  const lireRef = n => {
+    const p = $('#ref' + n + 'Prenom').value.trim(), nn = $('#ref' + n + 'Nom').value.trim();
+    if (!p && !nn) return null;
+    return { prenom: p, nom: nn, lien: $('#ref' + n + 'Lien').value, metier: $('#ref' + n + 'Metier').value.trim(), email: $('#ref' + n + 'Email').value.trim(), tel: $('#ref' + n + 'Tel').value.trim() };
+  };
+  const refs = [lireRef(1), lireRef(2)].filter(Boolean);
+  if (CATS_MINEURS.includes(cat.code) && !refs.length) {
+    toast('Un mineur doit avoir au moins un responsable légal.');
+    if (window.sectionErreur) sectionErreur('secRefs', 'Renseigne au moins un responsable légal (prénom et nom) pour un licencié mineur.');
+    return;
+  }
+  const cotPaye = Math.min(cat.cot, Math.max(0, Number($('#fCotPaye').value) || 0));
+  const deja = $('#fDeja').value === 'oui';
+  const ancienClub = deja ? ($('#fAncienClub').value.trim() || state.params.clubNom) : null;
+  const base = {
+    prenom, nom, sexe: $('#fSexe').value, naissance: $('#fNaiss').value, cat: cat.code,
+    nationalite: $('#fNat').value.trim() || 'Française',
+    villeNaissance: $('#fVilleN').value.trim() || '—', paysNaissance: $('#fPaysN').value.trim() || 'France',
+    ville: $('#fVille').value.trim() || 'Vincennes',
+    email: $('#fEmail').value.trim(), tel: $('#fTel').value.trim(),
+    licStatut: $('#fLicStatut').value, certFin: $('#fCert').value || addDaysIso(TODAY, 365),
+    dejaLicencie: deja, ancienClub, anneesLicence: deja ? Math.max(1, Number($('#fAnnees').value) || 1) : 0,
+    mutation: !!(deja && ancienClub && ancienClub !== state.params.clubNom),
+    tailleCm: Number($('#fTailleCm').value) || 175, poids: Number($('#fPoids').value) || 80,
+    pointure: Number($('#fPointure').value) || 42, tailleShort: $('#fTShort').value, tailleMaillot: $('#fTMaillot').value,
+    referents: refs.length ? refs : null,
+    familleAutres: $('#fFamille').value.trim() || 'Non',
+    prefMail: $('#fPrefMail').value, prefWhatsapp: $('#fPrefWa').value,
+    cot: cat.cot, cotPaye,
+    cotStatut: cat.cot === 0 ? 'exoneree' : cotPaye >= cat.cot ? 'payee' : cotPaye > 0 ? 'partielle' : 'impayee',
+    modePaiement: cat.cot === 0 ? '—' : $('#fModePai').value,
+  };
+  let cible;
+  if (l) { Object.assign(l, base); cible = l; toast(`Fiche de ${prenom} ${nom} mise à jour.`); }
+  else {
+    cible = normaliserLic({ id: Date.now(), licence: '2026' + ri(100000, 999999), inscrit: 2026, ...base });
+    if (cible.cot > 0) cible.echeances = cible.cotStatut === 'payee'
+      ? [{ date: TODAY, montant: cible.cot, statut: 'reglee' }]
+      : cible.cotStatut === 'partielle'
+        ? [{ date: TODAY, montant: cotPaye, statut: 'reglee' }, { date: addDaysIso(TODAY, 30), montant: cible.cot - cotPaye, statut: 'a_venir' }]
+        : [{ date: addDaysIso(TODAY, 15), montant: cible.cot, statut: 'a_venir' }];
+    state.licencies.push(cible);
+    toast(`${prenom} ${nom} ajouté aux licenciés.`);
+  }
+  state.licFicheId = cible.id;
+  subTabs.fiche = 'general';
+  state.view = 'licencie';
+  render();
+}
+
+/* ---- Lot B.2 : fiche partenaire = page ---- */
+state.spFicheId = null;
+openFicheSponsor = function (id) { state.spFicheId = id; state.view = 'partenaire'; render(); };
+
+function viewFichePartenaire() {
+  const s = state.sponsors.find(x => x.id === state.spFicheId);
+  if (!s) { state.view = 'sponsors'; return viewSponsors(); }
+  const ecrit = !window.canW || canW('sponsors');
+  const peutEncaisser = ['proposition', 'signe', 'recompense', 'a_renouveler'].includes(s.statut);
+  const todos = state.ctodos.filter(t => t.spId === s.id);
+  return `
+  <div class="page-head">
+    <div>
+      <p class="page-sub" style="margin:0 0 4px"><button class="btn btn-sm" data-back="sponsors">← Sponsors & subventions</button></p>
+      <h1 class="page-title">${esc(s.nom)}</h1>
+      <p class="page-sub">${esc(s.type)} · ${eur(s.montantAnnuel)} / an${s.fin ? ' · contrat jusqu\'au ' + dfrShort(s.fin) : ''}</p>
+      <div class="fiche-badges">${spBadge7(s.statut)}</div>
+    </div>
+    <div class="head-actions">
+      ${ecrit && peutEncaisser ? `<button class="btn" id="spVersement2">Enregistrer un versement</button>` : ''}
+      ${ecrit && s.statut === 'a_renouveler' ? `<button class="btn btn-primary" id="spRenouveler2">Marquer renouvelé (+1 an)</button>` : ''}
+    </div>
+  </div>
+  <div class="grid two-col">
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Partenariat</h3>
+        <div class="form-grid">
+          <div><label>Étape du pipeline</label>${ecrit
+            ? `<select id="spStatutSel2">${[...SP_ETAPES, ['termine', 'Ancien partenaire'], ['perdu', 'Perdu']].map(([v2, l2]) => `<option value="${v2}" ${s.statut === v2 ? 'selected' : ''}>${l2}</option>`).join('')}</select>`
+            : spBadge7(s.statut)}</div>
+          <div><label>Versé / attendu</label>${eur(spVerse(s))} / ${eur(s.attendu)}</div>
+          <div style="grid-column:1/-1"><label>Contreparties prévues</label>${esc(s.contreparties)}
+            ${todos.length ? `<br><span style="font-size:12.5px;color:var(--ink-2)">${todos.filter(t => t.fait).length}/${todos.length} délivrée(s) — <button class="btn btn-sm" data-goto-ctodo="1" style="margin-left:4px">voir la to-do</button></span>` : ''}</div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Contacts (${s.contacts.length})</h3>
+        ${s.contacts.length ? s.contacts.map(c => `<div class="alert-line">
+          <span style="min-width:0"><strong>${esc(c.nom)}</strong> — ${esc(c.fonction)}${c.cibleDonateur ? ' <span class="badge b-info">cible donateur</span>' : ''}<br>
+          <span style="font-size:12px;color:var(--ink-2)">${esc(c.email)} · ${esc(c.tel)}</span></span>
+        </div>`).join('') : '<p class="empty" style="padding:0 0 6px">Aucun contact.</p>'}
+        ${ecrit ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px">
+          <div class="field"><label for="spCtNom">Nom</label><input id="spCtNom" placeholder="Prénom Nom"></div>
+          <div class="field"><label for="spCtFonction">Fonction</label><input id="spCtFonction" placeholder="ex. Gérante"></div>
+          <button class="btn btn-sm" id="spCtAdd2">+ Ajouter</button>
+        </div>` : ''}
+      </div>
+      ${s.versements.length ? `<div class="card">
+        <h3>Versements</h3>
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th class="num">Montant</th></tr></thead>
+          <tbody>${s.versements.map(v2 => `<tr><td>${dfrShort(v2.date)}</td><td class="num">${eur(v2.montant)}</td></tr>`).join('')}</tbody></table></div>
+      </div>` : ''}
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <h3>Rappel</h3>
+        ${s.rappel ? `<p style="margin:0 0 8px"><span class="${daysUntil(s.rappel.date) < 0 ? 'rappel-due' : ''}">📅 ${dfr(s.rappel.date)}</span> — ${esc(s.rappel.objet)}
+          ${ecrit ? ' <button class="btn btn-sm" id="spRappelFait2">Fait ✓</button>' : ''}</p>` : '<p class="empty" style="padding:0 0 8px">Aucun rappel planifié.</p>'}
+        ${ecrit ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <div class="field"><label for="spRapDate">Date</label><input id="spRapDate" type="date" value="${s.rappel ? s.rappel.date : addDaysIso(TODAY, 7)}"></div>
+          <div class="field" style="flex:1;min-width:160px"><label for="spRapObjet">Objet</label><input id="spRapObjet" value="${s.rappel ? esc(s.rappel.objet) : ''}" placeholder="ex. Relancer après le devis"></div>
+          <button class="btn btn-sm" id="spRappelSave2">${s.rappel ? 'Modifier' : 'Planifier'}</button>
+        </div>` : ''}
+      </div>
+      <div class="card">
+        <h3>Suivi (${s.suivis.length})</h3>
+        ${s.suivis.length ? [...s.suivis].reverse().map(u => `<div class="suivi-item">
+          <span class="t"><span class="badge">${esc(u.type)}</span></span><span style="min-width:0">${esc(u.note)}</span><span class="when">${dfrShort(u.date)}</span>
+        </div>`).join('') : '<p class="empty" style="padding:0 0 6px">Aucun échange enregistré.</p>'}
+        ${ecrit ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px">
+          <div class="field"><label for="spSuiviType">Type</label><select id="spSuiviType"><option>Appel</option><option>Email</option><option>RDV</option><option>Note</option></select></div>
+          <div class="field" style="flex:1;min-width:160px"><label for="spSuiviNote">Note</label><input id="spSuiviNote" placeholder="ex. Proposition envoyée"></div>
+          <button class="btn btn-sm" id="spSuiviAdd2">Ajouter</button>
+        </div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---- Liaisons V8 ---- */
+const _bindExtraV7 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV7(v);
+  $$('[data-back]', v).forEach(b => b.onclick = () => { state.view = b.dataset.back; render(); });
+  $$('[data-stocksec]', v).forEach(b => b.onclick = () => { subTabs.stockSection = b.dataset.stocksec; render(); });
+  // Fiche licencié (page)
+  $$('[data-ftab2]', v).forEach(b => b.onclick = () => { subTabs.fiche = b.dataset.ftab2; render(); });
+  const l = state.view === 'licencie' ? state.licencies.find(x => x.id === state.licFicheId) : null;
+  if (l) {
+    const edit = $('#fpEdit'); if (edit) edit.onclick = () => openFormLic(l.id);
+    const lien = $('#fpLien'); if (lien) lien.onclick = () => { creerDemandePaiement(l); render(); };
+    $$('[data-fdocren]', v).forEach(b => b.onclick = () => {
+      const d = l.docsLic[Number(b.dataset.fdocren)];
+      openModal('Renommer le document', `<div class="field"><label for="rnNom">Nouveau nom</label><input id="rnNom" value="${esc(d.nom)}" style="width:100%"></div>`,
+        `<button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="rnOk">Renommer</button>`);
+      $('#rnOk').onclick = () => { d.nom = $('#rnNom').value.trim() || d.nom; toast('Document renommé.'); closeModal(); render(); };
+    });
+    $$('[data-fdocdl]', v).forEach(b => b.onclick = () => toast('Téléchargement simulé.'));
+    const da = $('#fdocAdd'); if (da) da.onclick = () => { l.docsLic.push({ nom: 'Nouveau document.pdf', type: 'Autre', date: TODAY }); toast('Document déposé (simulé) — renomme-le.'); render(); };
+    const dot = $('#fdotAdd'); if (dot) dot.onclick = () => openDotation(l.id, () => { closeModal(); render(); });
+  }
+  // Formulaire licencié (page)
+  $$('.fsave2', v).forEach(b => b.onclick = sauverFormLicencie);
+  // Fiche partenaire (page)
+  const s = state.view === 'partenaire' ? state.sponsors.find(x => x.id === state.spFicheId) : null;
+  if (s) {
+    const ecrit = !window.canW || canW('sponsors');
+    const sel = $('#spStatutSel2');
+    if (sel) sel.onchange = () => {
+      s.statut = sel.value;
+      if (['signe', 'recompense'].includes(s.statut)) { s.fin = s.fin || addDaysIso(TODAY, 365); s.attendu = s.montantAnnuel; }
+      toast(`${s.nom} → ${(SP_ETAPES.find(e => e[0] === s.statut) || [0, SP_SORTIES[s.statut]])[1]}.`);
+      render();
+    };
+    const goCt = $('[data-goto-ctodo]'); if (goCt) goCt.onclick = () => { state.view = 'sponsors'; subTabs.sponsors = 'contreparties'; render(); };
+    const ct = $('#spCtAdd2');
+    if (ct) ct.onclick = () => {
+      const nom = $('#spCtNom').value.trim();
+      if (!nom) { toast('Le nom du contact est obligatoire.'); return; }
+      s.contacts.push({ id: Date.now(), nom, fonction: $('#spCtFonction').value.trim() || '—', email: '—', tel: '—', cibleDonateur: false, dons: [] });
+      toast(`Contact ${nom} ajouté.`); render();
+    };
+    const rs = $('#spRappelSave2');
+    if (rs) rs.onclick = () => {
+      const objet = $('#spRapObjet').value.trim();
+      if (!objet) { toast('Donne un objet au rappel.'); return; }
+      s.rappel = { date: $('#spRapDate').value || addDaysIso(TODAY, 7), objet };
+      toast(`Rappel planifié le ${dfrShort(s.rappel.date)}.`); render();
+    };
+    const rf = $('#spRappelFait2');
+    if (rf) rf.onclick = () => { s.suivis.push({ date: TODAY, type: 'Note', note: 'Rappel traité : ' + s.rappel.objet }); s.rappel = null; toast('Rappel marqué fait.'); render(); };
+    const sa = $('#spSuiviAdd2');
+    if (sa) sa.onclick = () => {
+      const note = $('#spSuiviNote').value.trim();
+      if (!note) { toast('Écris une note.'); return; }
+      s.suivis.push({ date: TODAY, type: $('#spSuiviType').value, note });
+      if (s.statut === 'a_contacter') s.statut = 'proposition';
+      toast('Échange ajouté au suivi.'); render();
+    };
+    const vs = $('#spVersement2');
+    if (vs) vs.onclick = () => {
+      const reste = Math.max(0, s.attendu - spVerse(s));
+      openModal('Versement — ' + s.nom, `
+        <div class="form-grid">
+          <div class="field"><label for="vsMontant">Montant (€)</label><input id="vsMontant" type="number" min="1" value="${reste || s.montantAnnuel}"></div>
+          <div class="field"><label for="vsMode">Mode</label><select id="vsMode"><option>Virement</option><option>Chèque</option><option>Espèces</option></select></div>
+        </div>`, `
+        <button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="vsOk">Encaisser</button>`);
+      $('#vsOk').onclick = () => {
+        const m = Math.max(1, Number($('#vsMontant').value) || 1);
+        s.versements.push({ date: TODAY, montant: m });
+        if (SP_PIPELINE_AMONT.includes(s.statut)) { s.statut = 'signe'; s.fin = s.fin || addDaysIso(TODAY, 365); s.attendu = s.montantAnnuel; }
+        state.ecritures.unshift({ id: Date.now(), date: TODAY, sens: 'R', cat: 'Sponsors & partenaires', libelle: 'Partenariat ' + s.nom, montant: m });
+        state.bank.unshift({ id: Date.now() + 1, date: TODAY, libelle: ('VIR SEPA ' + s.nom).toUpperCase().slice(0, 30), montant: m, statut: 'rapprochee', ecritureId: null, catProposee: 'Sponsors & partenaires' });
+        toast(`${eur(m)} encaissés — écriture créée.`);
+        closeModal(); render();
+      };
+    };
+    const rn = $('#spRenouveler2');
+    if (rn) rn.onclick = () => {
+      s.statut = 'signe'; s.fin = addDaysIso(s.fin || TODAY, 365); s.attendu = s.montantAnnuel;
+      s.suivis.push({ date: TODAY, type: 'Note', note: 'Contrat renouvelé jusqu\'au ' + dfrShort(s.fin) + '.' });
+      toast(`Contrat renouvelé jusqu'au ${dfrShort(s.fin)}.`); render();
+    };
+  }
+};
+
+render();
+</script>
+<style>
+/* ---------- V8.1 : audit n°2 ---------- */
+@media (max-width: 760px) {
+  .demo-banner .db-long { display: none; }
+  .demo-banner .db-short { display: inline !important; }
+  .demo-banner .db-short[hidden] { display: inline !important; }
+  .toolbar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  .toolbar input[type="search"] { min-width: 170px; }
+  .toolbar .count-note { display: none; }
+  .m-cards td[data-label]::before { content: attr(data-label) " · "; color: var(--ink-3); font-size:12px; }
+}
+</style>
+<script>
+/* ================= V8.1 : FICHE DEMANDE DE PAIEMENT (clic sur la ligne) ================= */
+function openFichePaiement(pid) {
+  const p = state.paiements.find(x => x.id === pid);
+  if (!p) return;
+  const l = state.licencies.find(x => x.id === p.licId);
+  const ecrit = !window.canW || canW('compta');
+  openModal('Demande de paiement', `
+    <div class="form-grid">
+      <div><label>Licencié</label><strong>${l ? esc(l.prenom + ' ' + l.nom) : '—'}</strong>${l ? '<br><span style="color:var(--ink-2);font-size:12.5px">' + esc(catLabel(l.cat)) + '</span>' : ''}</div>
+      <div><label>Objet</label>${esc(p.objet)}</div>
+      <div><label>Montant</label><strong>${eur(p.montant)}</strong></div>
+      <div><label>Créée le</label>${dfr(p.creee)}</div>
+      <div><label>Statut</label>${p.statut === 'paye' ? '<span class="badge b-good"><span class="dot"></span>Payé le ' + dfrShort(p.payee) + '</span>' : p.statut === 'relancee' ? `<span class="badge b-serious"><span class="dot"></span>Relancé${p.relances > 0 ? ' ×' + p.relances : ''}</span>` : '<span class="badge b-warn"><span class="dot"></span>Lien envoyé</span>'}</div>
+    </div>
+    ${p.statut !== 'paye' ? '<p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">Dans la version réelle : lien de paiement unique envoyé par email/SMS, relance automatique après ' + state.params.relanceJours + ' jours.</p>' : ''}`, `
+    ${p.statut !== 'paye' && ecrit ? `
+      <button class="btn" id="payRenvoyer">Renvoyer le lien</button>
+      <button class="btn" id="payRelancer">Relancer</button>
+      <button class="btn" id="paySimuler">Simuler le paiement</button>` : ''}
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  const r = $('#payRelancer');
+  if (r) r.onclick = () => { p.statut = 'relancee'; p.relances++; toast('Relance envoyée (simulé).'); closeModal(); render(); };
+  const rv = $('#payRenvoyer');
+  if (rv) rv.onclick = () => toast('Lien renvoyé par email (simulé).');
+  const sim = $('#paySimuler');
+  if (sim) sim.onclick = () => { simulerPaiement(p.id); closeModal(); render(); };
+}
+const _bindExtraV8 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV8(v);
+  $$('[data-pay]', v).forEach(tr => {
+    const open = () => openFichePaiement(Number(tr.dataset.pay));
+    tr.onclick = open;
+    tr.onkeydown = e => { if (e.key === 'Enter') open(); };
+  });
+};
+render();
+</script>
+<style>
+/* ---------- V8.2 : audit heuristique appliqué ---------- */
+.nav-guide {
+  display: flex; align-items: center; gap: 8px; text-decoration: none;
+  color: var(--side-ink); font: 500 13px/1.2 system-ui, sans-serif;
+  padding: 8px 10px; border-radius: 8px; margin-top: 6px;
+}
+.nav-guide:hover { background: rgba(255,255,255,.07); color: var(--side-ink-strong); }
+.req { color: var(--critical-text); font-weight: 700; }
+input.err, select.err { border-color: var(--critical) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--critical) 25%, transparent); }
+.err-msg { color: var(--critical-text); font-size: 12px; margin-top: 4px; }
+.card.err-sec { border-color: var(--critical); box-shadow: 0 0 0 2px color-mix(in srgb, var(--critical) 20%, transparent); }
+th.th-tri { cursor: pointer; user-select: none; white-space: nowrap; }
+th.th-tri:hover { color: var(--ink); }
+@media (max-width: 760px) { .nav-guide { margin: 0; } }
+</style>
+<script>
+/* ================= V8.2 : CONFIRMATIONS, ERREURS LOCALISÉES, TRI, ROUVRIR, CONTRE-PASSATION ================= */
+
+/* ---- Confirmation générique (modale, pas de confirm() natif) ---- */
+function confirmer(titre, corpsHtml, labelOk, onOk, labelAnnuler = 'Annuler') {
+  openModal(titre, corpsHtml, `
+    <button class="btn" id="cfNon">${labelAnnuler}</button>
+    <button class="btn btn-primary" id="cfOui">${labelOk}</button>`);
+  $('#cfNon').onclick = closeModal;
+  $('#cfOui').onclick = () => { closeModal(); onOk(); };
+}
+
+/* ---- Erreurs de formulaire localisées ---- */
+function champErreur(id, msg) {
+  const el = $('#' + id);
+  if (!el) return;
+  el.classList.add('err');
+  let m = el.parentElement.querySelector('.err-msg');
+  if (!m) { m = document.createElement('div'); m.className = 'err-msg'; el.parentElement.appendChild(m); }
+  m.textContent = msg;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.focus({ preventScroll: true });
+  el.addEventListener('input', () => { el.classList.remove('err'); m.remove(); }, { once: true });
+}
+function sectionErreur(id, msg) {
+  const sec = $('#' + id);
+  if (!sec) return;
+  sec.classList.add('err-sec');
+  let m = sec.querySelector('.err-msg');
+  if (!m) { m = document.createElement('div'); m.className = 'err-msg'; sec.insertBefore(m, sec.children[1] || null); }
+  m.textContent = msg;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const inp = sec.querySelector('input');
+  if (inp) { inp.focus({ preventScroll: true }); inp.addEventListener('input', () => { sec.classList.remove('err-sec'); m.remove(); }, { once: true }); }
+}
+
+/* ---- Tri des colonnes ---- */
+const TRI = { lic: { k: 'nom', d: 1 }, stock: { k: null, d: 1 }, sp: { k: 'etape', d: 1 }, jr: { k: 'date', d: -1 } };
+function triFleche(liste, k) { return TRI[liste].k === k ? (TRI[liste].d > 0 ? ' ▲' : ' ▼') : ''; }
+const _cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
+function trierLicencies(rows) {
+  const T = TRI.lic;
+  const val = l => T.k === 'cat' ? CATEGORIES.findIndex(c => c.code === l.cat)
+    : T.k === 'statut' ? ({ 'b-crit': 0, 'b-warn': 1, 'b-good': 2 })[statutLic(l).cls]
+    : T.k === 'regle' ? (l.cot ? l.cotPaye / l.cot : 2)
+    : (l.nom + ' ' + l.prenom).toLowerCase();
+  return [...rows].sort((a, b) => _cmp(val(a), val(b)) * T.d || (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
+}
+function trierStock(rows) {
+  const T = TRI.stock;
+  if (!T.k) return rows;
+  const val = a => T.k === 'qte' ? a.qte : T.k === 'peremption' ? (a.peremption || '9999') : a.nom.toLowerCase();
+  return [...rows].sort((a, b) => _cmp(val(a), val(b)) * T.d);
+}
+function trierSponsors(rows) {
+  const T = TRI.sp;
+  if (T.k === 'etape') return [...rows].sort((a, b) => (SP_ETAPES.findIndex(e => e[0] === a.statut) - SP_ETAPES.findIndex(e => e[0] === b.statut)) * T.d || a.nom.localeCompare(b.nom, 'fr'));
+  const val = s => T.k === 'montant' ? s.montantAnnuel : T.k === 'echeance' ? (s.fin || (s.rappel ? s.rappel.date : '9999')) : s.nom.toLowerCase();
+  return [...rows].sort((a, b) => _cmp(val(a), val(b)) * T.d);
+}
+function trierEcritures() {
+  const T = TRI.jr;
+  const val = e => T.k === 'montant' ? e.montant : e.date;
+  return [...state.ecritures].sort((a, b) => _cmp(val(a), val(b)) * T.d || b.date.localeCompare(a.date));
+}
+
+/* ---- Infobulles ---- */
+function titreStatut(l) {
+  const certD = daysUntil(l.certFin);
+  return `Licence : ${{ validee: 'validée', attente: 'en attente FFR', a_renouveler: 'à renouveler' }[l.licStatut]} · Certificat : ${certD < 0 ? 'expiré' : 'valide jusqu’au ' + dfrShort(l.certFin)} · Cotisation : ${{ payee: 'payée', partielle: 'partielle', impayee: 'impayée', exoneree: 'exonérée' }[l.cotStatut]}`;
+}
+const SP_TITRES = {
+  a_contacter: 'Pistes identifiées, premier contact à prendre',
+  proposition: 'Contact établi, proposition en discussion',
+  signe: 'Contrat signé pour la saison',
+  recompense: 'Toutes les contreparties promises ont été délivrées',
+  a_renouveler: 'Contrat arrivant à échéance, renouvellement à négocier',
+};
+
+/* ---- Fiche écriture & contre-passation ---- */
+function openFicheEcriture(id) {
+  const e = state.ecritures.find(x => x.id === id);
+  if (!e) return;
+  const ecrit = !window.canW || canW('compta');
+  const liee = e.cpId ? state.ecritures.find(x => x.id === e.cpId) : e.cpOf ? state.ecritures.find(x => x.id === e.cpOf) : null;
+  openModal('Écriture comptable', `
+    <div class="form-grid">
+      <div><label>Date</label>${dfr(e.date)}</div>
+      <div><label>Sens</label>${e.sens === 'R' ? 'Recette' : 'Dépense'}</div>
+      <div><label>Catégorie</label><span class="badge">${esc(e.cat)}</span></div>
+      <div><label>Montant</label><strong style="color:${e.sens === 'R' ? 'var(--good-text)' : 'var(--critical-text)'}">${eur(e.montant)}</strong></div>
+      <div style="grid-column:1/-1"><label>Libellé</label>${esc(e.libelle)}</div>
+      ${e.cpId ? `<div style="grid-column:1/-1"><span class="badge b-warn"><span class="dot"></span>Contre-passée le ${liee ? dfrShort(liee.date) : ''}</span></div>` : ''}
+      ${e.cpOf ? `<div style="grid-column:1/-1"><span class="badge"><span class="dot"></span>Contre-passation de « ${liee ? esc(liee.libelle) : ''} »</span></div>` : ''}
+    </div>
+    <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">En comptabilité, on ne supprime jamais une écriture : on la contre-passe (écriture inverse) pour garder la traçabilité.</p>`, `
+    ${ecrit && !e.cpId && !e.cpOf ? `<button class="btn" id="ecCp">Contre-passer</button>` : ''}
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  const cp = $('#ecCp');
+  if (cp) cp.onclick = () => confirmer('Contre-passer cette écriture ?',
+    `<p style="margin:0 0 8px">Une écriture inverse de <strong>${eur(e.montant)}</strong> (${e.sens === 'R' ? 'dépense' : 'recette'}) sera créée à la date du jour. Les deux écritures resteront visibles au journal.</p>`,
+    'Contre-passer', () => {
+      const inv = { id: Date.now(), date: TODAY, sens: e.sens === 'R' ? 'D' : 'R', cat: e.cat, libelle: 'Contre-passation — ' + e.libelle, montant: e.montant, cpOf: e.id };
+      e.cpId = inv.id;
+      state.ecritures.unshift(inv);
+      state.ecritures.sort((a, b) => b.date.localeCompare(a.date));
+      toast('Écriture contre-passée — solde corrigé.');
+      render();
+    });
+}
+
+/* ---- Liaisons V8.2 ---- */
+const _bindExtraV81 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV81(v);
+  $$('[data-tri]', v).forEach(th => th.onclick = () => {
+    const [liste, k] = th.dataset.tri.split(':');
+    if (TRI[liste].k === k) TRI[liste].d *= -1; else { TRI[liste].k = k; TRI[liste].d = 1; }
+    render();
+  });
+  $$('[data-ecriture]', v).forEach(tr => {
+    tr.onclick = e => { if (e.target.closest('button')) return; openFicheEcriture(Number(tr.dataset.ecriture)); };
+    tr.onkeydown = e => { if (e.key === 'Enter') openFicheEcriture(Number(tr.dataset.ecriture)); };
+  });
+  $$('[data-vreopen]', v).forEach(b => b.onclick = () => {
+    const r = subTabs.codirOpen ? state.reunions.find(x => x.id === subTabs.codirOpen) : null;
+    const vt = r && r.votes.find(x => x.id === Number(b.dataset.vreopen));
+    if (!vt) return;
+    vt.statut = 'ouvert';
+    vt.resultat = null;
+    toast('Vote rouvert — les valeurs saisies sont conservées, clore à nouveau pour figer.');
+    render();
+  });
+  $$('[data-voircomme]', v).forEach(b => b.onclick = () => {
+    const p = PERSONAS.find(x => x.roleId === b.dataset.voircomme);
+    if (!p) { toast('Aucun utilisateur de démo n\'a ce rôle — change le rôle d\'un compte dans l\'onglet Utilisateurs.'); return; }
+    setPersona(p.id);
+    toast(`Tu regardes l'application comme ${p.nom} (${p.roleLabel}) — reviens via « voir comme » en bas du menu.`);
+  });
+  const fc = $('#fCat');
+  if (fc && $('#refObligBadge')) fc.addEventListener('change', () => { const bg = $('#refObligBadge'); if (bg) bg.hidden = !CATS_MINEURS.includes(fc.value); });
+};
+
+render();
+</script>
+<style>
+/* ================= V8.3 : accessibilité ================= */
+@media (max-width: 760px) {
+  .btn, .tabs button, .x-btn { min-height: 40px; }
+}
+</style>
+<script>
+/* ================= V8.3 : piège à focus dans les modales ================= */
+const FOCUSABLE_SEL = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const _openModalV83 = openModal;
+openModal = function (title, bodyHtml, footHtml) {
+  const prev = document.activeElement;
+  _openModalV83(title, bodyHtml, footHtml);
+  const root = $('#modalRoot');
+  root._prevFocus = prev;
+  const modal = root.querySelector('.modal');
+  if (!modal) return;
+  const first = modal.querySelector('.modal-body ' + FOCUSABLE_SEL.split(', ').join(', .modal-body ')) || modal.querySelector(FOCUSABLE_SEL);
+  if (first) first.focus();
+  modal.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    const items = Array.from(modal.querySelectorAll(FOCUSABLE_SEL)).filter(el => el.offsetParent !== null);
+    if (!items.length) { e.preventDefault(); return; }
+    const a = items[0], z = items[items.length - 1];
+    const cur = document.activeElement;
+    if (e.shiftKey && (cur === a || !modal.contains(cur))) { e.preventDefault(); z.focus(); }
+    else if (!e.shiftKey && (cur === z || !modal.contains(cur))) { e.preventDefault(); a.focus(); }
+  });
+};
+const _closeModalV83 = closeModal;
+closeModal = function () {
+  const r = $('#modalRoot');
+  const prev = r ? r._prevFocus : null;
+  if (r) r._prevFocus = null;
+  _closeModalV83();
+  if (prev && typeof prev.focus === 'function' && document.contains(prev)) prev.focus();
+};
 render();
 </script>
 

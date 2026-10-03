@@ -92,7 +92,7 @@ a { color: var(--info-text); }
 <div class="wrap">
 <header class="doc">
   <h1>Guide Ovalie Gestion</h1>
-  <p class="sub">Maquette V7 · septembre 2026 · données 100 % fictives — ce guide décrit chaque module, les vues selon le rôle connecté, les actions possibles et leurs répercussions dans le reste de l'application.</p>
+  <p class="sub">Maquette V8.2 · septembre 2026 · données 100 % fictives — ce guide décrit chaque module, les vues selon le rôle connecté, les actions possibles et leurs répercussions dans le reste de l'application.</p>
 </header>
 
 <div class="toc">
@@ -113,13 +113,14 @@ a { color: var(--info-text); }
 </ul>
 <div class="note">Trois niveaux d'accès par module, définis dans Paramètres → Droits & rôles : <span class="badge b-adm">Admin</span> <span class="badge b-ecr">Écriture</span> <span class="badge b-lec">Lecture</span> (module visible, boutons d'action masqués) <span class="badge b-non">Aucun</span> (module absent du menu). Répondre présent/absent à une convocation reste possible en lecture : c'est une action sur ses propres données.</div>
 
+<div class="note">Transverse (V8.2) : le <b>guide est accessible depuis le menu</b> (📖 en bas de la barre latérale) ; les grandes listes se <b>trient par clic sur les en-têtes</b> ; les champs obligatoires des formulaires sont marqués <b>*</b> et une erreur met le champ fautif en évidence avec focus automatique ; les actions définitives (clore un vote, retirer un point d'ordre du jour, contre-passer) demandent confirmation.</div>
 <h2 id="dashboard">▦ Tableau de bord</h2>
 <p class="lead">Vue de pilotage du club. Réservée aux rôles bureau (président, trésorière, secrétaire, membre codir).</p>
 <h3>Contenu</h3>
 <ul>
   <li>4 indicateurs : licenciés (+ licences en attente FFR), trésorerie, alertes stock, prochaine réunion.</li>
   <li>Courbe de trésorerie sur 12 mois (survol = détail par mois).</li>
-  <li>Liste <strong>« À traiter »</strong> : certificats expirés, stock sous seuil, péremptions, cotisations en attente, transactions bancaires à rapprocher, convocations non envoyées — chaque ligne a un bouton <em>Voir</em> qui ouvre le module concerné.</li>
+  <li>Liste <strong>« À traiter »</strong> triée par gravité (bloquant → à surveiller → routine), 6 lignes max (+ compteur du reste) — chaque ligne a un bouton <em>Voir</em> qui ouvre le module concerné.</li>
   <li>Effectifs par catégorie et répartition des cotisations (payées / partielles / impayées).</li>
 </ul>
 <h3>Connexions</h3>
@@ -142,8 +143,9 @@ a { color: var(--info-text); }
 <div class="flow"><b>Feuille de présence</b> (entraînement) → pointage conservé sur l'événement. <span class="sim">Version réelle : historiques d'assiduité par joueur.</span></div>
 
 <h2 id="licencies">👤 Licenciés</h2>
-<p class="lead">Le registre du club : 113 licenciés générés. Liste filtrable (recherche, catégorie, cotisation, certificat) ; badge <b>Mutation</b> pour les arrivants d'un autre club dont la licence n'est pas validée ; export CSV <span class="sim">(simulé)</span>, accessible aussi aux rôles en lecture.</p>
-<h3>La fiche licencié — 6 onglets</h3>
+<p class="lead">Le registre du club : 113 licenciés générés. Liste filtrable (recherche, catégorie, cotisation, certificat) ; badge <b>Mutation</b> pour les arrivants d'un autre club. La liste affiche un <b>statut synthétique</b> par licencié (À jour / point d'attention / bloquant, avec le premier problème nommé) — le détail vit dans la fiche. Export CSV <span class="sim">(simulé)</span>.</p>
+<h3>La fiche licencié — une page dédiée, 6 onglets</h3>
+<p>Clic sur un licencié → page pleine (fil d'Ariane « ← Licenciés », badges d'état, actions Modifier / Lien de paiement en haut à droite). Le formulaire de création/modification est lui aussi une page, en sections. Les modales ne servent plus qu'aux actions courtes.</p>
 <ul>
   <li><strong>Général</strong> : identité complète, nationalité et lieu de naissance, antécédents (déjà licencié, ancien club, saisons → badge Mutation FFR), mensurations (taille, poids, pointure, tailles short/maillot — utilisées par les dotations).</li>
   <li><strong>Responsable légal</strong> (mineurs) : référents 1 et 2 complets, autres membres de la famille licenciés, préférences de contact email et WhatsApp.</li>
@@ -163,8 +165,8 @@ a { color: var(--info-text); }
 <ul>
   <li><strong>Synthèse</strong> : solde, recettes/dépenses de l'exercice, graphique 12 mois, dépenses par poste.</li>
   <li><strong>Banque & rapprochement</strong> <span class="sim">(connecteur bancaire simulé)</span> : bouton <em>Synchroniser</em> qui importe des transactions, catégorie proposée, bouton <em>Valider</em> qui rapproche.</li>
-  <li><strong>Paiements en ligne</strong> <span class="sim">(module de paiement simulé)</span> : demandes envoyées aux familles, relances, bouton <em>Simuler le paiement</em>.</li>
-  <li><strong>Journal</strong> : toutes les écritures ; écriture manuelle possible.</li>
+  <li><strong>Paiements en ligne</strong> <span class="sim">(module de paiement simulé)</span> : demandes envoyées aux familles ; clic sur une ligne → fiche de la demande (renvoyer le lien, relancer, simuler le paiement).</li>
+  <li><strong>Journal</strong> : toutes les écritures, triables par date ou montant ; clic sur une écriture → fiche avec <b>contre-passation</b> (écriture inverse tracée, jamais de suppression) ; écriture manuelle possible.</li>
 </ul>
 <h3>Répercussions en chaîne</h3>
 <div class="flow"><b>Valider un rapprochement</b> → crée l'écriture au <b>Journal</b> → met à jour solde, graphiques et <b>Tableau de bord</b>.</div>
@@ -176,6 +178,7 @@ a { color: var(--info-text); }
 <h3>Partenaires — un vrai CRM en 4 onglets internes</h3>
 <ul>
   <li><strong>Pipeline visuel en 5 étapes</strong> : À contacter → Proposition → Signé → Récompensé → À renouveler (chaque étape affiche son nombre et son montant, clic = filtre), plus « Anciens & perdus » à part. Automatismes : un échange noté sur « À contacter » passe le partenaire en « Proposition » ; un versement encaissé le passe « Signé » ; toutes ses contreparties cochées le passent « Récompensé ».</li>
+  <li><strong>Fiche partenaire = page dédiée</strong> (fil d'Ariane, actions en haut, partenariat/contacts/versements à gauche, rappel/suivi à droite).</li>
   <li><strong>Contacts multiples par partenaire</strong> : chaque fiche porte ses interlocuteurs (nom, fonction, coordonnées), ajoutables depuis la fiche. Un contact peut être marqué <b>cible donateur</b>.</li>
   <li><strong>Rappels datés</strong> (planifier, modifier, « Fait ✓ » tracé dans le suivi) + encart « Rappels à venir » ; rappels dus sous 7 jours → alertes du Tableau de bord.</li>
   <li><strong>Historique des échanges</strong> par fiche (appel, email, RDV, note).</li>
@@ -206,12 +209,12 @@ a { color: var(--info-text); }
 <div class="flow">Conventions et dossiers ont vocation à être rangés dans <b>Documents</b> (dossier Sponsors & partenaires). <span class="sim">Version réelle : rappels automatiques, pièces rattachées (RIB, budget prévisionnel), suivi Compte Asso.</span></div>
 
 <h2 id="stock">▤ Stock</h2>
-<p class="lead">Multi-pôles : sportif, pharmacie, administratif, buvette — plus deux onglets transverses, <b>Boutique</b> et <b>Dotations</b>. Écriture pour président, éducateur, membre codir ; lecture pour trésorière et secrétaire.</p>
+<p class="lead">Trois sections : <b>Inventaire</b> (avec filtre par pôle en pastilles : sportif, pharmacie, administratif, buvette), <b>Boutique</b> et <b>Dotations</b>. Écriture pour président, éducateur, membre codir ; lecture pour trésorière et secrétaire.</p>
 <h3>Par pôle</h3>
 <ul>
-  <li>Jauge de niveau, badge <em>Sous seuil</em>, péremptions (pharmacie, buvette) avec alerte sous 60 jours (paramétrable).</li>
+  <li>Jauge de niveau (vert = confortable, orange = proche du seuil, rouge = sous le seuil — légende affichée), badge <em>Sous seuil</em>, péremptions avec alerte paramétrable.</li>
   <li><strong>Clic sur une ligne → fiche article</strong> : prix d'achat, prix de vente + marge, EAN, derniers mouvements, bouton <em>Modifier l'article</em> (une correction de quantité trace un mouvement « Correction d'inventaire »).</li>
-  <li>Boutons <em>+ Entrée</em> / <em>− Sortie</em> avec motif ; historique global des mouvements.</li>
+  <li>Les mouvements <em>+ Entrée</em> / <em>− Sortie</em> se font depuis la fiche article (les lignes de la liste restent propres) ; historique global des mouvements.</li>
 </ul>
 <h3>Boutique</h3>
 <div class="flow"><b>Vendre</b> (quantité, mode de paiement) → stock décrémenté + mouvement + <b>écriture comptable « Boutique »</b> + journal des ventes. Vente aux non-adhérents possible, pas de TVA (asso non assujettie).</div>
@@ -225,7 +228,7 @@ a { color: var(--info-text); }
 <ul>
   <li><strong>Préparation</strong> : ordre du jour (ajout/retrait), envoi des convocations <span class="sim">(simulé)</span>, documents joints.</li>
   <li><strong>Séance</strong> : émargement (codir) ou effectifs AG, calcul du <b>quorum</b> en direct, notes/décisions par point de l'ordre du jour.</li>
-  <li><strong>Votes</strong> : ouvrir un vote, saisir pour/contre/abstention, clore → résolution adoptée ou rejetée ; ajout de résolutions.</li>
+  <li><strong>Votes</strong> : ouvrir un vote, saisir pour/contre/abstention, clore (avec récapitulatif et confirmation) → résolution adoptée ou rejetée ; un vote clos peut être <b>rouvert</b> tant que le compte-rendu n'a pas été diffusé ; ajout de résolutions ; retrait d'un point d'ordre du jour confirmé.</li>
   <li><strong>Compte-rendu</strong> : généré automatiquement à partir du déroulé et des votes ; export PDF et diffusion <span class="sim">(simulés)</span>.</li>
 </ul>
 <h3>Connexions</h3>
@@ -288,7 +291,7 @@ a { color: var(--info-text); }
   <tr><td>Boutique en ligne au comptoir</td><td>Caisse mobile avec mode hors-ligne (réseau de stade)</td></tr>
 </table></div>
 
-<p style="margin-top:36px;color:var(--ink-3);font-size:12.5px">Guide V7 — évolue avec la maquette. Retours bienvenus : chaque remarque de testeur est tracée et traitée version par version.</p>
+<p style="margin-top:36px;color:var(--ink-3);font-size:12.5px">Guide V8.2 — évolue avec la maquette. Retours bienvenus : chaque remarque de testeur est tracée et traitée version par version.</p>
 </div>
 
 </body>
