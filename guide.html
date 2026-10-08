@@ -92,7 +92,7 @@ a { color: var(--info-text); }
 <div class="wrap">
 <header class="doc">
   <h1>Guide Ovalie Gestion</h1>
-  <p class="sub">Maquette V8.2 · septembre 2026 · données 100 % fictives — ce guide décrit chaque module, les vues selon le rôle connecté, les actions possibles et leurs répercussions dans le reste de l'application.</p>
+  <p class="sub">Maquette V10 · octobre 2026 · données 100 % fictives — ce guide décrit chaque module, les vues selon le rôle connecté, les actions possibles et leurs répercussions dans le reste de l'application.</p>
 </header>
 
 <div class="toc">
@@ -108,12 +108,14 @@ a { color: var(--info-text); }
   <li><strong>Alban Salini — Président</strong> : accès complet, y compris Paramètres.</li>
   <li><strong>Cybelle Mannes — Trésorière</strong> : Comptabilité en écriture, le reste surtout en lecture.</li>
   <li><strong>Julien Vasseur — Éducateur M10</strong> : Sportif en écriture (convocations, présences), Licenciés en lecture, Stock en écriture, Documents en cases.</li>
-  <li><strong>Joueuse Seniors</strong> (2 clubs) : menu réduit à Mon espace, Sportif, Documents. Peut changer de club (l'interface prend la couleur de l'autre club).</li>
+  <li><strong>Joueuse Seniors</strong> (2 clubs) : menu réduit à Mon espace, Notifications, Sportif, Documents. Peut changer de club (l'interface prend la couleur de l'autre club).</li>
   <li><strong>Parent d'un M10</strong> : mêmes vues que le joueur, mais rattaché à la licence de l'enfant.</li>
 </ul>
 <div class="note">Trois niveaux d'accès par module, définis dans Paramètres → Droits & rôles : <span class="badge b-adm">Admin</span> <span class="badge b-ecr">Écriture</span> <span class="badge b-lec">Lecture</span> (module visible, boutons d'action masqués) <span class="badge b-non">Aucun</span> (module absent du menu). Répondre présent/absent à une convocation reste possible en lecture : c'est une action sur ses propres données.</div>
 
 <div class="note">Transverse (V8.2) : le <b>guide est accessible depuis le menu</b> (📖 en bas de la barre latérale) ; les grandes listes se <b>trient par clic sur les en-têtes</b> ; les champs obligatoires des formulaires sont marqués <b>*</b> et une erreur met le champ fautif en évidence avec focus automatique ; les actions définitives (clore un vote, retirer un point d'ordre du jour, contre-passer) demandent confirmation.</div>
+<div class="note">Transverse (V9 → V10) : boutons <b>WhatsApp</b> partout où l'on contacte quelqu'un (fiche licencié, relances de paiement, sportif, alertes stock, commandes boutique) — la maquette ouvre WhatsApp avec le destinataire et le message pré-remplis, il ne reste qu'à appuyer sur Envoyer ; règle de destinataires commune email/WhatsApp : <b>majeur → le joueur, mineur → les parents</b> (contact direct du joueur possible à partir de M14 avec autorisation parentale pour WhatsApp, copie du joueur à partir de M16 pour l'email) ; <b>notifications in-app</b> pour les joueurs et parents (cloche 🔔 du menu) ; <b>exports CSV réels</b> sur les listes Licenciés et Stock ; <b>synchronisation d'agenda</b> (iCal) depuis le module Sportif.</div>
+
 <h2 id="dashboard">▦ Tableau de bord</h2>
 <p class="lead">Vue de pilotage du club. Réservée aux rôles bureau (président, trésorière, secrétaire, membre codir).</p>
 <h3>Contenu</h3>
@@ -127,131 +129,132 @@ a { color: var(--info-text); }
 <div class="flow">Le tableau de bord ne produit rien : il <b>agrège</b> tous les modules. Les seuils qui déclenchent ses alertes (délai certificat, péremption) viennent de <b>Paramètres → Alertes</b> — les changer recalcule immédiatement les alertes.</div>
 
 <h2 id="sportif">🏉 Sportif</h2>
-<p class="lead">Calendrier des matchs, entraînements et tournois, convocations et présences. Le module principal des coachs et joueurs, pensé mobile (cartes).</p>
+<p class="lead">Calendrier des matchs, entraînements, tournois <b>et événements club</b>, convocations et présences. Le module principal des coachs et joueurs, pensé mobile (cartes).</p>
 <h3>Vues par rôle</h3>
 <div class="table-wrap"><table>
   <tr><th>Rôle</th><th>Ce qu'il voit</th><th>Ce qu'il peut faire</th></tr>
-  <tr><td>Président, secrétaire</td><td>Toutes catégories</td><td>Créer un événement, convoquer, voir les réponses, saisir un résultat</td></tr>
+  <tr><td>Président, secrétaire</td><td>Toutes catégories</td><td>Créer/modifier/annuler un événement, demander les disponibilités, sélectionner, saisir un résultat</td></tr>
   <tr><td>Éducateur</td><td>Toutes catégories (filtre par défaut sur la sienne)</td><td>Idem + feuille de présence des entraînements (pointage P/A)</td></tr>
   <tr><td>Trésorière, membre codir</td><td>Tout le calendrier</td><td>Lecture seule</td></tr>
-  <tr><td>Joueur / parent</td><td>Filtré sur sa catégorie</td><td>Répondre <em>Présent</em> / <em>Absent</em> aux événements qui le concernent</td></tr>
+  <tr><td>Joueur / parent</td><td>Filtré sur sa catégorie</td><td>Donner sa disponibilité, répondre <em>Présent</em> / <em>Absent</em>, répondre aux invitations club</td></tr>
 </table></div>
-<h3>Actions & répercussions</h3>
-<div class="flow"><b>Convoquer</b> (match) → sélection des licenciés de la catégorie → chaque convoqué voit l'événement dans Sportif et <b>Mon espace</b>, avec boutons de réponse. Le bouton devient ensuite <em>Modifier la convocation</em>.</div>
-<div class="flow"><b>Réponse joueur</b> (Présent/Absent) → met à jour les compteurs de la carte et la liste <b>Réponses</b> vue par le coach.</div>
-<div class="flow"><b>Saisir le résultat</b> (match passé) → score affiché dans l'onglet Résultats. <span class="sim">Version réelle : alimenterait aussi les stats de l'onglet Rugby des fiches licenciés (matchs auto, essais/cartons saisis ici par le coach).</span></div>
-<div class="flow"><b>Feuille de présence</b> (entraînement) → pointage conservé sur l'événement. <span class="sim">Version réelle : historiques d'assiduité par joueur.</span></div>
+<h3>Le cycle d'un match (V9.2)</h3>
+<div class="flow"><b>1. Demander les disponibilités</b> (avec date limite) → les licenciés de la catégorie reçoivent une <b>notification</b> « Disponible ? » et répondent Oui/Non. <b>2. Sélectionner</b> → liste triée disponibles d'abord, bouton « Cocher les N disponibles », compteur avec alerte si un indisponible est retenu. <b>3. Convocation</b> → les retenus sont notifiés (les disponibles comptés présents d'office), les autres voient « Pas convoqué(e) ». On peut aussi <b>convoquer directement</b> sans phase de disponibilités.</div>
+<div class="flow"><b>Modifier / annuler / supprimer</b> un événement : contrôle de <b>doublon</b> (même catégorie, date, heure), notification automatique des changements (date, heure, lieu listés), « Annulé » reste affiché barré, la suppression est réservée aux erreurs de saisie et prévient du nombre de réponses perdues.</div>
+<div class="flow"><b>WhatsApp</b> : annonce au <b>groupe</b> d'équipe (convocation, demande de dispos, changement, annulation) et <b>relance individuelle des sans-réponse</b> — destinataires parents / joueur / les deux selon l'âge et l'autorisation parentale (voir Mon espace).</div>
+<div class="flow"><b>Saisir le résultat</b> (match passé) → score affiché dans l'onglet Résultats. <span class="sim">Version réelle : alimenterait aussi les stats de l'onglet Rugby des fiches licenciés.</span></div>
+<h3>Événements club (V10)</h3>
+<div class="flow"><b>+ Nouvel événement → « Événement club »</b> (soirée, loto, AG festive, repas…) : pas de catégorie — on choisit <b>les destinataires librement</b> : tout le club en un clic à la création, puis bouton <b>« Invités »</b> pour affiner (chips par catégorie, dirigeants compris, recherche et cases individuelles). Les invités reçoivent une notification « Invitation » et répondent Présent/Absent ; relance WhatsApp des sans-réponse et annonce groupe dédiées. Si la liste d'invités change, les notifications des personnes retirées l'indiquent.</div>
+<h3>Notifications & agenda (V9.3)</h3>
+<div class="flow">Chaque joueur/parent a une page <b>🔔 Notifications</b> : invitations, convocations, changements (détail de ce qui a changé), annulations — avec les boutons de réponse directement dans la notification. <b>📅 Synchroniser mon agenda</b> : lien iCal personnel (Google Agenda, Apple, Outlook), régénérable ; un événement annulé y reste marqué « ANNULÉ ». <span class="sim">Lien fictif dans la maquette.</span></div>
 
 <h2 id="licencies">👤 Licenciés</h2>
-<p class="lead">Le registre du club : 113 licenciés générés. Liste filtrable (recherche, catégorie, cotisation, certificat) ; badge <b>Mutation</b> pour les arrivants d'un autre club. La liste affiche un <b>statut synthétique</b> par licencié (À jour / point d'attention / bloquant, avec le premier problème nommé) — le détail vit dans la fiche. Export CSV <span class="sim">(simulé)</span>.</p>
+<p class="lead">Le registre du club : 113 licenciés générés. Liste filtrable (recherche, catégorie, cotisation, certificat) ; badge <b>Mutation</b> pour les arrivants d'un autre club. La liste affiche un <b>statut synthétique</b> par licencié — le détail vit dans la fiche. <b>Exporter (CSV)</b> produit un vrai fichier (lisible dans Excel), qui respecte les filtres et le tri affichés, référents compris.</p>
 <h3>La fiche licencié — une page dédiée, 6 onglets</h3>
-<p>Clic sur un licencié → page pleine (fil d'Ariane « ← Licenciés », badges d'état, actions Modifier / Lien de paiement en haut à droite). Le formulaire de création/modification est lui aussi une page, en sections. Les modales ne servent plus qu'aux actions courtes.</p>
+<p>Clic sur un licencié → page pleine (fil d'Ariane « ← Licenciés », badges d'état, actions Modifier / Lien de paiement / WhatsApp en haut à droite). Le formulaire de création/modification est lui aussi une page, en sections.</p>
 <ul>
-  <li><strong>Général</strong> : identité complète, nationalité et lieu de naissance, antécédents (déjà licencié, ancien club, saisons → badge Mutation FFR), mensurations (taille, poids, pointure, tailles short/maillot — utilisées par les dotations).</li>
-  <li><strong>Responsable légal</strong> (mineurs) : référents 1 et 2 complets, autres membres de la famille licenciés, préférences de contact email et WhatsApp.</li>
+  <li><strong>Général</strong> : identité complète, antécédents (badge Mutation FFR), mensurations (taille, poids, pointure, tailles short/maillot — utilisées par les dotations et la distribution en masse).</li>
+  <li><strong>Responsable légal</strong> (mineurs) : référents 1 et 2 complets, préférences de contact email et WhatsApp, <b>autorisation parentale de contact WhatsApp direct</b> (M14+) et <b>règle email</b> : qui reçoit les emails du club, avec copie du joueur possible à partir de M16.</li>
   <li><strong>Rugby</strong> : matchs, essais, cartons de la saison passée.</li>
-  <li><strong>Documents</strong> : certificat médical (« fiche de soin »), autorisation parentale — dépôt et <em>renommage</em>, alerte si certificat expiré.</li>
-  <li><strong>Paiement</strong> : état de la licence, montant réglé, mode de paiement, échéancier (réglée / à venir / en retard), demandes de paiement en ligne.</li>
-  <li><strong>Dotation</strong> : équipement reçu du club, bouton d'attribution.</li>
+  <li><strong>Documents</strong> : certificat médical, autorisation parentale — dépôt et renommage, alerte si certificat expiré.</li>
+  <li><strong>Paiement</strong> : état de la licence, montant réglé, mode de paiement, échéancier, demandes de paiement en ligne.</li>
+  <li><strong>Dotation</strong> : équipement reçu du club (avec la taille servie), bouton d'attribution.</li>
 </ul>
 <h3>Actions & répercussions</h3>
-<div class="flow"><b>Envoyer un lien de paiement</b> (fiche) → crée une demande dans <b>Comptabilité → Paiements en ligne</b>.</div>
-<div class="flow"><b>Attribuer une dotation</b> (fiche ou Stock → Dotations) → décrémente le <b>Stock</b>, trace un mouvement, apparaît dans la fiche du joueur.</div>
-<div class="flow"><b>Modifier / créer</b> → formulaire complet (identité, licence, mensurations, responsables légaux, cotisation). Un mineur sans responsable légal est refusé. Le montant réglé recalcule le statut de cotisation, donc le tableau de bord et les listes de relance.</div>
-<div class="flow">Les badges <b>certificat</b> dépendent du délai d'alerte de <b>Paramètres</b> ; les certificats expirés remontent au <b>Tableau de bord</b>.</div>
+<div class="flow"><b>Envoyer un lien de paiement</b> (fiche) → crée une demande dans <b>Comptabilité → Paiements en ligne</b>. <b>WhatsApp</b> → modèles selon la situation (certificat expiré, relance de paiement, message libre), destinataires selon la règle parents/joueur.</div>
+<div class="flow"><b>Attribuer une dotation</b> (fiche ou Stock → Distribution) → taille suggérée d'après la fiche, stock décrémenté par taille, mouvement tracé.</div>
+<div class="flow"><b>Modifier / créer</b> → formulaire complet. Un mineur sans responsable légal est refusé. Le montant réglé recalcule le statut de cotisation, donc le tableau de bord et les listes de relance.</div>
 
 <h2 id="compta">€ Comptabilité</h2>
 <p class="lead">Quatre onglets. En écriture pour président et trésorière ; lecture pour secrétaire et membre codir ; absent pour éducateur, joueur, parent.</p>
 <ul>
   <li><strong>Synthèse</strong> : solde, recettes/dépenses de l'exercice, graphique 12 mois, dépenses par poste.</li>
-  <li><strong>Banque & rapprochement</strong> <span class="sim">(connecteur bancaire simulé)</span> : bouton <em>Synchroniser</em> qui importe des transactions, catégorie proposée, bouton <em>Valider</em> qui rapproche.</li>
-  <li><strong>Paiements en ligne</strong> <span class="sim">(module de paiement simulé)</span> : demandes envoyées aux familles ; clic sur une ligne → fiche de la demande (renvoyer le lien, relancer, simuler le paiement).</li>
-  <li><strong>Journal</strong> : toutes les écritures, triables par date ou montant ; clic sur une écriture → fiche avec <b>contre-passation</b> (écriture inverse tracée, jamais de suppression) ; écriture manuelle possible.</li>
+  <li><strong>Banque & rapprochement</strong> <span class="sim">(connecteur bancaire simulé)</span> : bouton <em>Synchroniser</em>, catégorie proposée, bouton <em>Valider</em> qui rapproche.</li>
+  <li><strong>Paiements en ligne</strong> <span class="sim">(module de paiement simulé)</span> : demandes envoyées aux familles ; clic sur une ligne → fiche de la demande (renvoyer le lien, relancer par email ou <b>WhatsApp</b>, simuler le paiement) — la fiche affiche aussi le(s) <b>destinataire(s) email</b> résolus par la règle de contact.</li>
+  <li><strong>Journal</strong> : toutes les écritures, triables ; clic sur une écriture → fiche avec <b>contre-passation</b> (écriture inverse tracée, jamais de suppression) ; écriture manuelle possible.</li>
 </ul>
 <h3>Répercussions en chaîne</h3>
 <div class="flow"><b>Valider un rapprochement</b> → crée l'écriture au <b>Journal</b> → met à jour solde, graphiques et <b>Tableau de bord</b>.</div>
-<div class="flow"><b>Paiement en ligne reçu</b> → 4 effets d'un coup : cotisation du licencié mise à jour (fiche + liste), écriture « Cotisations » au Journal, transaction bancaire rapprochée, compteurs du Tableau de bord.</div>
-<div class="flow"><b>Vente boutique</b> (module Stock) → écriture « Boutique » au Journal.</div>
+<div class="flow"><b>Paiement en ligne reçu</b> → 4 effets d'un coup : cotisation du licencié mise à jour, écriture « Cotisations » au Journal, transaction bancaire rapprochée, compteurs du Tableau de bord.</div>
+<div class="flow"><b>Vente ou commande boutique, don, versement sponsor, subvention versée</b> → écritures correspondantes au Journal.</div>
 
 <h2 id="sponsors">🤝 Sponsors & subventions</h2>
-<p class="lead">Les financements du club, privés et publics, en deux onglets. Admin pour le président, écriture pour trésorière et secrétaire, lecture pour les membres du codir ; absent pour éducateur, joueur, parent.</p>
-<h3>Partenaires — un vrai CRM en 4 onglets internes</h3>
+<p class="lead">Les financements du club, privés et publics, en cinq onglets. Admin pour le président, écriture pour trésorière et secrétaire, lecture pour les membres du codir.</p>
+<h3>Partenaires — un vrai CRM</h3>
 <ul>
-  <li><strong>Pipeline visuel en 5 étapes</strong> : À contacter → Proposition → Signé → Récompensé → À renouveler (chaque étape affiche son nombre et son montant, clic = filtre), plus « Anciens & perdus » à part. Automatismes : un échange noté sur « À contacter » passe le partenaire en « Proposition » ; un versement encaissé le passe « Signé » ; toutes ses contreparties cochées le passent « Récompensé ».</li>
-  <li><strong>Fiche partenaire = page dédiée</strong> (fil d'Ariane, actions en haut, partenariat/contacts/versements à gauche, rappel/suivi à droite).</li>
-  <li><strong>Contacts multiples par partenaire</strong> : chaque fiche porte ses interlocuteurs (nom, fonction, coordonnées), ajoutables depuis la fiche. Un contact peut être marqué <b>cible donateur</b>.</li>
-  <li><strong>Rappels datés</strong> (planifier, modifier, « Fait ✓ » tracé dans le suivi) + encart « Rappels à venir » ; rappels dus sous 7 jours → alertes du Tableau de bord.</li>
-  <li><strong>Historique des échanges</strong> par fiche (appel, email, RDV, note).</li>
+  <li><strong>Pipeline visuel en 5 étapes</strong> : À contacter → Proposition → Signé → Récompensé → À renouveler (clic = filtre), plus « Anciens & perdus ». Automatismes : un échange noté passe « À contacter » en « Proposition » ; un versement encaissé passe « Signé » ; toutes les contreparties cochées passent « Récompensé ».</li>
+  <li><strong>Fiche partenaire = page dédiée</strong>, contacts multiples (cible donateur), rappels datés, historique des échanges.</li>
 </ul>
 <h3>Contreparties — la to-do des promesses</h3>
 <ul>
-  <li>Chaque contrepartie promise (poser le panneau, floquer les maillots, publier l'encart…) est une tâche avec responsable et échéance, à cocher quand c'est fait — colonnes « À faire » (retards en rouge) et « Fait ».</li>
-  <li>Quand tout est coché pour un partenaire signé → statut « Récompensé » automatiquement : le club sait qu'il a tenu ses promesses avant de demander le renouvellement.</li>
+  <li>Chaque contrepartie promise est une tâche avec responsable et échéance ; tout coché pour un partenaire signé → « Récompensé » automatique.</li>
 </ul>
-<h3>Contacts & donateurs</h3>
+<h3>Contacts & donateurs · Réseau du club</h3>
 <ul>
-  <li>Annuaire de tous les contacts physiques rattachés aux partenaires, avec marquage « cible donateur » et enregistrement de dons → écriture <b>« Dons & mécénat »</b> en comptabilité. <span class="sim">Version réelle : reçu fiscal CERFA automatique.</span></li>
-</ul>
-<h3>Réseau du club</h3>
-<ul>
-  <li>Cartographie <b>déclarative et consentie</b> du réseau des adhérents : joueurs seniors et parents volontaires qui ont renseigné leur entreprise/poste et accepté d'être sollicités. Visible du bureau uniquement.</li>
-  <li>Chaque ligne dit ce que la personne « peut ouvrir » ; « Créer une piste » ajoute l'entreprise au pipeline en « À contacter » avec la mention de la mise en relation et un rappel planifié.</li>
-  <li><span class="sim">Version réelle : la case de consentement vit dans Mon profil et reste révocable ; aucune collecte automatique de relations.</span></li>
+  <li>Annuaire des contacts physiques, dons → écriture <b>« Dons & mécénat »</b>. <span class="sim">Version réelle : reçu fiscal CERFA automatique.</span></li>
+  <li>Réseau <b>déclaratif et consenti</b> des adhérents volontaires, visible du bureau uniquement ; « Créer une piste » alimente le pipeline.</li>
 </ul>
 <h3>Subventions publiques</h3>
 <ul>
-  <li>Indicateurs : accordé sur la saison, en instruction, dossiers à déposer (avec prochaine date limite).</li>
-  <li>Cycle de vie d'un dossier : <em>à déposer → déposée → accordée → versée</em> (ou refusée), piloté depuis la fiche ; <em>+ Nouvelle demande</em>.</li>
+  <li>Cycle de vie d'un dossier : <em>à déposer → déposée → accordée → versée</em> (ou refusée) ; alertes avant date limite.</li>
 </ul>
-<h3>Connexions</h3>
-<div class="flow"><b>Versement partenaire</b> ou <b>subvention versée</b> → écriture au <b>Journal comptable</b> (« Sponsors & partenaires » / « Subvention ») + transaction bancaire → solde et Tableau de bord à jour.</div>
-<div class="flow"><b>Contrat à échéance ≤ 90 j</b>, <b>rappel dû sous 7 j</b> et <b>dossier à déposer ≤ 45 j</b> de la date limite → alertes « À traiter » du <b>Tableau de bord</b>.</div>
-<div class="flow">Conventions et dossiers ont vocation à être rangés dans <b>Documents</b> (dossier Sponsors & partenaires). <span class="sim">Version réelle : rappels automatiques, pièces rattachées (RIB, budget prévisionnel), suivi Compte Asso.</span></div>
+<div class="flow"><b>Versement partenaire</b> ou <b>subvention versée</b> → écriture au <b>Journal comptable</b> + transaction bancaire → solde et Tableau de bord à jour. Échéances, rappels dus et dossiers à déposer remontent en alertes.</div>
 
 <h2 id="stock">▤ Stock</h2>
-<p class="lead">Trois sections : <b>Inventaire</b> (avec filtre par pôle en pastilles : sportif, pharmacie, administratif, buvette), <b>Boutique</b> et <b>Dotations</b>. Écriture pour président, éducateur, membre codir ; lecture pour trésorière et secrétaire.</p>
-<h3>Par pôle</h3>
+<p class="lead">Refondu en V10 : <b>quatre onglets</b> — Inventaire · Dotations & packs · Distribution · Boutique. Écriture pour président, éducateur, membre codir ; lecture pour trésorière et secrétaire.</p>
+<h3>1 · Inventaire (avec et sans dimension)</h3>
 <ul>
-  <li>Jauge de niveau (vert = confortable, orange = proche du seuil, rouge = sous le seuil — légende affichée), badge <em>Sous seuil</em>, péremptions avec alerte paramétrable.</li>
-  <li><strong>Clic sur une ligne → fiche article</strong> : prix d'achat, prix de vente + marge, EAN, derniers mouvements, bouton <em>Modifier l'article</em> (une correction de quantité trace un mouvement « Correction d'inventaire »).</li>
-  <li>Les mouvements <em>+ Entrée</em> / <em>− Sortie</em> se font depuis la fiche article (les lignes de la liste restent propres) ; historique global des mouvements.</li>
+  <li>Filtre par pôle (sportif, pharmacie, administratif, buvette), jauges de niveau, seuils et péremptions comme avant.</li>
+  <li><b>Dimensions</b> : les articles textiles ont une <b>grille de tailles</b> (vêtements : 8 ans → XXL ; chaussettes : par pointures 31-34 → 43-46). La case « <b>Détail par taille</b> » déplie une sous-ligne par taille, avec badge « Épuisé » ; les articles sans dimension (ballons, compresses…) gardent une quantité simple.</li>
+  <li><b>Colonne « Pertes & bénéfices »</b> par article (survol = détail) : marge des ventes − coût des dotations distribuées − pertes (casse, péremption, corrections d'inventaire négatives), valorisées au prix d'achat. Le détail complet est dans la fiche article (tuiles Ventes / Marge / Dotations / Pertes / Résultat + stock par taille).</li>
+  <li><b>Exporter (CSV)</b> : vrai fichier, une ligne par taille + ligne TOTAL par article, résultat saison inclus.</li>
+  <li><b>📣 Signaler les alertes</b> : message pré-rempli par pôle (articles sous seuil, tailles épuisées, péremptions) envoyé au <b>responsable du pôle</b> par email ou WhatsApp selon le canal choisi dans Paramètres.</li>
+  <li>Entrées/sorties depuis la fiche article, <b>par taille</b>, avec motif « Péremption » qui alimente les pertes.</li>
 </ul>
-<h3>Boutique</h3>
-<div class="flow"><b>Vendre</b> (quantité, mode de paiement) → stock décrémenté + mouvement + <b>écriture comptable « Boutique »</b> + journal des ventes. Vente aux non-adhérents possible, pas de TVA (asso non assujettie).</div>
-<h3>Dotations</h3>
-<div class="flow"><b>Nouvelle dotation</b> (joueur + article) → stock décrémenté + journal des dotations + onglet <b>Dotation de la fiche du licencié</b>. Les tailles du joueur (short, maillot, pointure) viennent de sa fiche. Tout est donné, pas de gestion de retour.</div>
-<div class="flow">Sous seuil et péremptions remontent au <b>Tableau de bord</b> et en badge sur l'onglet du pôle.</div>
+<h3>2 · Dotations & packs (les créer)</h3>
+<ul>
+  <li>Liste des articles de dotation (stock par taille, prix d'achat) et <b>packs</b> : un pack = un ensemble d'articles (ex. pack rentrée = maillot + short + chaussettes), à usage <em>dotation</em> ou <em>vente</em> (avec prix de pack). Création/modification libre ; l'écran affiche combien de packs sont servables avec le stock actuel.</li>
+</ul>
+<h3>3 · Distribution (total ou par catégorie, en masse)</h3>
+<div class="flow"><b>📦 Distribuer en masse</b> : choisir un pack ou un article + une cible (tout le club ou une catégorie) → <b>écran de contrôle</b> joueur par joueur : taille servie pour chacun (d'après sa fiche), état OK / <b>Rupture de taille</b> / Déjà doté (décoché d'office), cases pour exclure quelqu'un. À la validation : stock décrémenté taille par taille, journal de distribution, onglet Dotation de chaque fiche. Les joueurs en rupture ne sont pas servis — on réassortit puis on relance, la liste se recalcule. Rien ne part en aveugle.</div>
+<ul>
+  <li>Dotation individuelle toujours possible (taille suggérée d'après la fiche) ; journal filtrable par catégorie ; indicateurs : articles distribués, joueurs servis, coût saison.</li>
+</ul>
+<h3>4 · Boutique (article unique ou pack, avec client)</h3>
+<ul>
+  <li><b>Vendre</b> un article (taille choisie si dimensionné) ou un <b>pack</b> (taille par composant) ; le <b>client</b> est un adhérent (sélecteur, relié à sa fiche) ou un nom libre pour les non-adhérents. Vente au comptoir sans TVA.</li>
+  <li><b>Commandes</b> : une commande (client, article, taille) <b>réserve le stock</b> ; statuts <em>Commandée → Prête → Retirée & payée</em>. « Marquer prête » propose de <b>prévenir le client</b> (WhatsApp ou email pré-rempli, selon Paramètres) ; l'encaissement se fait à la remise ; une annulation restitue le stock.</li>
+  <li>Journal des ventes avec taille, client et mode de paiement.</li>
+</ul>
+<div class="flow">Chaque vente, remise de commande ou don crée son <b>écriture comptable</b> ; chaque sortie (vente, dotation, casse, péremption) est un <b>mouvement tracé</b> ; sous seuil et péremptions remontent au <b>Tableau de bord</b>.</div>
 
 <h2 id="codir">⚖ Codir & AG</h2>
 <p class="lead">Réunions du comité directeur et assemblées générales. Admin pour président et secrétaire, écriture pour trésorière et membre codir.</p>
 <h3>Une réunion = 4 onglets</h3>
 <ul>
-  <li><strong>Préparation</strong> : ordre du jour (ajout/retrait), envoi des convocations <span class="sim">(simulé)</span>, documents joints.</li>
-  <li><strong>Séance</strong> : émargement (codir) ou effectifs AG, calcul du <b>quorum</b> en direct, notes/décisions par point de l'ordre du jour.</li>
-  <li><strong>Votes</strong> : ouvrir un vote, saisir pour/contre/abstention, clore (avec récapitulatif et confirmation) → résolution adoptée ou rejetée ; un vote clos peut être <b>rouvert</b> tant que le compte-rendu n'a pas été diffusé ; ajout de résolutions ; retrait d'un point d'ordre du jour confirmé.</li>
-  <li><strong>Compte-rendu</strong> : généré automatiquement à partir du déroulé et des votes ; export PDF et diffusion <span class="sim">(simulés)</span>.</li>
+  <li><strong>Préparation</strong> : ordre du jour (ajout/retrait confirmé), envoi des convocations <span class="sim">(simulé)</span>, documents joints.</li>
+  <li><strong>Séance</strong> : émargement (codir) ou effectifs AG, calcul du <b>quorum</b> en direct, notes/décisions par point.</li>
+  <li><strong>Votes</strong> : ouvrir, saisir pour/contre/abstention, clore (récapitulatif et confirmation) ; un vote clos peut être <b>rouvert</b> tant que le compte-rendu n'a pas été diffusé.</li>
+  <li><strong>Compte-rendu</strong> : généré automatiquement ; export PDF et diffusion <span class="sim">(simulés)</span> — la diffusion verrouille les votes.</li>
 </ul>
-<h3>Connexions</h3>
-<div class="flow">Les <b>quorums</b> par défaut (AG 25 %, codir 50 %) viennent de <b>Paramètres</b> et s'appliquent aux nouvelles réunions. L'émargement de séance alimente le calcul du quorum, qui conditionne la validité des votes ; le tout se retrouve dans le compte-rendu.</div>
-<div class="flow">Une convocation non envoyée pour une réunion en préparation remonte en alerte au <b>Tableau de bord</b>.</div>
+<div class="flow">Les <b>quorums</b> par défaut viennent de <b>Paramètres</b>. Une convocation non envoyée pour une réunion en préparation remonte en alerte au <b>Tableau de bord</b>.</div>
 
 <h2 id="documents">🗂 Documents</h2>
 <p class="lead">La GED du club, avec deux présentations selon le rôle.</p>
 <ul>
   <li><strong>Rôles bureau</strong> : vue type Drive — dossiers, fil d'Ariane, recherche globale, nouveau dossier, import, fiche fichier (partage, versions).</li>
-  <li><strong>Joueur / parent / éducateur</strong> : vue en <b>cases tactiles</b> (mobile) — « Mes documents » (certificat médical avec alerte, attestation de licence, reçu de cotisation) puis « Documents du club ».</li>
+  <li><strong>Joueur / parent / éducateur</strong> : vue en <b>cases tactiles</b> (mobile) — « Mes documents » (certificat médical avec alerte, attestation, reçu) puis « Documents du club ».</li>
 </ul>
-<h3>Visibilité par audience</h3>
-<div class="flow">Chaque document a un partage : <b>Bureau</b>, <b>Codir</b>, <b>Éducateurs</b> ou <b>Tous les membres</b>. Un joueur ne voit que « Tous les membres » — recherche comprise. Le partage au niveau fichier prime : un dossier réservé au bureau reste visible s'il contient un fichier public, sinon il disparaît. <span class="sim">Version réelle : ce filtrage devra être appliqué côté serveur.</span></div>
-<div class="flow">Les documents « Tous les membres » alimentent aussi la carte Documents de <b>Mon espace</b>.</div>
+<div class="flow">Chaque document a un partage : <b>Bureau</b>, <b>Codir</b>, <b>Éducateurs</b> ou <b>Tous les membres</b>. Un joueur ne voit que « Tous les membres » — recherche comprise. <span class="sim">Version réelle : filtrage appliqué côté serveur.</span></div>
 
 <h2 id="monespace">🏉 Mon espace <span class="badge" style="vertical-align:middle">joueur / parent uniquement</span></h2>
 <p class="lead">La page d'accueil des adhérents : l'essentiel en 4 cartes + documents.</p>
 <ul>
-  <li><strong>Ma licence</strong> (ou celle de l'enfant pour un parent) : numéro, catégorie, statut FFR.</li>
+  <li><strong>Ma licence</strong> (ou celle de l'enfant) : numéro, catégorie, statut FFR.</li>
   <li><strong>Certificat médical</strong> : validité, consigne si renouvellement nécessaire.</li>
   <li><strong>Ma cotisation</strong> : réglé/total, bouton <b>Payer en ligne</b> <span class="sim">(simulé)</span>.</li>
-  <li><strong>Prochains événements</strong> : les 2 prochains de sa catégorie, bouton <em>Répondre</em> → module Sportif.</li>
+  <li><strong>Prochains événements</strong> : les 2 prochains de sa catégorie, bouton <em>Répondre</em>.</li>
+  <li><strong>Messages WhatsApp du club</strong> (parent d'un mineur) : bloc d'<b>autorisation parentale de contact direct</b> — à partir de M14 seulement (âge minimum WhatsApp : 13 ans), avec le numéro du joueur, datée, nominative, révocable ; en dessous, le club n'écrit qu'aux parents.</li>
 </ul>
 <div class="flow"><b>Payer ma cotisation</b> → même chaîne que côté trésorière : cotisation à jour, écriture au Journal, transaction bancaire, tableau de bord.</div>
 
@@ -259,23 +262,22 @@ a { color: var(--info-text); }
 <p class="lead">Page dédiée (clic sur l'utilisateur en haut du menu), indépendante du club affiché.</p>
 <ul>
   <li>Identité (email, téléphone, modification <span class="sim">simulée</span>).</li>
-  <li><strong>Mes clubs & rôles</strong> : un compte peut appartenir à plusieurs clubs avec un rôle différent dans chacun ; demande de rattachement <span class="sim">(simulée)</span>. Le sélecteur de club (sous le nom, dans le menu) bascule l'interface aux couleurs de l'autre club.</li>
+  <li><strong>Mes clubs & rôles</strong> : un compte peut appartenir à plusieurs clubs ; le sélecteur de club bascule l'interface aux couleurs de l'autre club.</li>
   <li>Ma licence / licencié rattaché + historique de paiements.</li>
-  <li>Préférences de notifications ; sécurité & sessions (mot de passe, déconnexion <span class="sim">simulés</span>).</li>
+  <li>Préférences de notifications ; sécurité & sessions <span class="sim">(simulés)</span>.</li>
 </ul>
 
 <h2 id="parametres">⚙ Paramètres <span class="badge b-adm" style="vertical-align:middle">Président uniquement</span></h2>
-<p class="lead">Le back-office du club — 5 onglets, et la plupart des réglages agissent immédiatement sur le reste de l'application.</p>
+<p class="lead">Le back-office du club — 5 onglets, et la plupart des réglages agissent immédiatement.</p>
 <ul>
-  <li><strong>Identité & couleurs</strong> : nom du club, discipline, logo, couleur du club (« option A » : appliquée aux boutons, onglets et menu actif — jamais aux statuts ni aux graphiques ; assombrie automatiquement si illisible).</li>
-  <li><strong>Utilisateurs</strong> : attribution du rôle par personne — le changement est réellement appliqué (vérifiable via « voir comme ») ; invitation <span class="sim">(simulée)</span>.</li>
-  <li><strong>Droits & rôles</strong> : matrice rôle × module (Aucun / Lecture / Écriture / Admin) qui pilote le menu et les actions de chacun.</li>
-  <li><strong>Alertes & fonctionnement</strong> : délai d'alerte certificats, péremptions, relances, quorums AG/codir, début d'exercice, tarifs par catégorie.</li>
-  <li><strong>Modèles</strong> : convocation, compte-rendu, reçu, relance <span class="sim">(éditeur simulé)</span>.</li>
+  <li><strong>Identité & couleurs</strong> : nom, discipline, logo, couleur du club (« option A » — boutons, onglets et menu actif ; assombrie automatiquement si illisible).</li>
+  <li><strong>Utilisateurs</strong> : rôle par personne, réellement appliqué (vérifiable via « voir comme »).</li>
+  <li><strong>Droits & rôles</strong> : matrice rôle × module (Aucun / Lecture / Écriture / Admin), bouton « Voir » par rôle ; impossible de retirer les Paramètres au président.</li>
+  <li><strong>Alertes & fonctionnement</strong> : délais d'alerte (certificats, péremptions, relances), quorums, début d'exercice, tarifs — et depuis la V10 les <b>canaux d'alerte</b> : pour chaque situation (commande boutique prête → client ; sous seuil et péremption → responsable du pôle), choisir Aucun / Email / WhatsApp / les deux, avec la liste des responsables de pôle.</li>
+  <li><strong>Modèles</strong> : convocation, compte-rendu, reçu, relance <span class="sim">(éditeur simulé)</span> — et les <b>modèles WhatsApp</b> éditables (variables cliquables), chacun en deux versions : aux parents (vouvoiement) et directe au joueur (tutoiement).</li>
 </ul>
 <h3>Répercussions</h3>
-<div class="flow"><b>Délai certificat 60 → 120 j</b> → les badges des licenciés, le filtre « expirent sous X j » et les alertes du Tableau de bord se recalculent aussitôt.</div>
-<div class="flow"><b>Quorums</b> → appliqués aux prochaines réunions créées. <b>Tarifs</b> → appliqués aux nouvelles inscriptions (les cotisations émises ne sont pas recalculées).</div>
+<div class="flow"><b>Délai certificat 60 → 120 j</b> → badges, filtres et alertes recalculés aussitôt. <b>Canal d'alerte</b> → change immédiatement les boutons proposés (📣 Signaler les alertes, Prévenir le client).</div>
 <div class="flow"><b>Droits</b> → changer une case de la matrice, puis « voir comme » le rôle concerné : le menu et les boutons changent.</div>
 
 <h2 id="simule">🧪 Ce qui est simulé (et le serait pour de vrai)</h2>
@@ -284,14 +286,16 @@ a { color: var(--info-text); }
   <tr><td>Données générées, modifications en mémoire (perdues au rechargement)</td><td>Base de données, comptes utilisateurs, historique</td></tr>
   <tr><td>Synchronisation bancaire fictive</td><td>Agrégateur DSP2 (Bridge, Powens…)</td></tr>
   <tr><td>Liens et « simuler le paiement »</td><td>Prestataire de paiement (Stripe, HelloAsso…)</td></tr>
-  <tr><td>Convocations, relances, diffusion « envoyées »</td><td>Emails et notifications push réels</td></tr>
+  <tr><td>WhatsApp : lien pré-rempli, un clic par destinataire</td><td>Envois automatiques via l'API WhatsApp Business (payante au message) ; l'email reste inclus</td></tr>
+  <tr><td>Notifications in-app (réelles dans la maquette), lien agenda fictif</td><td>Notifications push + flux iCal servi par le serveur du club</td></tr>
+  <tr><td>Convocations codir, diffusion CR « envoyées »</td><td>Emails réels</td></tr>
   <tr><td>Licences et mutations saisies à la main</td><td>Lien avec Oval-e / FFR</td></tr>
   <tr><td>Filtrage des documents côté navigateur</td><td>Droits appliqués côté serveur (sécurité réelle)</td></tr>
-  <tr><td>Exports PDF/CSV (messages)</td><td>Vrais exports (FEC, compte de résultat, feuilles de match)</td></tr>
-  <tr><td>Boutique en ligne au comptoir</td><td>Caisse mobile avec mode hors-ligne (réseau de stade)</td></tr>
+  <tr><td>Exports <b>CSV réels</b> (licenciés, stock) ; PDF simulés</td><td>Exports complets (FEC, compte de résultat, feuilles de match)</td></tr>
+  <tr><td>Boutique au comptoir, commandes encaissées à la remise</td><td>Caisse mobile hors-ligne (réseau de stade), paiement en ligne des commandes</td></tr>
 </table></div>
 
-<p style="margin-top:36px;color:var(--ink-3);font-size:12.5px">Guide V8.2 — évolue avec la maquette. Retours bienvenus : chaque remarque de testeur est tracée et traitée version par version.</p>
+<p style="margin-top:36px;color:var(--ink-3);font-size:12.5px">Guide V10 — évolue avec la maquette. Retours bienvenus : chaque remarque de testeur est tracée et traitée version par version.</p>
 </div>
 
 </body>

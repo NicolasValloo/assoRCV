@@ -2932,7 +2932,8 @@ bindExtra = function (v) {
           <td>${chip(e.reponses[l.id])}</td>
           ${ecrit ? `<td><button class="btn btn-sm" data-pt="${l.id}" data-val="present">P</button> <button class="btn btn-sm" data-pt="${l.id}" data-val="absent">A</button></td>` : ''}
         </tr>`).join('')}</tbody></table></div>`,
-      `<button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+      `${ecrit && e.date >= TODAY && waSansRepListe(e).length ? `<button class="btn wa-btn" id="waSansRep">${WA_ICO} Relancer ${waSansRepListe(e).length} sans-réponse</button>` : ''}<button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+    const wsr = $('#waSansRep'); if (wsr) wsr.onclick = () => { closeModal(); waSansReponse(e); };
     $$('#modalRoot [data-pt]').forEach(p => p.onclick = () => {
       e.reponses[Number(p.dataset.pt)] = p.dataset.val;
       if (!e.convoques.includes(Number(p.dataset.pt))) e.convoques.push(Number(p.dataset.pt));
@@ -4779,6 +4780,7 @@ function viewFicheLicencie() {
     </div>
     <div class="head-actions">
       ${l.cotStatut !== 'payee' && l.cot && ecrit ? `<button class="btn" id="fpLien">Envoyer un lien de paiement</button>` : ''}
+      ${ecrit || (window.canW && canW('sportif')) ? `<button class="btn" id="fpWa">${typeof WA_ICO !== 'undefined' ? WA_ICO : ''} WhatsApp</button>` : ''}
       ${ecrit ? `<button class="btn btn-primary" id="fpEdit">Modifier</button>` : ''}
     </div>
   </div>
@@ -5118,12 +5120,15 @@ function openFichePaiement(pid) {
     ${p.statut !== 'paye' && ecrit ? `
       <button class="btn" id="payRenvoyer">Renvoyer le lien</button>
       <button class="btn" id="payRelancer">Relancer</button>
+      ${l ? `<button class="btn wa-btn" id="payWa">${WA_ICO} Relancer sur WhatsApp</button>` : ''}
       <button class="btn" id="paySimuler">Simuler le paiement</button>` : ''}
     <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
   const r = $('#payRelancer');
   if (r) r.onclick = () => { p.statut = 'relancee'; p.relances++; toast('Relance envoyée (simulé).'); closeModal(); render(); };
   const rv = $('#payRenvoyer');
   if (rv) rv.onclick = () => toast('Lien renvoyé par email (simulé).');
+  const pw = $('#payWa');
+  if (pw) pw.onclick = () => { closeModal(); waRelancePaiement(p, l); };
   const sim = $('#paySimuler');
   if (sim) sim.onclick = () => { simulerPaiement(p.id); closeModal(); render(); };
 }
@@ -5335,6 +5340,2231 @@ closeModal = function () {
   if (r) r._prevFocus = null;
   _closeModalV83();
   if (prev && typeof prev.focus === 'function' && document.contains(prev)) prev.focus();
+};
+render();
+</script>
+
+<script>
+/* ====== V9.1 : WhatsApp click-to-chat (liens wa.me + modèles) — destinataires parents / joueur, relances présence ====== */
+const WA_LIEN_APPLI = 'https://nicolasvalloo.github.io/assoRCV/';
+const WA_CATS_DIRECT = ['M14', 'M16', 'M19']; // WhatsApp : 13 ans minimum en Europe
+/* texte = message aux parents (ou générique) ; joueur = variante adressée directement au joueur (tutoiement) */
+const WA_MODELES_DEFAUT = {
+  convocMatch: { nom: 'Convocation (individuelle)',
+    texte: 'Bonjour {destinataire},\nConvocation {club} 🏉\n{joueur} — {match}\n📅 {date} à {heure}\n📍 {lieu}\nMerci de répondre présent/absent dans l\'appli : {lienAppli}\n{expediteur}',
+    joueur: 'Salut {destinataire} 🏉\nTu es convoqué(e) : {match}\n📅 {date} à {heure}\n📍 {lieu}\nRéponds présent/absent dans l\'appli : {lienAppli}\n{expediteur}' },
+  convocGroupe: { nom: 'Annonce au groupe d\'équipe',
+    texte: '🏉 Convocation {categorie} — {match}\n📅 {date} à {heure}\n📍 {lieu}\nConvoqué(e)s ({nbConvoques}) : {liste}\nMerci de répondre dans l\'appli : {lienAppli}' },
+  relanceReponse: { nom: 'Relance présence (match / entraînement)',
+    texte: 'Bonjour {destinataire}, nous n\'avons pas encore la réponse de {joueur} pour « {match} » ({date} à {heure}). Pouvez-vous répondre dans l\'appli ? {lienAppli}\nMerci ! {expediteur}',
+    joueur: 'Salut {destinataire}, on n\'a pas ta réponse pour « {match} » ({date} à {heure}). Tu peux répondre présent/absent dans l\'appli ? {lienAppli}\nMerci ! {expediteur}' },
+  lienPaiement: { nom: 'Envoi du lien de paiement',
+    texte: 'Bonjour {destinataire}, voici le lien pour régler la cotisation 2026-2027 de {joueur} ({montant}) : {lienPaiement}\nPaiement en plusieurs fois possible. Merci ! {expediteur} — {club}',
+    joueur: 'Bonjour {destinataire}, voici le lien pour régler ta cotisation 2026-2027 ({montant}) : {lienPaiement}\nPaiement en plusieurs fois possible. Merci ! {expediteur} — {club}' },
+  relancePaiement: { nom: 'Relance de paiement',
+    texte: 'Bonjour {destinataire}, petit rappel : il reste {montant} à régler pour la cotisation de {joueur}.\nLien de paiement : {lienPaiement}\nN\'hésitez pas à nous écrire en cas de difficulté. {expediteur} — {club}',
+    joueur: 'Bonjour {destinataire}, petit rappel : il reste {montant} à régler pour ta cotisation.\nLien de paiement : {lienPaiement}\nÉcris-nous en cas de difficulté. {expediteur} — {club}' },
+  certificat: { nom: 'Certificat médical',
+    texte: 'Bonjour {destinataire}, le certificat médical de {joueur} {etatCertif}. Sans certificat valide, la licence est bloquée.\nVous pouvez déposer une photo du nouveau certificat dans l\'appli : {lienAppli}\nMerci ! {expediteur}',
+    joueur: 'Bonjour {destinataire}, ton certificat médical {etatCertif}. Sans certificat valide, ta licence est bloquée.\nTu peux déposer une photo du nouveau certificat dans l\'appli : {lienAppli}\nMerci ! {expediteur}' },
+  libre: { nom: 'Message libre',
+    texte: 'Bonjour {destinataire},\n\n{expediteur} — {club}',
+    joueur: 'Salut {destinataire},\n\n{expediteur} — {club}' },
+};
+state.waModeles = JSON.parse(JSON.stringify(WA_MODELES_DEFAUT));
+state.waMode = { sport: 'parents', admin: 'parents' };
+const WA_VARS = {
+  destinataire: 'prénom de la personne qui reçoit', joueur: 'prénom et nom du licencié', club: 'nom du club',
+  expediteur: 'votre nom', categorie: 'catégorie', match: 'intitulé de l\'événement', date: 'date', heure: 'heure', lieu: 'lieu',
+  liste: 'convoqué(e)s', nbConvoques: 'nombre de convoqué(e)s', montant: 'montant restant dû',
+  lienPaiement: 'lien de paiement', etatCertif: '« expire le … » / « a expiré le … »', lienAppli: 'lien de l\'application',
+};
+
+/* ---- Données : téléphone du joueur mineur + autorisation parentale de contact direct ---- */
+(function seedContactDirect() {
+  for (const l of state.licencies) {
+    if (!WA_CATS_DIRECT.includes(l.cat)) continue;
+    const p = l.cat === 'M14' ? 0.55 : l.cat === 'M16' ? 0.85 : 0.95;
+    if (rnd() < p) l.telJoueur = l.telJoueur || `07 ${ri(10,99)} ${ri(10,99)} ${ri(10,99)} ${ri(10,99)}`;
+    if (l.telJoueur && rnd() < 0.55) { l.waDirect = true; l.waDirectDate = addDaysIso(TODAY, -ri(5, 40)); l.waDirectPar = l.referents ? l.referents[0].prenom + ' ' + l.referents[0].nom : '—'; }
+  }
+})();
+const estMineur = l => !!(l.referents && l.referents.length) || CATS_MINEURS.includes(l.cat);
+const waDirectEligible = l => WA_CATS_DIRECT.includes(l.cat);
+const waDirectOk = l => !estMineur(l) || (waDirectEligible(l) && l.waDirect && !!l.telJoueur);
+
+function waNum(tel) {
+  let d = String(tel || '').replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) d = d.slice(1);
+  else if (d.startsWith('00')) d = d.slice(2);
+  else if (d.length === 10 && d.startsWith('0')) d = '33' + d.slice(1);
+  return /^\d{10,15}$/.test(d) ? d : null;
+}
+const waUrl = (num, texte) => `https://wa.me/${num || ''}?text=${encodeURIComponent(texte)}`;
+const waFill = (t, vars) => t.replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? String(vars[k]) : m);
+const WA_ICO = '<svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3C6.9 3 3 6.6 3 11.2c0 2.3 1 4.4 2.7 5.9L5 21l4.1-1.9c.9.3 1.9.4 2.9.4 5.1 0 9-3.6 9-8.2S17.1 3 12 3zm-4 9.4a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z"/></svg>';
+
+/* Destinataires d'un licencié selon le mode : 'parents' | 'joueur' | 'tous' */
+function waDestinataires(l, mode) {
+  if (!estMineur(l)) return [{ prenom: l.prenom, nom: l.prenom + ' ' + l.nom, role: 'Joueur·se', tel: l.tel, l, estJoueur: true }];
+  const pref = l.prefWhatsapp || 'Les deux';
+  const refs = (l.referents || []);
+  const parents = (pref === 'Référent 1' ? [refs[0]] : pref === 'Référent 2' ? [refs[1] || refs[0]] : refs).filter(Boolean)
+    .map(r => ({ prenom: r.prenom, nom: r.prenom + ' ' + r.nom, role: r.lien + ' de ' + l.prenom, tel: r.tel, l, estJoueur: false }));
+  const joueur = waDirectOk(l) ? [{ prenom: l.prenom, nom: l.prenom + ' ' + l.nom, role: 'Joueur·se mineur·e — contact direct autorisé par les parents', tel: l.telJoueur, l, estJoueur: true }] : [];
+  if (mode === 'joueur') return joueur.length ? joueur : parents.map(p => Object.assign(p, { repli: true }));
+  if (mode === 'tous') return [...joueur, ...parents];
+  return parents;
+}
+function waVarsLic(l) {
+  const restant = Math.max(0, (l.cot || 0) - (l.cotPaye || 0));
+  const j = daysUntil(l.certFin);
+  return {
+    joueur: l.prenom + ' ' + l.nom, categorie: catLabel(l.cat).split(' – ')[0],
+    montant: eur(restant), lienPaiement: 'https://paiement.exemple.fr/rcv/' + l.licence,
+    etatCertif: j < 0 ? 'a expiré le ' + dfr(l.certFin) : 'expire le ' + dfr(l.certFin),
+  };
+}
+function waVarsEvt(e) {
+  const conv = state.licencies.filter(x => e.convoques.includes(x.id));
+  return { match: evtTitre(e), date: dfr(e.date), heure: e.heure, lieu: e.lieu, categorie: catLabel(e.cat).split(' – ')[0],
+    liste: conv.map(x => x.prenom + ' ' + x.nom[0] + '.').join(', ') || '—', nbConvoques: conv.length };
+}
+function waTrace(c, modeleId) {
+  c.l.waLog = c.l.waLog || [];
+  c.l.waLog.unshift({ date: TODAY, par: state.currentUser.nom, a: c.nom, direct: c.estJoueur && estMineur(c.l), modele: state.waModeles[modeleId].nom });
+}
+
+/* Modale commune.
+   opts : { titre, modeles:[ids], licencies:[l], vars, varsLic(l)→{}, groupe:bool, onOuvert(c) } */
+function waOpen(opts) {
+  const commun = Object.assign({ club: state.params.clubNom, expediteur: (state.currentUser && state.currentUser.nom) || state.params.clubNom, lienAppli: WA_LIEN_APPLI }, opts.vars || {});
+  const lics = opts.licencies || [];
+  const mineurs = lics.filter(estMineur);
+  const nbAutorises = mineurs.filter(waDirectOk).length;
+  let mid = opts.modele || opts.modeles[0];
+  const modeKey = opts.modeKey || 'admin';
+  let mode = state.waMode[modeKey];
+  const varsPour = c => Object.assign({}, commun, c ? (opts.varsLic ? opts.varsLic(c.l) : waVarsLic(c.l)) : {}, c ? { destinataire: c.prenom } : {});
+  const cibles = () => lics.flatMap(l => waDestinataires(l, mode));
+  // pré-remplit ce qui est commun à toutes les cibles d'un même type, laisse les variables personnelles
+  const prerempli = (texte, cs) => {
+    const v = Object.assign({}, commun);
+    if (lics.length === 1) Object.assign(v, opts.varsLic ? opts.varsLic(lics[0]) : waVarsLic(lics[0]));
+    if (cs.length === 1) v.destinataire = cs[0].prenom;
+    return waFill(texte, v);
+  };
+  const corps = () => {
+    const m = state.waModeles[mid];
+    const cs = cibles();
+    const csP = cs.filter(c => !c.estJoueur), csJ = cs.filter(c => c.estJoueur);
+    const zone = (id, lab, texte, n) => `<div class="field" style="margin-top:10px"><label for="${id}">${lab}${n > 1 ? ' <span style="font-weight:400;color:var(--ink-3)">— {destinataire} et {joueur} personnalisés à chaque envoi</span>' : ''}</label>
+      <textarea id="${id}" rows="7" style="width:100%;resize:vertical">${esc(texte)}</textarea></div>`;
+    return `
+    ${opts.modeles.length > 1 ? `<div class="field"><label for="waMod">Modèle</label>
+      <select id="waMod">${opts.modeles.map(id => `<option value="${id}" ${id === mid ? 'selected' : ''}>${esc(state.waModeles[id].nom)}</option>`).join('')}</select></div>` : ''}
+    ${!opts.groupe && mineurs.length ? `<div class="field" style="margin-top:10px"><label>Envoyer à ${mineurs.length > 1 ? '(mineurs)' : ''}</label>
+      <div class="wa-seg" role="radiogroup">
+        ${[['parents', 'Parents'], ['joueur', 'Joueur'], ['tous', 'Joueur + parents']].map(([k, lab]) => `<button type="button" role="radio" aria-checked="${mode === k}" class="${mode === k ? 'on' : ''}" data-wamode="${k}" ${k !== 'parents' && !nbAutorises ? 'disabled' : ''}>${lab}</button>`).join('')}
+      </div>
+      <span class="wa-sub" style="margin-top:4px">${nbAutorises
+        ? `Contact direct autorisé par les parents pour ${nbAutorises}/${mineurs.length} mineur(s).${nbAutorises < mineurs.length && mode === 'joueur' ? ' Pour les autres, le message part aux parents.' : ''}`
+        : 'Aucune autorisation parentale de contact direct : seuls les parents peuvent être contactés.'}</span></div>` : ''}
+    ${opts.groupe
+      ? zone('waTxtP', 'Message', prerempli(m.texte, []), 0)
+      : (csP.length ? zone('waTxtP', csJ.length ? 'Message aux parents' : 'Message', prerempli(m.texte, csP), csP.length) : '')
+        + (csJ.length ? zone('waTxtJ', csP.length ? 'Message aux joueurs' : 'Message', prerempli(m.joueur || m.texte, csJ), csJ.length) : '')}
+    ${opts.groupe ? `<div class="wa-row" style="margin-top:12px">
+        <div><strong>Groupe WhatsApp de l'équipe</strong><br><span class="wa-sub">WhatsApp s'ouvre et vous choisissez le groupe (ou n'importe quel contact).</span></div>
+        <a class="btn wa-btn" id="waGo" target="_blank" rel="noopener" href="#">${WA_ICO} Choisir le groupe</a></div>`
+    : `<div class="wa-list" style="margin-top:12px">${cs.map((c, i) => { const n = waNum(c.tel); return `<div class="wa-row">
+        <div style="min-width:0"><strong>${esc(c.nom)}</strong> <span class="wa-sub">· ${esc(c.role)}${c.repli ? ' (pas d\'autorisation directe)' : ''}</span><br><span class="wa-sub">${n ? esc(c.tel) : '<span style="color:var(--critical-text)">numéro manquant ou invalide</span>'}</span></div>
+        ${n ? `<a class="btn btn-sm wa-btn" data-wago="${i}" target="_blank" rel="noopener" href="#">${WA_ICO} Ouvrir</a>` : ''}
+      </div>`; }).join('') || '<p class="empty" style="padding:4px 0">Aucun destinataire.</p>'}
+      ${cs.length > 1 ? `<p class="wa-sub" style="margin:6px 0 0">WhatsApp n'accepte qu'un destinataire par lien : un clic par personne, le message est déjà rempli.</p>` : ''}</div>`}
+    <details style="margin-top:12px"><summary class="wa-sub" style="cursor:pointer">Tester avec un vrai contact</summary>
+      <p class="wa-sub" style="margin:6px 0">Les numéros de la maquette sont fictifs. Ce bouton ouvre WhatsApp sans destinataire : vous choisissez vous-même à qui l'envoyer.</p>
+      <a class="btn btn-sm" id="waTest" target="_blank" rel="noopener" href="#">Ouvrir WhatsApp et choisir le contact</a></details>`;
+  };
+  openModal(opts.titre || 'Message WhatsApp', corps(), `<button class="btn" onclick="closeModal()">Fermer</button>`);
+  const bind = () => {
+    const rerender = () => { $('#modalRoot .modal-body').innerHTML = corps(); bind(); };
+    const sel = $('#waMod'); if (sel) sel.onchange = () => { mid = sel.value; rerender(); };
+    $$('#modalRoot [data-wamode]').forEach(b => b.onclick = () => { mode = state.waMode[modeKey] = b.dataset.wamode; rerender(); });
+    const txtP = () => ($('#waTxtP') || {}).value || '', txtJ = () => ($('#waTxtJ') || {}).value || '';
+    const final = c => waFill(c && c.estJoueur ? txtJ() : txtP(), varsPour(c));
+    const cs = cibles();
+    const lier = (a, num, c, apres) => {
+      const maj = () => { a.href = waUrl(num, final(c)); };
+      a.onmouseenter = maj; a.onfocus = maj; a.ontouchstart = maj; maj();
+      a.addEventListener('click', () => { maj(); if (apres) apres(); });
+    };
+    $$('#modalRoot [data-wago]').forEach(a => {
+      const c = cs[Number(a.dataset.wago)];
+      lier(a, waNum(c.tel), c, () => {
+        a.innerHTML = '✓ Ouvert'; a.classList.add('wa-done');
+        waTrace(c, mid);
+        if (opts.onOuvert) opts.onOuvert(c);
+      });
+    });
+    const go = $('#waGo'); if (go) lier(go, '', null, () => { if (opts.onOuvert) opts.onOuvert(null); });
+    const test = $('#waTest'); if (test) lier(test, '', cs[0] || null);
+    $$('#modalRoot textarea').forEach(t => t.addEventListener('input', () => $$('#modalRoot a[href]').forEach(a => a.dispatchEvent(new Event('mouseenter')))));
+  };
+  bind();
+}
+
+/* ---- Points d'entrée ---- */
+function waFicheLic(l) {
+  const ids = [];
+  if (daysUntil(l.certFin) < (state.params.certJours || 60)) ids.push('certificat');
+  if (l.cot && l.cotStatut !== 'payee') ids.push('relancePaiement', 'lienPaiement');
+  ids.push('libre');
+  waOpen({ titre: 'WhatsApp — ' + l.prenom + ' ' + l.nom, modeles: ids, licencies: [l],
+    onOuvert: () => toast('WhatsApp ouvert : il ne reste qu\'à appuyer sur Envoyer.') });
+}
+function waRelancePaiement(p, l) {
+  waOpen({ titre: 'Relance WhatsApp — ' + l.prenom + ' ' + l.nom, modeles: ['relancePaiement', 'lienPaiement'], licencies: [l],
+    varsLic: x => Object.assign(waVarsLic(x), { montant: eur(p.montant), lienPaiement: 'https://paiement.exemple.fr/rcv/' + p.id }),
+    onOuvert: () => { if (p.statut !== 'paye' && !p._waRelance) { p._waRelance = true; p.statut = 'relancee'; p.relances++; render(); } toast('Relance préparée dans WhatsApp — demande marquée « relancée ».'); } });
+}
+function waGroupeEvt(e) {
+  waOpen({ titre: 'Groupe WhatsApp — ' + evtTitre(e), modeles: ['convocGroupe'], vars: waVarsEvt(e), groupe: true,
+    onOuvert: () => toast('Choisissez le groupe de l\'équipe dans WhatsApp, puis Envoyer.') });
+}
+/* Sans réponse : match/tournoi = convoqués sans réponse ; entraînement = licenciés de la catégorie sans réponse */
+function waSansRepListe(e) {
+  const pool = e.type === 'entrainement' ? state.licencies.filter(x => x.cat === e.cat) : state.licencies.filter(x => e.convoques.includes(x.id));
+  return pool.filter(x => !e.reponses[x.id] || e.reponses[x.id] === '?');
+}
+function waSansReponse(e) {
+  const lics = waSansRepListe(e);
+  if (!lics.length) { toast('Tout le monde a répondu.'); return; }
+  waOpen({ titre: `Relancer ${lics.length} sans-réponse — ${evtTitre(e)}`, modeles: e.type === 'entrainement' ? ['relanceReponse'] : ['relanceReponse', 'convocMatch'],
+    licencies: lics, vars: waVarsEvt(e), modeKey: 'sport' });
+}
+
+/* ---- Paramètres → Modèles : modèles WhatsApp éditables (parents + joueur) ---- */
+const _paramModelesV9 = paramModeles;
+paramModeles = function () {
+  return _paramModelesV9() + `
+  <h3 style="margin:22px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2)">Messages WhatsApp</h3>
+  <p style="margin:0 0 10px;font-size:12.5px;color:var(--ink-2);max-width:720px">Textes pré-remplis quand vous cliquez sur WhatsApp (fiche licencié, paiements, sportif). Chaque modèle a une version pour les parents et une version adressée directement au joueur (majeur, ou mineur avec autorisation parentale).</p>
+  <div class="grid" style="grid-template-columns:1fr;max-width:720px">
+    ${Object.entries(state.waModeles).map(([id, m]) => `<div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px"><strong>${esc(m.nom)}</strong>${m.texte !== WA_MODELES_DEFAUT[id].texte || m.joueur !== WA_MODELES_DEFAUT[id].joueur ? ' <span class="badge b-info">personnalisé</span>' : ''}<br><span class="wa-sub wa-apercu">${esc(m.texte.split('\n')[0])}${m.texte.includes('\n') ? ' …' : ''}</span></div>
+      ${(!window.canW || canW('parametres')) ? `<button class="btn btn-sm" data-wamod="${id}">Modifier</button>` : ''}
+    </div>`).join('')}
+  </div>`;
+};
+function waEditModele(id) {
+  const m = state.waModeles[id];
+  openModal('Modèle WhatsApp — ' + m.nom, `
+    <div class="field"><label for="wmTxt">${m.joueur != null ? 'Message aux parents' : 'Message'}</label><textarea id="wmTxt" rows="7" style="width:100%;resize:vertical">${esc(m.texte)}</textarea></div>
+    ${m.joueur != null ? `<div class="field" style="margin-top:10px"><label for="wmTxtJ">Message direct au joueur</label><textarea id="wmTxtJ" rows="6" style="width:100%;resize:vertical">${esc(m.joueur)}</textarea></div>` : ''}
+    <p class="wa-sub" style="margin:10px 0 4px">Variables (cliquer pour insérer dans le dernier champ utilisé) :</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${Object.entries(WA_VARS).map(([k, d]) => `<button class="btn btn-sm" data-wvar="${k}" title="${esc(d)}">{${k}}</button>`).join('')}</div>`, `
+    <button class="btn" id="wmReset">Rétablir les textes d'origine</button>
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="wmOk">Enregistrer</button>`);
+  let cible = $('#wmTxt');
+  $$('#modalRoot textarea').forEach(t => t.addEventListener('focus', () => { cible = t; }));
+  $$('#modalRoot [data-wvar]').forEach(b => b.onclick = () => {
+    const ta = cible, s = ta.selectionStart, ins = '{' + b.dataset.wvar + '}';
+    ta.value = ta.value.slice(0, s) + ins + ta.value.slice(ta.selectionEnd); ta.focus(); ta.setSelectionRange(s + ins.length, s + ins.length);
+  });
+  $('#wmReset').onclick = () => { $('#wmTxt').value = WA_MODELES_DEFAUT[id].texte; if ($('#wmTxtJ')) $('#wmTxtJ').value = WA_MODELES_DEFAUT[id].joueur; };
+  $('#wmOk').onclick = () => {
+    if (!$('#wmTxt').value.trim() || ($('#wmTxtJ') && !$('#wmTxtJ').value.trim())) { toast('Un message ne peut pas être vide.'); return; }
+    m.texte = $('#wmTxt').value; if ($('#wmTxtJ')) m.joueur = $('#wmTxtJ').value;
+    toast('Modèle WhatsApp enregistré.'); closeModal(); render();
+  };
+}
+
+/* ---- Autorisation parentale : bloc réutilisable (fiche, Mon espace) ---- */
+function waDirectBloc(l, peutModifier, vueParent) {
+  if (!estMineur(l)) return '';
+  const nDirect = (l.waLog || []).filter(x => x.direct).length;
+  if (!waDirectEligible(l)) return `<div class="card"><h3>Messages WhatsApp du club à ${esc(l.prenom)}</h3>
+    <p class="wa-sub" style="margin:0">Non proposé en ${esc(catLabel(l.cat).split(' – ')[0])} : WhatsApp est interdit aux moins de 13 ans en Europe. Le club écrit uniquement aux parents. L'option s'ouvre à partir de M14.</p></div>`;
+  return `<div class="card"><h3>Messages WhatsApp du club à ${esc(l.prenom)}</h3>
+    <p style="margin:0 0 8px">${l.waDirect
+      ? `<span class="badge b-good"><span class="dot"></span>Contact direct autorisé</span> <span class="wa-sub">par ${esc(l.waDirectPar || 'le responsable légal')} le ${dfrShort(l.waDirectDate)}</span>`
+      : '<span class="badge"><span class="dot"></span>Contact direct non autorisé</span> <span class="wa-sub">le club écrit aux parents</span>'}</p>
+    <p class="wa-sub" style="margin:0 0 10px">${vueParent ? 'Si vous l\'autorisez, les éducateurs pourront écrire directement à ' + esc(l.prenom) + ' (convocations, présence). Ils pourront toujours vous écrire aussi. Révocable à tout moment.' : 'Autorisation donnée par le responsable légal (révocable). Sans elle, le choix « Joueur » est désactivé à l\'envoi.'}
+      Numéro du joueur : ${l.telJoueur ? esc(l.telJoueur) : '<em>non renseigné</em>'}${nDirect ? ` · ${nDirect} message(s) direct(s) préparé(s) par le club (traçabilité)` : ''}</p>
+    ${peutModifier ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <div class="field"><label for="waTelJ">Téléphone de ${esc(l.prenom)}</label><input id="waTelJ" value="${esc(l.telJoueur || '')}" placeholder="07 …"></div>
+      <button class="btn btn-sm" id="waDirectToggle">${l.waDirect ? 'Retirer l\'autorisation' : (vueParent ? 'J\'autorise' : 'Enregistrer l\'autorisation des parents')}</button>
+    </div>` : ''}</div>`;
+}
+function waDirectBind(l, vueParent) {
+  const b = $('#waDirectToggle');
+  if (!b) return;
+  b.onclick = () => {
+    const tel = $('#waTelJ').value.trim();
+    if (!l.waDirect && !waNum(tel)) { toast(`Renseigne d'abord le téléphone de ${l.prenom}.`); $('#waTelJ').focus(); return; }
+    l.telJoueur = tel || l.telJoueur;
+    l.waDirect = !l.waDirect;
+    l.waDirectDate = TODAY;
+    l.waDirectPar = vueParent ? state.currentUser.nom : (l.referents ? l.referents[0].prenom + ' ' + l.referents[0].nom + ' (saisi par ' + state.currentUser.nom + ')' : state.currentUser.nom);
+    toast(l.waDirect ? `Contact direct autorisé pour ${l.prenom}.` : `Autorisation retirée : le club écrira aux parents.`);
+    render();
+  };
+}
+// Onglet « Responsable légal » de la fiche
+const _ficheLicBodyV9 = ficheLicBody;
+ficheLicBody = function (l, t) {
+  const html = _ficheLicBodyV9(l, t);
+  if (t !== 'responsable') return html;
+  return html + '<div style="margin-top:12px">' + waDirectBloc(l, !window.canW || canW('licencies'), false) + '</div>';
+};
+// Mon espace (parent)
+const _viewMonEspaceV9 = viewMonEspace;
+viewMonEspace = function () {
+  const html = _viewMonEspaceV9();
+  const u = state.currentUser;
+  const enfant = u.enfantId ? state.licencies.find(x => x.id === u.enfantId) : null;
+  if (!enfant) return html;
+  return html + '<div style="margin-top:14px;max-width:760px">' + waDirectBloc(enfant, true, true) + '</div>';
+};
+
+/* ---- Carte événement : boutons Groupe + relance des sans-réponse ---- */
+const _evtCardV9 = evtCard;
+evtCard = function (e, opts = {}) {
+  let html = _evtCardV9(e, opts);
+  const ecrit = !window.canW || canW('sportif');
+  if (!ecrit || opts.compact || e.date < TODAY) return html;
+  if (e.type !== 'entrainement' && !e.convoques.length) return html;
+  const n = waSansRepListe(e).length;
+  const btns = `${e.type !== 'entrainement' ? `<button class="btn btn-sm" data-wagrp="${e.id}">${WA_ICO} Groupe</button>` : ''}${n ? `<button class="btn btn-sm" data-wasr="${e.id}">${WA_ICO} Relancer ${n} sans-réponse</button>` : ''}`;
+  return html.replace(/(<button class="btn btn-sm" data-feuille="\d+">)/, btns + '$1');
+};
+
+/* ---- Liaisons ---- */
+const _bindExtraV9 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV9(v);
+  $$('[data-wamod]', v).forEach(b => b.onclick = () => waEditModele(b.dataset.wamod));
+  $$('[data-wagrp]', v).forEach(b => b.onclick = () => { const e = state.events.find(x => x.id === Number(b.dataset.wagrp)); if (e) waGroupeEvt(e); });
+  $$('[data-wasr]', v).forEach(b => b.onclick = () => { const e = state.events.find(x => x.id === Number(b.dataset.wasr)); if (e) waSansReponse(e); });
+  const l = state.view === 'licencie' ? state.licencies.find(x => x.id === state.licFicheId) : null;
+  const fw = $('#fpWa'); if (fw && l) fw.onclick = () => waFicheLic(l);
+  if (l) waDirectBind(l, false);
+  if (state.view === 'mon-espace' && state.currentUser.enfantId) { const e2 = state.licencies.find(x => x.id === state.currentUser.enfantId); if (e2) waDirectBind(e2, true); }
+};
+render();
+</script>
+<style>
+/* WhatsApp : vert de la marque en fond, texte foncé (contraste 8,7:1 ; le blanc sur ce vert ne fait que 2:1) */
+:root { --wa: #25d366; --wa-ink: #0b1f12; --wa-hover: #1ebe5a; }
+.wa-btn { background: var(--wa); border-color: var(--wa); color: var(--wa-ink); text-decoration: none; white-space: nowrap; }
+.wa-btn:hover { background: var(--wa-hover); border-color: var(--wa-hover); }
+.wa-btn.wa-done { background: var(--surface-2); border-color: var(--line-strong); color: var(--ink-2); }
+.wa-ico { width: 15px; height: 15px; flex: none; }
+.btn:not(.wa-btn) > .wa-ico { color: var(--wa); }
+.wa-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.wa-row:last-child { border-bottom: 0; }
+.wa-sub { font-size: 12.5px; color: var(--ink-2); }
+.wa-apercu { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 520px; }
+.wa-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; flex-wrap: wrap; align-self: flex-start; }
+.wa-seg button { border: 0; background: var(--surface); color: var(--ink-2); font: 600 13px/1 system-ui, sans-serif; padding: 9px 12px; cursor: pointer; }
+.wa-seg button + button { border-left: 1px solid var(--line-strong); }
+.wa-seg button.on { background: var(--wa); color: var(--wa-ink); }
+.wa-seg button[disabled] { opacity: .45; cursor: not-allowed; }
+@media (max-width: 760px) { .wa-row { flex-wrap: wrap; } .wa-seg button { min-height: 40px; } }
+</style>
+<script>
+/* ====== V9.2 : SPORTIF — gestion des événements (modifier / annuler / supprimer) + disponibilités → sélection ====== */
+
+/* ---- Modèles WhatsApp supplémentaires ---- */
+Object.assign(WA_MODELES_DEFAUT, {
+  dispoDemande: { nom: 'Demande de disponibilités (groupe)',
+    texte: '🏉 {categorie} — {match}\n📅 {date} à {heure}\n📍 {lieu}\nQui est disponible ? Répondez dans l\'appli avant le {limite} : {lienAppli}\nLa sélection sera communiquée ensuite.' },
+  relanceDispo: { nom: 'Relance disponibilité',
+    texte: 'Bonjour {destinataire}, nous attendons la disponibilité de {joueur} pour « {match} » ({date}). Merci de répondre dans l\'appli avant le {limite} : {lienAppli}\n{expediteur}',
+    joueur: 'Salut {destinataire}, tu es dispo pour « {match} » ({date}) ? Réponds dans l\'appli avant le {limite} : {lienAppli}\n{expediteur}' },
+  modification: { nom: 'Changement d\'horaire / de lieu (groupe)',
+    texte: '⚠ Changement — {match}\nNouveau rendez-vous : {date} à {heure}\n📍 {lieu}\nMerci de vérifier vos réponses dans l\'appli : {lienAppli}' },
+  annulation: { nom: 'Annulation (groupe)',
+    texte: '❌ Annulé — {match} prévu le {date} à {heure}.\nDésolé pour le contretemps. {expediteur} — {club}' },
+});
+for (const k of ['dispoDemande', 'relanceDispo', 'modification', 'annulation']) state.waModeles[k] = JSON.parse(JSON.stringify(WA_MODELES_DEFAUT[k]));
+WA_VARS.limite = 'date limite de réponse (disponibilités)';
+
+const _waVarsEvtV92 = waVarsEvt;
+waVarsEvt = function (e) { return Object.assign(_waVarsEvtV92(e), { limite: e.dispoLimite ? dfr(e.dispoLimite) : dfr(e.date) }); };
+
+/* ---- Données : disponibilités demandées pour les événements sans convocation ---- */
+(function seedDispos() {
+  const proteges = [PERSONAS.find(p => p.id === 'joueur'), PERSONAS.find(p => p.id === 'parent')].map(p => p && (p.licId || p.enfantId)).filter(Boolean);
+  for (const e of state.events) {
+    e.dispos = e.dispos || {};
+    if (e.type === 'entrainement' || e.resultat || e.convoques.length || e.date < TODAY) continue;
+    e.dispoDemandee = true;
+    e.dispoLimite = addDaysIso(e.date, -3);
+    for (const l of state.licencies.filter(x => x.cat === e.cat)) {
+      if (proteges.includes(l.id)) continue; // laissés sans réponse pour la démo joueur / parent
+      const r = rnd();
+      if (r < 0.55) e.dispos[l.id] = 'dispo'; else if (r < 0.7) e.dispos[l.id] = 'indispo';
+    }
+  }
+})();
+const phaseDispo = e => e.type !== 'entrainement' && e.dispoDemandee && !e.convoques.length;
+const dispoCompte = e => {
+  const pool = state.licencies.filter(x => x.cat === e.cat);
+  const oui = pool.filter(x => e.dispos[x.id] === 'dispo').length, non = pool.filter(x => e.dispos[x.id] === 'indispo').length;
+  return { oui, non, sans: pool.length - oui - non, total: pool.length };
+};
+
+/* ---- Relances : en phase dispo, on relance ceux qui n'ont pas donné leur disponibilité ---- */
+const _waSansRepListeV92 = waSansRepListe;
+waSansRepListe = function (e) {
+  if (phaseDispo(e)) return state.licencies.filter(x => x.cat === e.cat && !e.dispos[x.id]);
+  return _waSansRepListeV92(e);
+};
+waSansReponse = function (e) {
+  const lics = waSansRepListe(e);
+  if (!lics.length) { toast('Tout le monde a répondu.'); return; }
+  const dispo = phaseDispo(e);
+  waOpen({ titre: `Relancer ${lics.length} sans-réponse — ${evtTitre(e)}`,
+    modeles: dispo ? ['relanceDispo'] : e.type === 'entrainement' ? ['relanceReponse'] : ['relanceReponse', 'convocMatch'],
+    licencies: lics, vars: waVarsEvt(e), modeKey: 'sport' });
+};
+waGroupeEvt = function (e, modeleId) {
+  const id = modeleId || (phaseDispo(e) ? 'dispoDemande' : 'convocGroupe');
+  waOpen({ titre: 'Groupe WhatsApp — ' + evtTitre(e), modeles: [id], vars: waVarsEvt(e), groupe: true,
+    onOuvert: () => toast('Choisissez le groupe de l\'équipe dans WhatsApp, puis Envoyer.') });
+};
+
+/* ---- Carte événement (réécrite) ---- */
+const DISPO_BADGE = { dispo: '<span class="badge b-good"><span class="dot"></span>Disponible</span>', indispo: '<span class="badge b-crit"><span class="dot"></span>Indisponible</span>' };
+evtCard = function (e, opts = {}) {
+  const [tl, tb] = EVT_TYPES[e.type];
+  const lic = monLicSportif();
+  const concerne = lic && lic.cat === e.cat;
+  const ecrit = !window.canW || canW('sportif');
+  const passe = e.date < TODAY;
+  const selec = e.type !== 'entrainement';
+  const pd = phaseDispo(e);
+  const nbP = Object.values(e.reponses).filter(r => r === 'present').length;
+  const nbA = Object.values(e.reponses).filter(r => r === 'absent').length;
+  const dc = pd ? dispoCompte(e) : null;
+  const nSR = !passe && !e.annule ? waSansRepListe(e).length : 0;
+  const ico = typeof WA_ICO !== 'undefined' ? WA_ICO : '';
+
+  let joueurHtml = '';
+  if (concerne && !passe && !opts.staffOnly) {
+    if (e.annule) joueurHtml = '';
+    else if (!selec || e.convoques.includes(lic.id)) {
+      const rep = e.reponses[lic.id] || (e.convoques.includes(lic.id) ? '?' : null);
+      joueurHtml = `<div class="evt-actions">${selec ? '<span class="badge b-info" style="align-self:center">Tu es convoqué(e)</span>' : ''}
+        <button class="btn btn-sm ${rep === 'present' ? 'rsvp-ok' : ''}" data-rsvp="present" data-evt="${e.id}">✓ Présent${rep === 'present' ? ' (confirmé)' : ''}</button>
+        <button class="btn btn-sm ${rep === 'absent' ? 'rsvp-ko' : ''}" data-rsvp="absent" data-evt="${e.id}">✕ Absent</button></div>`;
+    } else if (e.convoques.length) joueurHtml = '<p class="wa-sub" style="margin:8px 0 0">Pas convoqué(e) pour ' + (e.type === 'tournoi' ? 'ce tournoi' : 'ce match') + '.</p>';
+    else if (e.dispoDemandee) {
+      const d = e.dispos[lic.id];
+      joueurHtml = `<div class="evt-actions"><span class="wa-sub" style="align-self:center">Disponible ?${e.dispoLimite ? ' (réponse avant le ' + dfrShort(e.dispoLimite) + ')' : ''}</span>
+        <button class="btn btn-sm ${d === 'dispo' ? 'rsvp-ok' : ''}" data-dispo="dispo" data-evt="${e.id}">✓ Oui${d === 'dispo' ? ' (noté)' : ''}</button>
+        <button class="btn btn-sm ${d === 'indispo' ? 'rsvp-ko' : ''}" data-dispo="indispo" data-evt="${e.id}">✕ Non</button></div>`;
+    }
+  }
+
+  let staffHtml = '';
+  if (ecrit && !opts.compact) {
+    const B = [];
+    if (e.annule) {
+      B.push(`<button class="btn btn-sm" data-evtrestore="${e.id}">Rétablir</button>`, `<button class="btn btn-sm btn-danger" data-evtdel="${e.id}">Supprimer</button>`);
+    } else if (!passe) {
+      if (selec && !e.convoques.length && !e.dispoDemandee) {
+        B.push(`<button class="btn btn-sm btn-primary" data-dispoask="${e.id}">Demander les disponibilités</button>`, `<button class="btn btn-sm" data-convoq="${e.id}">Convoquer directement</button>`);
+      } else if (pd) {
+        B.push(`<button class="btn btn-sm btn-primary" data-convoq="${e.id}">Sélectionner (${dc.oui} dispo)</button>`, `<button class="btn btn-sm" data-wagrp="${e.id}">${ico} Groupe</button>`);
+        if (nSR) B.push(`<button class="btn btn-sm" data-wasr="${e.id}">${ico} Relancer ${nSR} sans-réponse</button>`);
+      } else if (selec) {
+        B.push(`<button class="btn btn-sm btn-primary" data-convoq="${e.id}">Modifier la sélection</button>`, `<button class="btn btn-sm" data-wagrp="${e.id}">${ico} Groupe</button>`);
+        if (nSR) B.push(`<button class="btn btn-sm" data-wasr="${e.id}">${ico} Relancer ${nSR} sans-réponse</button>`);
+        B.push(`<button class="btn btn-sm" data-feuille="${e.id}">Réponses</button>`);
+      } else {
+        if (nSR) B.push(`<button class="btn btn-sm" data-wasr="${e.id}">${ico} Relancer ${nSR} sans-réponse</button>`);
+        B.push(`<button class="btn btn-sm" data-feuille="${e.id}">Feuille de présence</button>`);
+      }
+      B.push(`<button class="btn btn-sm" data-evtedit="${e.id}">Modifier</button>`);
+    } else {
+      if (e.convoques.length || !selec) B.push(`<button class="btn btn-sm" data-feuille="${e.id}">${selec ? 'Réponses' : 'Feuille de présence'}</button>`);
+      if (selec && !e.resultat) B.push(`<button class="btn btn-sm btn-primary" data-score="${e.id}">Saisir le résultat</button>`);
+      B.push(`<button class="btn btn-sm" data-evtedit="${e.id}">Modifier</button>`);
+    }
+    staffHtml = `<div class="evt-actions">${B.join('')}</div>`;
+  }
+
+  const meta = e.convoques.length
+    ? ` · ${e.convoques.length} convoqué(s), ${nbP} présent(s)${nbA ? ', ' + nbA + ' absent(s)' : ''}`
+    : pd ? ` · Dispos : ${dc.oui} oui · ${dc.non} non · ${dc.sans} sans réponse` : '';
+  return `<div class="card evt-card${e.annule ? ' evt-annule' : ''}">
+    ${evtDateBlock(e)}
+    <div class="evt-main">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="badge ${tb}">${tl}</span>
+        <span class="badge">${esc(catLabel(e.cat).split(' – ')[0])}</span>
+        ${e.type === 'match' ? `<span class="badge">${e.domicile ? 'Domicile' : 'Extérieur'}</span>` : ''}
+        ${e.annule ? '<span class="badge b-crit"><span class="dot"></span>Annulé</span>' : ''}
+        ${pd && !e.annule && ecrit ? `<span class="badge b-warn"><span class="dot"></span>Disponibilités${e.dispoLimite ? ' jusqu\'au ' + dfrShort(e.dispoLimite) : ''}</span>` : ''}
+        ${e.modifie && !e.annule ? '<span class="badge b-info">Modifié</span>' : ''}
+      </div>
+      <div class="evt-title" style="margin-top:6px">${esc(evtTitre(e))}</div>
+      <div class="evt-meta">${e.heure} · ${esc(e.lieu)}${e.annule ? '' : meta}</div>
+      ${joueurHtml}${staffHtml}
+    </div>
+    ${e.resultat ? `<div class="evt-score" style="color:${e.resultat.nous >= e.resultat.eux ? 'var(--good-text)' : 'var(--critical-text)'}">${e.resultat.nous}–${e.resultat.eux}</div>` : ''}
+  </div>`;
+};
+
+/* ---- Demande de disponibilités ---- */
+function openDemandeDispo(e) {
+  const n = state.licencies.filter(x => x.cat === e.cat).length;
+  const defLim = addDaysIso(e.date, -3) > TODAY ? addDaysIso(e.date, -3) : e.date;
+  openModal('Demander les disponibilités — ' + evtTitre(e), `
+    <p style="margin:0 0 12px">Les <strong>${n} licencié(s)</strong> de la catégorie ${esc(catLabel(e.cat).split(' – ')[0])} reçoivent la question « Disponible ? » dans l'appli (et une notification dans la version réelle). Vous sélectionnez ensuite les joueurs parmi les disponibles.</p>
+    <div class="field" style="max-width:240px"><label for="ddLim">Réponse attendue avant le</label><input id="ddLim" type="date" value="${defLim}" max="${e.date}"></div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn" id="ddOk">Envoyer la demande</button>
+    <button class="btn wa-btn" id="ddOkWa">${WA_ICO} Envoyer + annoncer sur WhatsApp</button>`);
+  const go = wa => {
+    const lim = $('#ddLim').value;
+    if (!lim) { champErreur('ddLim', 'Indique une date limite.'); return; }
+    if (lim > e.date) { champErreur('ddLim', 'La date limite doit précéder l\'événement.'); return; }
+    e.dispoDemandee = true; e.dispoLimite = lim; e.dispos = e.dispos || {};
+    if (window.notifInvitation) notifInvitation(e);
+    closeModal(); render();
+    toast(`Demande de disponibilité notifiée à ${n} licencié(s).`);
+    if (wa) waGroupeEvt(e, 'dispoDemande');
+  };
+  $('#ddOk').onclick = () => go(false);
+  $('#ddOkWa').onclick = () => go(true);
+}
+
+/* ---- Sélection / convocation ---- */
+function openSelection(e) {
+  const rang = l => ({ dispo: 0, undefined: 1, indispo: 2 })[e.dispos[l.id]];
+  const pool = state.licencies.filter(l => l.cat === e.cat).sort((a, b) => rang(a) - rang(b) || a.nom.localeCompare(b.nom, 'fr'));
+  const avecDispo = !!e.dispoDemandee;
+  const nbDispo = pool.filter(l => e.dispos[l.id] === 'dispo').length;
+  openModal((e.convoques.length ? 'Modifier la sélection — ' : 'Sélection — ') + evtTitre(e), `
+    <p style="margin:0 0 10px;color:var(--ink-2);font-size:13px">${dfr(e.date)} à ${e.heure} · ${esc(e.lieu)}</p>
+    ${avecDispo ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <button class="btn btn-sm" id="selDispos">Cocher les ${nbDispo} disponibles</button>
+      <button class="btn btn-sm" id="selAucun">Tout décocher</button>
+      <span class="wa-sub" id="selCompte"></span></div>` : '<p class="wa-sub" style="margin:0 0 10px">Sans demande de disponibilités : vous convoquez directement, chacun confirmera sa présence. <span id="selCompte"></span></p>'}
+    <div class="sel-list">
+      ${pool.map(l => `<label class="sel-item${e.dispos[l.id] === 'indispo' ? ' sel-indispo' : ''}">
+        <input type="checkbox" data-sel="${l.id}" ${e.convoques.includes(l.id) ? 'checked' : ''}>
+        <span class="sel-nom">${esc(l.prenom + ' ' + l.nom)}</span>
+        ${avecDispo ? (DISPO_BADGE[e.dispos[l.id]] || '<span class="badge"><span class="dot"></span>Sans réponse</span>') : ''}
+      </label>`).join('')}
+    </div>
+    <p class="wa-sub" style="margin:10px 0 0">Les joueurs sélectionnés reçoivent leur convocation ; ceux déclarés disponibles sont directement comptés présents. Les non-retenus voient « Pas convoqué(e) pour ce match ».</p>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn" id="selOk">Valider la sélection</button>
+    <button class="btn wa-btn" id="selOkWa">${WA_ICO} Valider + annoncer sur WhatsApp</button>`);
+  const boxes = () => $$('#modalRoot [data-sel]');
+  const compte = () => {
+    const ids = boxes().filter(c => c.checked).map(c => Number(c.dataset.sel));
+    const indispos = ids.filter(id => e.dispos[id] === 'indispo').length;
+    const el = $('#selCompte'); if (el) el.innerHTML = `<strong>${ids.length}</strong> sélectionné(s)${indispos ? ` dont <span style="color:var(--critical-text)">${indispos} indisponible(s)</span>` : ''}`;
+  };
+  boxes().forEach(c => c.onchange = compte); compte();
+  const sd = $('#selDispos'); if (sd) sd.onclick = () => { boxes().forEach(c => { c.checked = e.dispos[Number(c.dataset.sel)] === 'dispo'; }); compte(); };
+  const sa = $('#selAucun'); if (sa) sa.onclick = () => { boxes().forEach(c => { c.checked = false; }); compte(); };
+  const valider = wa => {
+    const ids = boxes().filter(c => c.checked).map(c => Number(c.dataset.sel));
+    if (!ids.length) { toast('Sélectionne au moins un joueur.'); return; }
+    const nouveaux = ids.filter(id => !e.convoques.includes(id));
+    e.convoques = ids;
+    if (window.notifConvocation) notifConvocation(e, nouveaux);
+    for (const id of ids) if (!e.reponses[id] || e.reponses[id] === '?') e.reponses[id] = e.dispos[id] === 'dispo' ? 'present' : '?';
+    for (const k of Object.keys(e.reponses)) if (!ids.includes(Number(k))) delete e.reponses[k];
+    closeModal(); render();
+    toast(`${ids.length} joueur(s) convoqué(s)${nouveaux.length ? ' — ' + nouveaux.length + ' notification(s) envoyée(s)' : ''}.`);
+    if (wa) waGroupeEvt(e, 'convocGroupe');
+  };
+  $('#selOk').onclick = () => valider(false);
+  $('#selOkWa').onclick = () => valider(true);
+}
+
+/* ---- Modifier / annuler / supprimer ---- */
+const evtTouche = e => e.convoques.length || e.dispoDemandee || Object.keys(e.reponses).length;
+function openEditEvt(e) {
+  const passe = e.date < TODAY;
+  openModal('Modifier — ' + evtTitre(e), `
+    <div class="form-grid">
+      <div class="field"><label for="eeType">Type</label><select id="eeType">${Object.entries(EVT_TYPES).map(([k, [lab]]) => `<option value="${k}" ${e.type === k ? 'selected' : ''}>${lab}</option>`).join('')}</select></div>
+      <div class="field"><label for="eeCat">Catégorie</label><select id="eeCat">${CATS_SPORT.map(c => `<option value="${c}" ${e.cat === c ? 'selected' : ''}>${esc(catLabel(c))}</option>`).join('')}</select></div>
+      <div class="field"><label for="eeDate">Date <span class="req">*</span></label><input id="eeDate" type="date" value="${e.date}"></div>
+      <div class="field"><label for="eeHeure">Heure <span class="req">*</span></label><input id="eeHeure" type="time" value="${e.heure}"></div>
+      <div class="field" style="grid-column:1/-1"><label for="eeLieu">Lieu</label><input id="eeLieu" value="${esc(e.lieu)}"></div>
+      <div class="field"><label for="eeAdv">Adversaire / intitulé</label><input id="eeAdv" value="${esc(e.adversaire || '')}" placeholder="matchs et tournois"></div>
+      <div class="field"><label for="eeDom">Terrain</label><select id="eeDom"><option value="1" ${e.domicile !== false ? 'selected' : ''}>Domicile</option><option value="0" ${e.domicile === false ? 'selected' : ''}>Extérieur</option></select></div>
+    </div>
+    ${e.type === 'entrainement' ? '<p class="wa-sub" style="margin:10px 0 0">Modifie cette séance uniquement. Dans la version réelle : choix « cette séance / toutes les séances du créneau ».</p>' : ''}
+    ${evtTouche(e) && !passe ? '<p class="wa-sub" style="margin:10px 0 0">Des joueurs ont déjà été sollicités : si la date, l\'heure ou le lieu change, un message de changement vous sera proposé.</p>' : ''}`, `
+    <button class="btn btn-danger" id="eeDel">Supprimer</button>
+    ${!passe ? '<button class="btn" id="eeCancel">Annuler l\'événement</button>' : ''}
+    <button class="btn" onclick="closeModal()">Fermer</button>
+    <button class="btn btn-primary" id="eeOk">Enregistrer</button>`);
+  $('#eeOk').onclick = () => {
+    const v = { type: $('#eeType').value, cat: $('#eeCat').value, date: $('#eeDate').value, heure: $('#eeHeure').value, lieu: $('#eeLieu').value.trim() || e.lieu };
+    if (!v.date) { champErreur('eeDate', 'Date obligatoire'); return; }
+    if (!v.heure) { champErreur('eeHeure', 'Heure obligatoire'); return; }
+    const doublon = state.events.find(x => x !== e && !x.annule && x.cat === v.cat && x.date === v.date && x.heure === v.heure);
+    if (doublon) { champErreur('eeHeure', `Déjà pris : « ${evtTitre(doublon)} » (${catLabel(v.cat).split(' – ')[0]}) à cette date et heure.`); return; }
+    const change = v.date !== e.date || v.heure !== e.heure || v.lieu !== e.lieu;
+    const avant = { type: e.type, cat: e.cat, date: e.date, heure: e.heure, lieu: e.lieu, adversaire: e.adversaire, domicile: e.domicile };
+    if (v.cat !== e.cat && e.convoques.length) { e.convoques = []; e.reponses = {}; e.dispos = {}; }
+    Object.assign(e, v);
+    if (v.type !== 'entrainement') { e.adversaire = $('#eeAdv').value.trim() || e.adversaire || 'À définir'; e.domicile = $('#eeDom').value === '1'; }
+    if (change) e.modifie = true;
+    const nNotif = window.notifModif ? notifModif(e, avant) : 0;
+    state.events.sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+    closeModal(); render();
+    toast(nNotif ? `Événement modifié — ${nNotif} joueur(s) prévenu(s) du changement.` : 'Événement modifié.');
+    if (change && evtTouche(e) && e.date >= TODAY) waGroupeEvt(e, 'modification');
+  };
+  const c = $('#eeCancel');
+  if (c) c.onclick = () => confirmer('Annuler l\'événement ?',
+    `<p style="margin:0 0 8px"><strong>${esc(evtTitre(e))}</strong> — ${dfr(e.date)} à ${e.heure}</p>
+     <p style="margin:0;font-size:13px;color:var(--ink-2)">L'événement reste visible avec la mention « Annulé » pour que les joueurs le sachent. ${evtTouche(e) ? 'Un message d\'annulation vous sera proposé pour le groupe.' : ''}</p>`,
+    'Annuler l\'événement', () => { e.annule = true; const nN = window.notifEvt ? notifEvt(e, 'annulation') : 0; render(); toast(nN ? `Événement annulé — ${nN} joueur(s) prévenu(s).` : 'Événement annulé.'); if (evtTouche(e)) waGroupeEvt(e, 'annulation'); }, 'Retour');
+  $('#eeDel').onclick = () => confirmerSuppression(e);
+}
+function confirmerSuppression(e) {
+  const nRep = Object.keys(e.reponses).length + Object.keys(e.dispos || {}).length;
+  confirmer('Supprimer l\'événement ?',
+    `<p style="margin:0 0 8px"><strong>${esc(evtTitre(e))}</strong> — ${dfr(e.date)} à ${e.heure}</p>
+     <p style="margin:0;font-size:13px;color:var(--ink-2)">${nRep ? `<strong style="color:var(--critical-text)">${nRep} réponse(s) seront perdues.</strong> Si l'événement n'a simplement pas lieu, préférez « Annuler l'événement » : les joueurs verront l'annulation.` : 'La suppression est définitive. À réserver aux erreurs de saisie.'}</p>`,
+    'Supprimer définitivement', () => { const nN = window.notifEvt ? notifEvt(e, 'suppression') : 0; state.events = state.events.filter(x => x !== e); render(); toast(nN ? `Événement supprimé — ${nN} joueur(s) prévenu(s).` : 'Événement supprimé.'); }, 'Retour');
+}
+
+/* Changer de persona remet le filtre de catégorie à zéro (sinon le parent voit la catégorie du coach) */
+const _setPersonaV92 = setPersona;
+setPersona = function (id) { subTabs.sportCat = ''; _setPersonaV92(id); };
+
+/* ---- Liaisons ---- */
+const _bindExtraV92 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV92(v);
+  const ev = el => state.events.find(x => x.id === Number(el));
+  $$('[data-convoq]', v).forEach(b => b.onclick = () => { const e = ev(b.dataset.convoq); if (e) openSelection(e); });
+  $$('[data-dispoask]', v).forEach(b => b.onclick = () => { const e = ev(b.dataset.dispoask); if (e) openDemandeDispo(e); });
+  $$('[data-evtedit]', v).forEach(b => b.onclick = () => { const e = ev(b.dataset.evtedit); if (e) openEditEvt(e); });
+  $$('[data-evtdel]', v).forEach(b => b.onclick = () => { const e = ev(b.dataset.evtdel); if (e) confirmerSuppression(e); });
+  $$('[data-evtrestore]', v).forEach(b => b.onclick = () => { const e = ev(b.dataset.evtrestore); if (e) { e.annule = false; const nN = window.notifEvt ? notifEvt(e, 'retabli') : 0; render(); toast(nN ? `Événement rétabli — ${nN} joueur(s) prévenu(s).` : 'Événement rétabli.'); } });
+  $$('[data-dispo]', v).forEach(b => b.onclick = () => {
+    const e = ev(b.dataset.evt), lic = monLicSportif();
+    if (!e || !lic) return;
+    e.dispos[lic.id] = b.dataset.dispo;
+    render();
+    toast(b.dataset.dispo === 'dispo' ? 'Disponibilité notée — le coach fera sa sélection.' : 'Indisponibilité notée — le coach est prévenu.');
+  });
+};
+render();
+</script>
+<style>
+.evt-annule .evt-title { text-decoration: line-through; color: var(--ink-3); }
+.evt-annule .evt-date { opacity: .55; }
+.sel-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+.sel-item { display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink); }
+.sel-item:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); }
+.sel-item .sel-nom { flex: 1; min-width: 0; }
+.sel-item .badge { font-size: 12px; }
+.sel-indispo .sel-nom { color: var(--ink-2); }
+.modal-foot { flex-wrap: wrap; }
+</style>
+<script>
+/* ====== V9.3 : NOTIFICATIONS IN-APP (création / modification / annulation / suppression) + SYNCHRO AGENDA ====== */
+
+state.notifs = [];
+let _nid = 1;
+const uniq = a => [...new Set(a)];
+const catCourte = c => catLabel(c).split(' – ')[0];
+const quandEvt = e => `${dfr(e.date)} à ${e.heure}`;
+const poolCat = e => state.licencies.filter(l => l.cat === e.cat).map(l => l.id);
+
+function notifier(e, type, licIds, data = {}) {
+  const ids = uniq(licIds);
+  for (const id of ids) state.notifs.unshift(Object.assign({ id: _nid++, licId: id, date: TODAY, type, evtId: e.id, titre: evtTitre(e), quand: quandEvt(e), lieu: e.lieu, lu: false }, data));
+  e.notifies = uniq([...(e.notifies || []), ...ids]);
+  return ids.length;
+}
+/* Création / demande : toute la catégorie est invitée à répondre */
+function notifInvitation(e) {
+  return notifier(e, e.type === 'entrainement' ? 'presence' : 'dispo', poolCat(e), { limite: e.dispoLimite || null });
+}
+function notifConvocation(e, ids) { return ids.length ? notifier(e, 'convocation', ids) : 0; }
+function notifEvt(e, type) { return (e.notifies || []).length ? notifier(e, type, e.notifies) : 0; }
+/* Modification : on liste précisément ce qui change */
+function notifModif(e, avant) {
+  const ch = [];
+  if (avant.date !== e.date) ch.push(`Date : ${dfr(avant.date)} → ${dfr(e.date)}`);
+  if (avant.heure !== e.heure) ch.push(`Heure : ${avant.heure} → ${e.heure}`);
+  if (avant.lieu !== e.lieu) ch.push(`Lieu : ${avant.lieu} → ${e.lieu}`);
+  if (e.type !== 'entrainement' && (avant.adversaire || '') !== (e.adversaire || '')) ch.push(`Adversaire : ${avant.adversaire || '—'} → ${e.adversaire}`);
+  if (e.type === 'match' && avant.domicile !== e.domicile) ch.push(`Terrain : ${avant.domicile === false ? 'extérieur' : 'domicile'} → ${e.domicile ? 'domicile' : 'extérieur'}`);
+  if (avant.type !== e.type) ch.push(`Type : ${EVT_TYPES[avant.type][0]} → ${EVT_TYPES[e.type][0]}`);
+  if (avant.cat !== e.cat) ch.push(`Catégorie : ${catCourte(avant.cat)} → ${catCourte(e.cat)}`);
+  if (!ch.length) return 0;
+  const n = notifEvt(e, 'modification');
+  for (const nf of state.notifs.slice(0, n)) nf.changements = ch;
+  return n;
+}
+
+/* ---- Données de démo : notifications déjà envoyées ---- */
+(function seedNotifs() {
+  for (const e of state.events) {
+    if (e.date < TODAY) continue;
+    if (e.type !== 'entrainement' && e.dispoDemandee && !e.convoques.length) notifier(e, 'dispo', poolCat(e), { limite: e.dispoLimite, date: addDaysIso(TODAY, -2) });
+    if (e.convoques.length) notifier(e, 'convocation', e.convoques, { date: addDaysIso(TODAY, -3) });
+    if (e.type === 'entrainement') e.notifies = poolCat(e); // créneaux connus de tous, sans notification à chaque séance
+  }
+  // un changement déjà notifié, pour montrer le rendu
+  const m = state.events.find(x => x.type === 'match' && x.cat === 'SEN' && x.date >= TODAY && x.convoques.length);
+  if (m) { notifEvt(m, 'modification'); for (const nf of state.notifs.filter(x => x.type === 'modification')) { nf.changements = ['Heure : 14:30 → ' + m.heure]; nf.date = addDaysIso(TODAY, -1); } m.modifie = true; }
+  for (const nf of state.notifs) if (nf.date < addDaysIso(TODAY, -2)) nf.lu = true;
+})();
+
+/* ---- Qui lit quoi : le joueur (licId) ou le parent (enfantId) ---- */
+const monLicNotif = () => { const u = state.currentUser; return u.licId || u.enfantId || null; };
+const mesNotifs = () => { const id = monLicNotif(); return id ? state.notifs.filter(n => n.licId === id) : []; };
+const nonLues = () => mesNotifs().filter(n => !n.lu).length;
+
+const _visibleModulesV93 = visibleModules;
+visibleModules = function () {
+  const mods = _visibleModulesV93();
+  if (!monLicNotif()) return mods;
+  const n = nonLues();
+  const item = { id: 'notifs', label: 'Notifications' + (n ? ` (${n})` : ''), ico: '🔔' };
+  const i = mods.findIndex(m => m.id === 'mon-espace');
+  mods.splice(i >= 0 ? i + 1 : 0, 0, item);
+  return mods;
+};
+
+const NOTIF_TYPES = {
+  dispo: ['Nouvel événement', 'b-info'], presence: ['Entraînement', 'b-info'], convocation: ['Convocation', 'b-good'],
+  modification: ['Modifié', 'b-warn'], annulation: ['Annulé', 'b-crit'], suppression: ['Supprimé', 'b-crit'], retabli: ['Rétabli', 'b-good'],
+};
+function viewNotifs() {
+  const u = state.currentUser;
+  const lic = state.licencies.find(l => l.id === monLicNotif());
+  const pourP = ph => u.enfantId && lic ? `Pour ${esc(lic.prenom)} : ${ph.charAt(0).toLowerCase() + ph.slice(1)}` : ph;
+  const liste = mesNotifs();
+  const ligne = n => {
+    const e = state.events.find(x => x.id === n.evtId);
+    const actif = e && !e.annule && e.date >= TODAY;
+    const [lab, cls] = NOTIF_TYPES[n.type];
+    let corps = '', actions = '';
+    if (n.type === 'dispo') {
+      corps = `${n.quand} · ${esc(n.lieu)}<br>${pourP('Disponible ?')}${n.limite ? ' Réponse avant le ' + dfrShort(n.limite) + '.' : ''}`;
+      if (actif && !e.convoques.length) { const d = e.dispos[lic.id]; actions = `<button class="btn btn-sm ${d === 'dispo' ? 'rsvp-ok' : ''}" data-nrep="dispo" data-nid="${n.id}">✓ Oui</button><button class="btn btn-sm ${d === 'indispo' ? 'rsvp-ko' : ''}" data-nrep="indispo" data-nid="${n.id}">✕ Non</button>`; }
+      else if (actif) corps += `<br><em>${e.convoques.includes(lic.id) ? 'Sélection publiée : convoqué(e).' : 'Sélection publiée : pas retenu(e) cette fois.'}</em>`;
+    } else if (n.type === 'presence' || n.type === 'convocation') {
+      corps = `${n.quand} · ${esc(n.lieu)}<br>${pourP(n.type === 'convocation' ? 'Convoqué(e). Merci de confirmer la présence.' : 'Présent(e) ?')}`;
+      if (actif) { const r = e.reponses[lic.id]; actions = `<button class="btn btn-sm ${r === 'present' ? 'rsvp-ok' : ''}" data-nrep="present" data-nid="${n.id}">✓ Présent</button><button class="btn btn-sm ${r === 'absent' ? 'rsvp-ko' : ''}" data-nrep="absent" data-nid="${n.id}">✕ Absent</button>`; }
+    } else if (n.type === 'modification') {
+      corps = `<ul class="notif-ch">${(n.changements || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul>${u.enfantId ? 'Pensez à vérifier la réponse de ' + esc(lic.prenom) + '.' : 'Vérifie ta réponse si besoin.'}`;
+    } else if (n.type === 'annulation') corps = `Prévu le ${n.quand}. ${pourP('Plus besoin de venir.')}`;
+    else if (n.type === 'suppression') corps = `Prévu le ${n.quand}. Retiré du calendrier par le club.`;
+    else if (n.type === 'retabli') corps = `Finalement maintenu : ${n.quand} · ${esc(n.lieu)}.`;
+    if (e && n.type !== 'suppression') actions += `<button class="btn btn-sm" data-ngo="${n.evtId}">Voir</button>`;
+    return `<div class="card notif${n.lu ? '' : ' notif-new'}">
+      <div class="notif-head"><span class="badge ${cls}"><span class="dot"></span>${lab}</span><strong>${esc(n.titre)}</strong><span class="when">${n.lu ? '' : '<span class="notif-dot" aria-label="non lue"></span>'}${dfrShort(n.date)}</span></div>
+      <div class="notif-body">${corps}</div>
+      ${actions ? `<div class="evt-actions">${actions}</div>` : ''}
+    </div>`;
+  };
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Notifications</h1>
+    <p class="page-sub">${u.enfantId && lic ? 'Événements de ' + esc(lic.prenom + ' ' + lic.nom) : 'Mes événements'} — invitations, convocations, changements et annulations</p></div>
+  </div>
+  <div class="notif-list">${liste.length ? liste.map(ligne).join('') : '<div class="card"><p class="empty" style="padding:6px">Aucune notification.</p></div>'}</div>
+  <p style="font-size:12.5px;color:var(--ink-2);max-width:760px">Dans la version réelle : notification push sur le téléphone, et l'agenda synchronisé (Sportif → « Synchroniser mon agenda ») se met à jour tout seul.</p>`;
+}
+
+const _renderV93 = render;
+render = function () {
+  _renderV93();
+  if (state.view === 'notifs') {
+    $('#view').innerHTML = viewNotifs();
+    bindView();
+    window.scrollTo(0, 0);
+    // vues = lues (la pastille du menu disparaît au prochain affichage)
+    for (const n of mesNotifs()) n.lu = true;
+  }
+};
+
+/* ---- Création d'événement : notification immédiate aux joueurs concernés ---- */
+function openNewEvt() {
+  openModal('Nouvel événement', `
+    <div class="form-grid">
+      <div class="field"><label for="neType">Type</label><select id="neType"><option value="match">Match</option><option value="entrainement">Entraînement</option><option value="tournoi">Tournoi</option></select></div>
+      <div class="field"><label for="neCat">Catégorie</label><select id="neCat">${CATS_SPORT.map(c => `<option value="${c}">${esc(catLabel(c))}</option>`).join('')}</select></div>
+      <div class="field"><label for="neDate">Date <span class="req">*</span></label><input id="neDate" type="date" value="${addDaysIso(TODAY, 7)}" min="${TODAY}"></div>
+      <div class="field"><label for="neHeure">Heure <span class="req">*</span></label><input id="neHeure" type="time" value="15:00"></div>
+      <div class="field" style="grid-column:1/-1"><label for="neLieu">Lieu</label><input id="neLieu" value="${esc(LIEUX.dom)}"></div>
+      <div class="field ne-sel"><label for="neAdv">Adversaire / intitulé</label><input id="neAdv" placeholder="ex. RC Montclar"></div>
+      <div class="field ne-sel"><label for="neDom">Terrain</label><select id="neDom"><option value="1">Domicile</option><option value="0">Extérieur</option></select></div>
+    </div>
+    <div class="ne-notif">
+      <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:600;color:var(--ink)"><input type="checkbox" id="neAsk" checked> <span id="neAskLab"></span></label>
+      <div class="field ne-sel" style="margin-top:8px;max-width:240px"><label for="neLim">Réponse attendue avant le</label><input id="neLim" type="date"></div>
+      <p class="wa-sub" style="margin:6px 0 0" id="neAskNote"></p>
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="neOk">Créer</button>`);
+  const maj = () => {
+    const t = $('#neType').value, n = state.licencies.filter(l => l.cat === $('#neCat').value).length;
+    $$('#modalRoot .ne-sel').forEach(el => { el.hidden = t === 'entrainement'; });
+    $('#neAskLab').textContent = t === 'entrainement' ? 'Demander « Présent(e) ? » aux joueurs' : 'Demander les disponibilités dès maintenant';
+    $('#neAskNote').textContent = `${n} licencié(s) ${catCourte($('#neCat').value)} recevront une notification dans l'appli.`;
+    const d = $('#neDate').value; if (d) { $('#neLim').max = d; $('#neLim').value = addDaysIso(d, -3) > TODAY ? addDaysIso(d, -3) : d; }
+  };
+  ['neType', 'neCat', 'neDate'].forEach(id => $('#' + id).addEventListener('change', maj)); maj();
+  $('#neOk').onclick = () => {
+    const type = $('#neType').value, cat = $('#neCat').value, date = $('#neDate').value, heure = $('#neHeure').value;
+    if (!date) { champErreur('neDate', 'Date obligatoire'); return; }
+    if (date < TODAY) { champErreur('neDate', 'La date est déjà passée.'); return; }
+    if (!heure) { champErreur('neHeure', 'Heure obligatoire'); return; }
+    const doublon = state.events.find(x => !x.annule && x.cat === cat && x.date === date && x.heure === heure);
+    if (doublon) { champErreur('neHeure', `Déjà pris : « ${evtTitre(doublon)} » à cette date et heure.`); return; }
+    const e = EVT(type, cat, date, heure, $('#neLieu').value.trim() || LIEUX.dom,
+      type !== 'entrainement' ? { adversaire: $('#neAdv').value.trim() || 'À définir', domicile: $('#neDom').value === '1' } : {});
+    e.dispos = {};
+    state.events.push(e);
+    state.events.sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+    let n = 0;
+    if ($('#neAsk').checked) {
+      if (type !== 'entrainement') { e.dispoDemandee = true; e.dispoLimite = $('#neLim').value || date; }
+      n = notifInvitation(e);
+    }
+    closeModal(); render();
+    toast(n ? `Événement créé — ${n} joueur(s) notifié(s).` : 'Événement créé, sans notification.');
+  };
+}
+
+/* ---- Synchronisation agenda (abonnement iCal) ---- */
+state.calPrefs = {};
+function calPrefs() {
+  const u = state.currentUser;
+  if (!state.calPrefs[u.id]) {
+    const l = state.licencies.find(x => x.id === monLicNotif());
+    state.calPrefs[u.id] = { cats: l ? [l.cat] : (u.roleId === 'educateur' ? ['M10'] : [...CATS_SPORT]), entrainements: true, token: Math.random().toString(36).slice(2, 12) };
+  }
+  return state.calPrefs[u.id];
+}
+const icsDate = (d, h) => d.replace(/-/g, '') + 'T' + h.replace(':', '') + '00';
+function icsFlux(p) {
+  const evts = state.events.filter(e => p.cats.includes(e.cat) && (p.entrainements || e.type !== 'entrainement') && e.date >= addDaysIso(TODAY, -30));
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//Ovalie Gestion//${state.params.clubNom}//FR`, `X-WR-CALNAME:${state.params.clubNom}`, 'X-WR-TIMEZONE:Europe/Paris', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H'];
+  for (const e of evts.slice(0, 40)) {
+    const [h, m] = e.heure.split(':').map(Number);
+    const fin = String(h + (e.type === 'entrainement' ? 1 : 2)).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    L.push('BEGIN:VEVENT', `UID:evt-${e.id}@ovalie-gestion`, `SEQUENCE:${e.modifie ? 1 : 0}`, `DTSTART;TZID=Europe/Paris:${icsDate(e.date, e.heure)}`, `DTEND;TZID=Europe/Paris:${icsDate(e.date, fin)}`,
+      `SUMMARY:${e.annule ? 'ANNULÉ — ' : ''}${evtTitre(e)} (${catCourte(e.cat)})`, `LOCATION:${e.lieu}`, `STATUS:${e.annule ? 'CANCELLED' : 'CONFIRMED'}`, 'END:VEVENT');
+  }
+  L.push('END:VCALENDAR');
+  return { texte: L.join('\n'), n: evts.length };
+}
+function openCalSync() {
+  const p = calPrefs();
+  const adherent = state.currentUser.roleId === 'adherent';
+  const corps = () => {
+    const url = `https://agenda.ovalie-gestion.exemple.fr/c/${p.token}.ics`;
+    const webcal = url.replace('https://', 'webcal://');
+    const f = icsFlux(p);
+    return `
+    <p style="margin:0 0 12px">Abonnez votre agenda à <strong>votre lien personnel</strong> : les événements du club y apparaissent et se mettent à jour tout seuls (changement d'heure, annulation).</p>
+    <div class="form-grid">
+      <div class="field"><label>Catégories</label><div class="cal-cats">${(adherent ? p.cats : CATS_SPORT).map(c => `<label class="cal-cat"><input type="checkbox" data-calcat="${c}" ${p.cats.includes(c) ? 'checked' : ''} ${adherent ? 'disabled' : ''}> ${esc(catCourte(c))}</label>`).join('')}</div></div>
+      <div class="field"><label>Contenu</label><label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)"><input type="checkbox" id="calEnt" ${p.entrainements ? 'checked' : ''}> Inclure les entraînements</label>
+        <span class="wa-sub" style="margin-top:4px">${f.n} événement(s) dans le flux.</span></div>
+    </div>
+    <div class="cal-boutons">
+      <a class="btn" target="_blank" rel="noopener" href="https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}">Google Agenda</a>
+      <a class="btn" href="${webcal}">iPhone / Mac (Calendrier Apple)</a>
+      <a class="btn" target="_blank" rel="noopener" href="https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(url)}&name=${encodeURIComponent(state.params.clubNom)}">Outlook</a>
+    </div>
+    <div class="field" style="margin-top:12px"><label for="calUrl">Lien d'abonnement (à coller dans n'importe quel agenda)</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="calUrl" readonly value="${url}" style="flex:1;min-width:220px;font-family:ui-monospace,monospace;font-size:12.5px"><button class="btn btn-sm" id="calCopy">Copier</button><button class="btn btn-sm" id="calRegen">Régénérer</button></div>
+      <span class="wa-sub" style="margin-top:4px">Lien personnel : ne le partagez pas. « Régénérer » coupe l'ancien lien (téléphone perdu, lien partagé par erreur).</span></div>
+    <div class="cal-info">
+      <strong>À savoir</strong>
+      <ul>
+        <li>Synchronisation dans un seul sens : l'agenda affiche les événements du club ; répondre présent/absent se fait dans l'appli.</li>
+        <li>Délai de mise à jour fixé par l'agenda, pas par le club : Google peut mettre jusqu'à 24 h à refléter un changement. Pour un changement de dernière minute, c'est la notification de l'appli qui fait foi.</li>
+        <li>Un événement annulé reste dans l'agenda, marqué « ANNULÉ » ; un événement supprimé disparaît.</li>
+      </ul>
+    </div>
+    <details style="margin-top:10px"><summary class="wa-sub" style="cursor:pointer">Aperçu du flux iCal (pour les curieux)</summary><pre class="cal-pre">${esc(f.texte)}</pre></details>
+    <p class="wa-sub" style="margin:10px 0 0">Maquette : le lien est fictif, l'abonnement ne fonctionnera pas encore. La version réelle sert ce flux depuis le serveur du club.</p>`;
+  };
+  openModal('Synchroniser mon agenda', corps(), `<button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  const bind = () => {
+    const re = () => { $('#modalRoot .modal-body').innerHTML = corps(); bind(); };
+    $$('#modalRoot [data-calcat]').forEach(c => c.onchange = () => { p.cats = $$('#modalRoot [data-calcat]').filter(x => x.checked).map(x => x.dataset.calcat); re(); });
+    $('#calEnt').onchange = ev => { p.entrainements = ev.target.checked; re(); };
+    $('#calCopy').onclick = () => { const i = $('#calUrl'); navigator.clipboard.writeText(i.value).then(() => toast('Lien copié.'), () => { i.select(); toast('Sélectionné : copiez avec Ctrl/Cmd + C.'); }); };
+    $('#calRegen').onclick = () => confirmer('Régénérer le lien ?', '<p style="margin:0">L\'ancien lien cessera de fonctionner : les agendas abonnés ne recevront plus les mises à jour. Il faudra se réabonner avec le nouveau lien.</p>', 'Régénérer', () => { p.token = Math.random().toString(36).slice(2, 12); openCalSync(); toast('Nouveau lien généré.'); }, 'Retour');
+  };
+  bind();
+}
+const _viewSportifV93 = viewSportif;
+viewSportif = function () {
+  return _viewSportifV93().replace('<div class="tabs" role="tablist">', `<div style="margin:10px 0 0"><button class="btn btn-sm" id="btnCal">📅 Synchroniser mon agenda</button></div><div class="tabs" role="tablist">`);
+};
+
+/* ---- Liaisons ---- */
+const _bindExtraV93 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV93(v);
+  const ne = $('#btnNewEvt'); if (ne) ne.onclick = openNewEvt;
+  const bc = $('#btnCal'); if (bc) bc.onclick = openCalSync;
+  $$('[data-ngo]', v).forEach(b => b.onclick = () => { const e = state.events.find(x => x.id === Number(b.dataset.ngo)); subTabs.sportCat = e ? e.cat : ''; subTabs.sportOnglet = e && e.date < TODAY ? 'passe' : 'avenir'; state.view = 'sportif'; render(); });
+  $$('[data-nrep]', v).forEach(b => b.onclick = () => {
+    const n = state.notifs.find(x => x.id === Number(b.dataset.nid));
+    const e = n && state.events.find(x => x.id === n.evtId);
+    if (!e) return;
+    const val = b.dataset.nrep;
+    if (val === 'dispo' || val === 'indispo') e.dispos[n.licId] = val;
+    else { e.reponses[n.licId] = val; if (e.type === 'entrainement' && !e.convoques.includes(n.licId)) e.convoques.push(n.licId); }
+    toast({ dispo: 'Disponibilité notée.', indispo: 'Indisponibilité notée — le coach est prévenu.', present: 'Présence confirmée.', absent: 'Absence signalée — le coach est prévenu.' }[val]);
+    render();
+  });
+};
+render();
+</script>
+<style>
+.notif-list { display: flex; flex-direction: column; gap: 10px; max-width: 760px; margin-top: 14px; }
+.notif-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.notif-head .when { margin-left: auto; font-size: 12px; color: var(--ink-3); display: inline-flex; gap: 6px; align-items: center; }
+.notif-body { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+.notif-new { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.notif-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.notif-ch { margin: 4px 0 6px; padding-left: 18px; color: var(--ink); }
+.ne-notif { margin-top: 14px; padding: 12px; background: var(--surface-2); border-radius: 10px; }
+.cal-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-cat { display: inline-flex; gap: 6px; align-items: center; margin: 0; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; font-weight: 500; color: var(--ink); }
+.cal-boutons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.cal-boutons .btn { text-decoration: none; }
+.cal-info { margin-top: 14px; padding: 10px 14px; background: var(--surface-2); border-radius: 10px; font-size: 13px; }
+.cal-info ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); }
+.cal-pre { max-height: 220px; overflow: auto; background: var(--surface-2); border-radius: 8px; padding: 10px; font-size: 12px; margin: 8px 0 0; white-space: pre; }
+</style>
+
+<style>
+/* ---------- V10 : dimensions, packs, distribution, boutique ---------- */
+.dim-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dim-cell { border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; font-size: 12.5px; text-align: center; min-width: 54px; }
+.dim-cell .dq { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 700; font-size: 17px; display: block; }
+.dim-cell.dim-vide { color: var(--ink-3); border-style: dashed; }
+.dim-cell.dim-vide .dq { color: var(--critical-text); }
+tr.sub-taille td { border-bottom-style: dashed; color: var(--ink-2); font-size: 12.5px; padding-top: 4px; padding-bottom: 4px; }
+.pnl-pos { color: var(--good-text); font-weight: 600; }
+.pnl-neg { color: var(--critical-text); font-weight: 600; }
+.pack-item { display: flex; gap: 8px; align-items: center; padding: 5px 0; font-size: 13px; }
+.pack-item .pq { flex: none; width: 34px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cmd-contenu { font-size: 12.5px; color: var(--ink-2); }
+@media (max-width: 760px) { .m-cards tr.sub-taille { padding: 4px 12px; } }
+</style>
+<script>
+/* ================= V10 : STOCK — DIMENSIONS (TAILLES), PACKS, DISTRIBUTION EN MASSE, P&L, BOUTIQUE CLIENT & COMMANDES ================= */
+
+/* ---- Dimensions : grille de tailles par article ---- */
+const DIMS_VETEMENTS = ['8 ans', '10 ans', '12 ans', '14 ans', 'S', 'M', 'L', 'XL', 'XXL'];
+const DIMS_CHAUSSETTES = ['31-34', '35-38', '39-42', '43-46'];
+const DIMS_ADULTES = ['S', 'M', 'L', 'XL', 'XXL'];
+
+function qteDims(a) { return a.dims ? Object.values(a.dims).reduce((s, q) => s + q, 0) : a.qte; }
+function initDims(a, tailles) {
+  a.dims = {};
+  let reste = a.qte;
+  tailles.forEach((t, i) => {
+    const part = i === tailles.length - 1 ? reste : Math.min(reste, Math.max(0, Math.round(a.qte / tailles.length) + ri(-2, 2)));
+    a.dims[t] = part; reste -= part;
+  });
+  a.qte = qteDims(a);
+}
+(function seedDims() {
+  const map = [
+    ['Chaussettes club (paire)', DIMS_CHAUSSETTES],
+    ['Short club', DIMS_VETEMENTS],
+    ["Maillot d'entraînement club", DIMS_VETEMENTS],
+    ['Maillot réplique supporter', DIMS_ADULTES],
+  ];
+  for (const [nom, tailles] of map) {
+    const a = state.stock.find(x => x.nom === nom);
+    if (a) initDims(a, tailles);
+  }
+})();
+
+/* Quelle taille de l'article pour ce licencié (d'après sa fiche) */
+function dimPourLic(a, l) {
+  if (!a.dims) return null;
+  const cles = Object.keys(a.dims);
+  if (cles[0] && cles[0].includes('-')) { // pointures (chaussettes)
+    const p = l.pointure || 42;
+    return cles.find(c => { const [lo, hi] = c.split('-').map(Number); return p >= lo && p <= hi; }) || cles[cles.length - 1];
+  }
+  const souhait = /short/i.test(a.nom) ? l.tailleShort : l.tailleMaillot;
+  if (a.dims[souhait] !== undefined) return souhait;
+  // taille la plus proche dans l'échelle complète
+  const ech = TAILLES_TOUTES;
+  const i = ech.indexOf(souhait);
+  let best = cles[0], dist = 99;
+  for (const c of cles) { const d = Math.abs(ech.indexOf(c) - i); if (d < dist) { dist = d; best = c; } }
+  return best;
+}
+
+/* Sortie de stock traçée, avec taille éventuelle. Retourne false si stock insuffisant. */
+function stockRetirer(a, taille, q, motif, par) {
+  if (a.dims && taille) {
+    if ((a.dims[taille] || 0) < q) return false;
+    a.dims[taille] -= q; a.qte = qteDims(a);
+  } else {
+    if (a.qte < q) return false;
+    a.qte -= q;
+  }
+  state.mouvements.unshift({ id: Date.now() + ri(1, 9999), date: TODAY, artId: a.id, delta: -q, motif, par: par || state.currentUser.nom, taille: taille || null });
+  return true;
+}
+function stockAjouter(a, taille, q, motif, par) {
+  if (a.dims && taille) { a.dims[taille] = (a.dims[taille] || 0) + q; a.qte = qteDims(a); }
+  else a.qte += q;
+  state.mouvements.unshift({ id: Date.now() + ri(1, 9999), date: TODAY, artId: a.id, delta: q, motif, par: par || state.currentUser.nom, taille: taille || null });
+}
+
+/* ---- Pertes & bénéfices par article (saison) ---- */
+const MOTIFS_PERTE = ['Casse / perte', 'Péremption', "Correction d'inventaire"];
+function resultatArticle(a) {
+  const vts = state.ventes.filter(v => v.artId === a.id || (!v.artId && v.article === a.nom));
+  const ca = vts.reduce((s, v) => s + v.qte * v.pu, 0);
+  const coutVentes = vts.reduce((s, v) => s + v.qte * (a.prixAchat || 0), 0);
+  const dots = state.dotationsLog.filter(d => d.artId === a.id || (!d.artId && d.article === a.nom));
+  const coutDot = dots.reduce((s, d) => s + d.qte * (a.prixAchat || 0), 0);
+  const pertes = state.mouvements.filter(m => m.artId === a.id && m.delta < 0 && MOTIFS_PERTE.includes(m.motif))
+    .reduce((s, m) => s + (-m.delta) * (a.prixAchat || 0), 0);
+  const marge = ca - coutVentes;
+  return { ca, marge, coutDot, pertes, res: marge - coutDot - pertes, nbVentes: vts.reduce((s, v) => s + v.qte, 0), nbDot: dots.reduce((s, d) => s + d.qte, 0) };
+}
+const pnlCell = a => {
+  const r = resultatArticle(a);
+  if (!r.ca && !r.coutDot && !r.pertes) return '<span style="color:var(--ink-3)">—</span>';
+  return `<span class="${r.res >= 0 ? 'pnl-pos' : 'pnl-neg'}" title="Ventes : ${eur(r.ca)} (marge ${eur(r.marge)}) · Dotations : −${eur(r.coutDot)} · Pertes : −${eur(r.pertes)}">${r.res >= 0 ? '+' : ''}${eur(Math.round(r.res * 100) / 100)}</span>`;
+};
+
+/* ---- Packs ---- */
+state.packs = [];
+(function seedPacks() {
+  const art = nom => state.stock.find(x => x.nom === nom);
+  const P = (nom, usage, items, prixVente) => {
+    const its = items.map(([n, q]) => ({ artId: art(n) ? art(n).id : null, qte: q })).filter(x => x.artId);
+    state.packs.push({ id: state.packs.length + 1, nom, usage, items: its, prixVente: prixVente || null });
+  };
+  P('Pack rentrée école de rugby', 'dotation', [["Maillot d'entraînement club", 1], ['Short club', 1], ['Chaussettes club (paire)', 1]]);
+  P('Pack joueur senior', 'dotation', [["Maillot d'entraînement club", 1], ['Short club', 1], ['Chaussettes club (paire)', 2]]);
+  P('Pack supporter', 'vente', [['Maillot réplique supporter', 1], ['Écharpe du club', 1]], 55);
+})();
+const packArt = it => state.stock.find(x => x.id === it.artId);
+const packServables = p => Math.min(...p.items.map(it => { const a = packArt(it); return a ? Math.floor(a.qte / it.qte) : 0; }));
+const packPrixAchat = p => p.items.reduce((s, it) => { const a = packArt(it); return s + (a ? a.prixAchat * it.qte : 0); }, 0);
+const packPrixVenteRef = p => p.items.reduce((s, it) => { const a = packArt(it); return s + (a && a.prixVente ? a.prixVente * it.qte : 0); }, 0);
+
+/* ---- Historique : dotations/ventes de seed reliées aux articles (pour le P&L) + tailles ---- */
+(function relierHistorique() {
+  for (const v of state.ventes) if (!v.artId) { const a = state.stock.find(x => x.nom === v.article); if (a) v.artId = a.id; }
+  for (const d of state.dotationsLog) if (!d.artId) { const a = state.stock.find(x => x.nom === d.article); if (a) { d.artId = a.id; const l = state.licencies.find(x => x.id === d.licId); if (l && a.dims) d.taille = dimPourLic(a, l); } }
+})();
+
+/* ---- Commandes boutique ---- */
+state.commandes = [];
+(function seedCommandes() {
+  const mr = state.stock.find(x => x.nom === 'Maillot réplique supporter');
+  const bo = state.stock.find(x => x.nom === 'Bonnet du club');
+  const l1 = state.licencies.find(x => x.cat === 'M12');
+  if (mr) {
+    state.commandes.push({ id: 1, client: l1 ? null : 'Famille Robin', licId: l1 ? l1.id : null, tel: '', email: '',
+      items: [{ artId: mr.id, qte: 1, taille: 'L' }], date: addDaysIso(TODAY, -4), statut: 'commandee', total: mr.prixVente });
+    stockRetirer(mr, 'L', 1, 'Commande boutique (réservation)', 'S. Vialar');
+  }
+  if (bo) {
+    state.commandes.push({ id: 2, client: 'M. Keller (supporter)', licId: null, tel: '06 44 51 20 98', email: '',
+      items: [{ artId: bo.id, qte: 2, taille: null }], date: addDaysIso(TODAY, -7), statut: 'prete', total: 2 * bo.prixVente });
+    stockRetirer(bo, null, 2, 'Commande boutique (réservation)', 'S. Vialar');
+  }
+})();
+const cmdClientNom = c => c.licId ? (state.licencies.find(l => l.id === c.licId) || {}).prenom + ' ' + (state.licencies.find(l => l.id === c.licId) || {}).nom : c.client;
+const cmdContenu = c => c.items.map(it => { const a = packArt(it); return `${it.qte} × ${a ? a.nom : '—'}${it.taille ? ' (' + it.taille + ')' : ''}`; }).join(', ');
+const CMD_BADGE = { commandee: '<span class="badge b-info"><span class="dot"></span>Commandée</span>', prete: '<span class="badge b-warn"><span class="dot"></span>Prête — client à prévenir</span>', notifiee: '<span class="badge b-warn"><span class="dot"></span>Prête — client prévenu</span>', retiree: '<span class="badge b-good"><span class="dot"></span>Retirée & payée</span>', annulee: '<span class="badge"><span class="dot"></span>Annulée</span>' };
+
+/* ---- Les 4 onglets du module ---- */
+stockSectionTabs = function (active) {
+  const nbCmd = state.commandes.filter(c => ['commandee', 'prete', 'notifiee'].includes(c.statut)).length;
+  const tabs = [['inv', 'Inventaire'], ['packs', '🎽 Dotations & packs'], ['distribution', '📦 Distribution'], ['boutique', `🛒 Boutique${nbCmd ? ' (' + nbCmd + ')' : ''}`]];
+  return `<div class="tabs" role="tablist">${tabs.map(([k, lab]) => `<button role="tab" aria-selected="${active === k}" class="${active === k ? 'active' : ''}" data-stocksec="${k}">${lab}</button>`).join('')}</div>`;
+};
+
+const _viewStockV93 = viewStock;
+viewStock = function () {
+  if (subTabs.stockSection === 'dotations') subTabs.stockSection = 'distribution';
+  if (subTabs.stockSection === 'packs') return viewPacks();
+  if (subTabs.stockSection === 'distribution') return viewDistribution();
+  if (subTabs.stockSection === 'boutique') return viewBoutique();
+  return viewInventaire();
+};
+
+/* ---- Onglet 1 : Inventaire (avec et sans dimension, P&L par article) ---- */
+function viewInventaire() {
+  const f = state.filtres.stock;
+  const pole = ['boutique', 'dotations', 'distribution', 'packs'].includes(subTabs.stockPole) ? 'tous' : subTabs.stockPole;
+  let rows = pole === 'tous' ? state.stock : state.stock.filter(a => a.pole === pole);
+  if (f.alerte) rows = rows.filter(a => a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= state.params.peremptionJours));
+  rows = window.trierStock ? trierStock(rows) : rows;
+  const { sousSeuil, perimes } = alertesStock();
+  const poleLabel = c => (POLES.find(p => p.code === c) || { label: c }).label;
+  const nbAlertes = c => state.stock.filter(a => a.pole === c && (a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= state.params.peremptionJours))).length;
+  const gauge = a => {
+    const ratio = a.seuil ? a.qte / (a.seuil * 2) : 1;
+    const cls = a.qte <= a.seuil ? 'low' : a.qte <= a.seuil * 1.4 ? 'mid' : '';
+    return `<div class="gauge ${cls}" role="img" title="${a.qte} ${a.unite} en stock — seuil d'alerte à ${a.seuil}" aria-label="${a.qte} ${a.unite} pour un seuil de ${a.seuil}"><i style="width:${Math.min(100, ratio * 100).toFixed(0)}%"></i></div>`;
+  };
+  const peremp = a => {
+    if (!a.peremption) return '<span style="color:var(--ink-3)">—</span>';
+    const d = daysUntil(a.peremption);
+    if (d < 0) return `<span class="badge b-crit"><span class="dot"></span>Périmé (${dfrShort(a.peremption)})</span>`;
+    if (d <= state.params.peremptionJours) return `<span class="badge b-warn"><span class="dot"></span>${dfrShort(a.peremption)} (${d} j)</span>`;
+    return `<span style="color:var(--ink-2)">${dfrShort(a.peremption)}</span>`;
+  };
+  const sousLignes = a => !f.dims || !a.dims ? '' : Object.entries(a.dims).map(([t, q]) => `<tr class="sub-taille">
+    <td style="padding-left:26px">↳ ${esc(t)}</td>${pole === 'tous' ? '<td></td>' : ''}
+    <td class="num">${q} <span style="font-weight:400">${esc(a.unite)}</span>${q === 0 ? ' <span class="badge b-crit" style="margin-left:4px"><span class="dot"></span>Épuisé</span>' : ''}</td>
+    <td></td><td></td><td></td><td></td><td></td>
+  </tr>`).join('');
+  const nbAl = sousSeuil.length + perimes.length;
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Stock</h1>
+    <p class="page-sub">${state.stock.length} références sur ${POLES.length} pôles · ${sousSeuil.length} sous seuil, ${perimes.length} péremption(s) à surveiller</p></div>
+    <div class="head-actions">
+      ${nbAl && window.openAlertesStock ? `<button class="btn" id="btnAlertesStock">📣 Signaler les alertes (${nbAl})</button>` : ''}
+      <button class="btn" id="btnExportStock">Exporter (CSV)</button>
+      <button class="btn" id="btnHistoStock">Historique des mouvements</button>
+      <button class="btn btn-primary" id="btnNewArt">+ Nouvel article</button>
+    </div>
+  </div>
+  ${stockSectionTabs('inv')}
+  <div class="filtres-chips">
+    <button class="${pole === 'tous' ? 'on' : ''}" data-pole="tous">Tous les pôles</button>
+    ${POLES.map(p => { const n = p.label.replace('Pôle ', ''); return `<button class="${pole === p.code ? 'on' : ''}" data-pole="${p.code}">${n[0].toUpperCase() + n.slice(1)}${nbAlertes(p.code) ? ` · ⚠ ${nbAlertes(p.code)}` : ''}</button>`; }).join('')}
+  </div>
+  <div class="toolbar">
+    <label style="display:flex;align-items:center;gap:7px;margin:0;font-size:13px;font-weight:500;color:var(--ink)">
+      <input type="checkbox" id="stAlerte" ${f.alerte ? 'checked' : ''}> Uniquement les alertes</label>
+    <label style="display:flex;align-items:center;gap:7px;margin:0;font-size:13px;font-weight:500;color:var(--ink)">
+      <input type="checkbox" id="stDims" ${f.dims ? 'checked' : ''}> Détail par taille</label>
+    <span class="count-note">${rows.length} référence(s)</span>
+  </div>
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap m-cards"><table>
+      <thead><tr><th class="th-tri" data-tri="stock:nom">Article${triFleche('stock', 'nom')}</th>${pole === 'tous' ? '<th>Pôle</th>' : ''}<th class="num th-tri" data-tri="stock:qte">Quantité${triFleche('stock', 'qte')}</th><th>Niveau</th><th class="num">Seuil</th><th class="th-tri" data-tri="stock:peremption">Péremption${triFleche('stock', 'peremption')}</th><th class="num">Pertes & bénéfices</th><th>Emplacement</th></tr></thead>
+      <tbody>${rows.length ? rows.map(a => `<tr class="rowlink" data-artfiche="${a.id}" tabindex="0">
+        <td><strong>${esc(a.nom)}</strong>${a.dims ? ` <span class="badge" style="margin-left:4px">${Object.keys(a.dims).length} tailles</span>` : ''}${a.qte <= a.seuil ? ' <span class="badge b-crit" style="margin-left:4px"><span class="dot"></span>Sous seuil</span>' : ''}</td>
+        ${pole === 'tous' ? `<td><span class="badge">${esc(poleLabel(a.pole))}</span></td>` : ''}
+        <td class="num" data-label="Quantité" style="font-weight:600">${a.qte} <span style="color:var(--ink-3);font-weight:400">${esc(a.unite)}</span></td>
+        <td>${gauge(a)}</td>
+        <td class="num" data-label="Seuil" style="color:var(--ink-3)">${a.seuil}</td>
+        <td data-label="Péremption">${peremp(a)}</td>
+        <td class="num" data-label="P&L">${pnlCell(a)}</td>
+        <td style="color:var(--ink-2)">${esc(a.empl)}</td>
+      </tr>${sousLignes(a)}`).join('') : '<tr><td colspan="8" class="empty">Aucun article dans ce pôle.</td></tr>'}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">« Pertes & bénéfices » par article sur la saison : marge des ventes boutique − coût des dotations distribuées − pertes (casse, péremption, corrections d'inventaire négatives), valorisées au prix d'achat. Survole le montant pour le détail, ou ouvre la fiche de l'article.</p>`;
+}
+
+/* ---- Mouvement entrée/sortie : taille + motif Péremption ---- */
+openMouvement = function (artId, sens) {
+  const a = state.stock.find(x => x.id === artId);
+  if (!a) return;
+  openModal(`${sens === '+' ? 'Entrée' : 'Sortie'} — ${a.nom}`, `
+    <p style="margin:0 0 12px;color:var(--ink-2)">Stock actuel : <strong style="color:var(--ink)">${a.qte} ${esc(a.unite)}</strong>${a.dims ? ' (' + Object.entries(a.dims).map(([t, q]) => t + ' : ' + q).join(' · ') + ')' : ''} · seuil d'alerte : ${a.seuil}</p>
+    <div class="form-grid">
+      ${a.dims ? `<div class="field"><label for="mvTaille">Taille</label><select id="mvTaille">${Object.keys(a.dims).map(t => `<option>${esc(t)}</option>`).join('')}</select></div>` : ''}
+      <div class="field"><label for="mvQte">Quantité</label><input id="mvQte" type="number" min="1" value="1"></div>
+      <div class="field"><label for="mvMotif">Motif</label><select id="mvMotif">
+        ${(sens === '+' ? ['Réassort', 'Achat', 'Don partenaire', 'Retour matériel', "Correction d'inventaire"]
+          : ['Sortie match', 'Sortie entraînement', 'Usage infirmerie', 'Vente buvette', 'Casse / perte', 'Péremption', "Correction d'inventaire"]).map(m => `<option>${m}</option>`).join('')}</select></div>
+      <div class="field"><label for="mvQui">Par</label><input id="mvQui" value="${esc(state.currentUser.nom)}"></div>
+    </div>
+    ${sens === '-' ? '<p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">Les sorties « Casse / perte », « Péremption » et les corrections négatives comptent dans les pertes de l\'article (colonne Pertes & bénéfices).</p>' : ''}`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="mvSave">Enregistrer le mouvement</button>`);
+  $('#mvSave').onclick = () => {
+    const q = Math.max(1, Number($('#mvQte').value) || 1);
+    const taille = a.dims ? $('#mvTaille').value : null;
+    const par = $('#mvQui').value.trim() || '—';
+    if (sens === '+') stockAjouter(a, taille, q, $('#mvMotif').value, par);
+    else if (!stockRetirer(a, taille, q, $('#mvMotif').value, par)) { champErreur('mvQte', `Stock insuffisant${taille ? ' en ' + taille : ''} (${taille ? a.dims[taille] : a.qte} restant).`); return; }
+    toast(`${sens === '+' ? '+' : '−'}${q} ${a.unite}${taille ? ' (' + taille + ')' : ''} — ${a.nom} : ${a.qte} ${a.unite} en stock.` + (a.qte <= a.seuil ? ' ⚠ Sous le seuil.' : ''));
+    closeModal(); render();
+  };
+};
+
+/* ---- Fiche article : grille de tailles + bloc P&L ---- */
+const _openFicheArticleV83 = openFicheArticle;
+openFicheArticle = function (id) {
+  _openFicheArticleV83(id);
+  const a = state.stock.find(x => x.id === id);
+  const body = $('#modalRoot .modal-body');
+  if (!a || !body) return;
+  const r = resultatArticle(a);
+  let html = '';
+  if (a.dims) html += `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:14px 0 2px">Stock par taille</h3>
+    <div class="dim-grid">${Object.entries(a.dims).map(([t, q]) => `<div class="dim-cell${q === 0 ? ' dim-vide' : ''}"><span class="dq">${q}</span>${esc(t)}</div>`).join('')}</div>`;
+  html += `<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:14px 0 8px">Pertes & bénéfices (saison)</h3>
+    <div class="stat-tiles">
+      <div class="stat-tile"><div class="v" style="font-size:20px">${eur(r.ca)}</div><div class="l">Ventes (${r.nbVentes})</div></div>
+      <div class="stat-tile"><div class="v" style="font-size:20px;color:${r.marge >= 0 ? 'var(--good-text)' : 'var(--critical-text)'}">${eur(Math.round(r.marge * 100) / 100)}</div><div class="l">Marge ventes</div></div>
+      <div class="stat-tile"><div class="v" style="font-size:20px">−${eur(r.coutDot)}</div><div class="l">Dotations (${r.nbDot})</div></div>
+      <div class="stat-tile"><div class="v" style="font-size:20px;color:${r.pertes ? 'var(--critical-text)' : 'inherit'}">−${eur(r.pertes)}</div><div class="l">Pertes</div></div>
+      <div class="stat-tile"><div class="v" style="font-size:20px;color:${r.res >= 0 ? 'var(--good-text)' : 'var(--critical-text)'}">${r.res >= 0 ? '+' : ''}${eur(Math.round(r.res * 100) / 100)}</div><div class="l">Résultat</div></div>
+    </div>`;
+  body.insertAdjacentHTML('beforeend', html);
+};
+
+/* ---- Onglet 2 : Dotations & packs (création) ---- */
+function viewPacks() {
+  const artsDot = state.stock.filter(a => a.dotation);
+  const ecrit = !window.canW || canW('stock');
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Stock</h1>
+    <p class="page-sub">Dotations & packs — définir ce que le club remet aux joueurs ou vend en lot</p></div>
+    <div class="head-actions">${ecrit ? '<button class="btn btn-primary" id="btnNewPack">+ Nouveau pack</button>' : ''}</div>
+  </div>
+  ${stockSectionTabs('packs')}
+  <div class="grid two-col" style="margin-top:14px">
+    <div class="card" style="padding:4px 8px">
+      <div style="padding:10px 8px 0"><h3 style="margin:0 0 6px">Articles de dotation</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Article</th><th class="num">Stock</th><th>Tailles</th><th class="num">Prix d'achat</th></tr></thead>
+        <tbody>${artsDot.map(a => `<tr class="rowlink" data-artfiche="${a.id}" tabindex="0">
+          <td><strong>${esc(a.nom)}</strong></td>
+          <td class="num" style="font-weight:600">${a.qte}</td>
+          <td style="font-size:12.5px;color:var(--ink-2)">${a.dims ? Object.entries(a.dims).map(([t, q]) => `${t} : ${q}`).join(' · ') : '—'}</td>
+          <td class="num">${eur(a.prixAchat)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <p style="font-size:12px;color:var(--ink-3);padding:8px">Un article devient « de dotation » via sa fiche → Modifier l'article → case « Article de dotation joueurs ».</p>
+    </div>
+    <div>
+      ${state.packs.map(p => `<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <strong style="flex:1;min-width:140px">${esc(p.nom)}</strong>
+          <span class="badge ${p.usage === 'vente' ? 'b-info' : 'b-good'}">${p.usage === 'vente' ? 'Vendu en boutique' : 'Dotation'}</span>
+          ${ecrit ? `<button class="btn btn-sm" data-packedit="${p.id}">Modifier</button>` : ''}
+        </div>
+        ${p.items.map(it => { const a = packArt(it); return `<div class="pack-item"><span class="pq">${it.qte} ×</span><span style="flex:1;min-width:0">${a ? esc(a.nom) : '—'}</span><span style="color:var(--ink-3);font-size:12px">${a ? a.qte + ' en stock' : ''}</span></div>`; }).join('')}
+        <p style="font-size:12.5px;color:var(--ink-2);margin:8px 0 0">
+          ${packServables(p)} pack(s) servables · coût ${eur(packPrixAchat(p))}${p.usage === 'vente' ? ` · prix de vente <strong>${eur(p.prixVente || packPrixVenteRef(p))}</strong>` : ''}
+          ${p.usage === 'dotation' ? ` · <button class="btn btn-sm btn-primary" data-packdist="${p.id}">Distribuer</button>` : ''}
+        </p>
+      </div>`).join('')}
+      <p style="font-size:12.5px;color:var(--ink-2)">Les tailles ne bloquent pas la création du pack : elles sont résolues joueur par joueur à la distribution (d'après les fiches) ou choisies à la vente.</p>
+    </div>
+  </div>`;
+}
+
+function openFormPack(id) {
+  const p = id ? state.packs.find(x => x.id === id) : null;
+  const arts = state.stock.filter(a => a.dotation || a.vente);
+  let items = p ? p.items.map(it => ({ ...it })) : [{ artId: arts[0] ? arts[0].id : null, qte: 1 }];
+  const corps = () => `
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1"><label for="pkNom">Nom du pack <span class="req">*</span></label><input id="pkNom" value="${p ? esc(p.nom) : ''}" placeholder="ex. Pack rentrée M14"></div>
+      <div class="field"><label for="pkUsage">Usage</label><select id="pkUsage"><option value="dotation" ${!p || p.usage === 'dotation' ? 'selected' : ''}>Dotation joueurs</option><option value="vente" ${p && p.usage === 'vente' ? 'selected' : ''}>Vendu en boutique</option></select></div>
+      <div class="field"><label for="pkPV">Prix de vente du pack (€) — si vendu</label><input id="pkPV" type="number" min="0" step="0.5" value="${p && p.prixVente ? p.prixVente : ''}" placeholder="${p ? eur(packPrixVenteRef(p)) : 'somme des articles par défaut'}"></div>
+    </div>
+    <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:14px 0 8px">Composition</h3>
+    <div id="pkItems">${items.map((it, i) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <select data-pkart="${i}" style="flex:1">${arts.map(a => `<option value="${a.id}" ${it.artId === a.id ? 'selected' : ''}>${esc(a.nom)}</option>`).join('')}</select>
+      <input data-pkqte="${i}" type="number" min="1" value="${it.qte}" style="width:70px" aria-label="Quantité">
+      ${items.length > 1 ? `<button class="x-btn" data-pkdel="${i}" title="Retirer">✕</button>` : ''}
+    </div>`).join('')}</div>
+    <button class="btn btn-sm" id="pkAdd">+ Ajouter un article</button>`;
+  openModal(p ? 'Modifier le pack' : 'Nouveau pack', corps(), `
+    ${p ? '<button class="btn btn-danger" id="pkSuppr">Supprimer le pack</button>' : ''}
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="pkOk">${p ? 'Enregistrer' : 'Créer le pack'}</button>`);
+  const lire = () => { items = items.map((it, i) => ({ artId: Number($(`[data-pkart="${i}"]`).value), qte: Math.max(1, Number($(`[data-pkqte="${i}"]`).value) || 1) })); };
+  const rerender = () => { // conserve ce qui est déjà saisi (nom, usage, prix)
+    const garde = { nom: $('#pkNom').value, usage: $('#pkUsage').value, pv: $('#pkPV').value };
+    $('#modalRoot .modal-body').innerHTML = corps();
+    $('#pkNom').value = garde.nom; $('#pkUsage').value = garde.usage; $('#pkPV').value = garde.pv;
+    bind();
+  };
+  const bind = () => {
+    $('#pkAdd').onclick = () => { lire(); items.push({ artId: arts[0].id, qte: 1 }); rerender(); };
+    $$('#modalRoot [data-pkdel]').forEach(b => b.onclick = () => { lire(); items.splice(Number(b.dataset.pkdel), 1); rerender(); });
+  };
+  bind();
+  $('#pkOk').onclick = () => {
+    const nom = $('#pkNom').value.trim();
+    if (!nom) { champErreur('pkNom', 'Donne un nom au pack.'); return; }
+    lire();
+    const pv = $('#pkPV').value === '' ? null : Math.max(0, Number($('#pkPV').value) || 0);
+    if (p) { Object.assign(p, { nom, usage: $('#pkUsage').value, prixVente: pv, items }); toast(`Pack « ${nom} » mis à jour.`); }
+    else { state.packs.push({ id: Date.now(), nom, usage: $('#pkUsage').value, prixVente: pv, items }); toast(`Pack « ${nom} » créé.`); }
+    closeModal(); render();
+  };
+  const del = $('#pkSuppr');
+  if (del) del.onclick = () => confirmer('Supprimer ce pack ?', `<p style="margin:0">Le pack « <strong>${esc(p.nom)}</strong> » sera retiré. Les dotations et ventes déjà faites ne changent pas.</p>`, 'Supprimer', () => { state.packs = state.packs.filter(x => x.id !== p.id); toast('Pack supprimé.'); render(); });
+}
+
+/* ---- Onglet 3 : Distribution (individuelle + en masse) ---- */
+subTabs.distCat = '';
+function viewDistribution() {
+  const nomLic = id => { const l = state.licencies.find(x => x.id === id); return l ? l.prenom + ' ' + l.nom : '—'; };
+  const catDe = id => { const l = state.licencies.find(x => x.id === id); return l ? l.cat : null; };
+  const f = subTabs.distCat;
+  const rows = f ? state.dotationsLog.filter(d => catDe(d.licId) === f) : state.dotationsLog;
+  const cout = state.dotationsLog.reduce((s, d) => { const a = packArt(d); return s + d.qte * (a ? a.prixAchat : 0); }, 0);
+  const servis = new Set(state.dotationsLog.map(d => d.licId)).size;
+  const ecrit = !window.canW || canW('stock');
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Stock</h1>
+    <p class="page-sub">Distribution des dotations — en masse (pack × catégorie) ou joueur par joueur</p></div>
+    <div class="head-actions">${ecrit ? `
+      <button class="btn" id="btnNewDot">+ Dotation individuelle</button>
+      <button class="btn btn-primary" id="btnDistMasse">📦 Distribuer en masse</button>` : ''}</div>
+  </div>
+  ${stockSectionTabs('distribution')}
+  <div class="grid kpis" style="margin-top:14px">
+    <div class="card"><h3>Articles distribués</h3><div class="kpi-value">${state.dotationsLog.reduce((s, d) => s + d.qte, 0)}</div>
+      <div class="kpi-note">sur la saison 2026-2027</div></div>
+    <div class="card"><h3>Joueurs servis</h3><div class="kpi-value">${servis}</div>
+      <div class="kpi-note">sur ${state.licencies.length} licenciés</div></div>
+    <div class="card"><h3>Coût des dotations</h3><div class="kpi-value">${eur(Math.round(cout))}</div>
+      <div class="kpi-note">valorisé au prix d'achat — repris dans « Pertes & bénéfices »</div></div>
+  </div>
+  <div class="toolbar">
+    <select id="distCat" aria-label="Filtrer par catégorie">
+      <option value="">Catégorie : toutes</option>
+      ${CATEGORIES.map(c => `<option value="${c.code}" ${f === c.code ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}
+    </select>
+    <span class="count-note">${rows.length} ligne(s)</span>
+  </div>
+  <div class="card" style="padding:4px 8px">
+    <div class="table-wrap m-cards"><table>
+      <thead><tr><th>Joueur</th><th>Article</th><th class="num">Qté</th><th>Taille</th><th>Date</th><th>Remis par</th></tr></thead>
+      <tbody>${rows.length ? rows.map(d => `<tr>
+        <td><strong>${esc(nomLic(d.licId))}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(catLabel(catDe(d.licId) || '') || '')}</span></td>
+        <td data-label="Article">🎽 ${esc(d.article)}</td>
+        <td class="num" data-label="Qté">${d.qte}</td>
+        <td data-label="Taille">${d.taille ? `<span class="badge">${esc(d.taille)}</span>` : '—'}</td>
+        <td style="white-space:nowrap" data-label="Date">${dfrShort(d.date)}</td>
+        <td style="color:var(--ink-2)" data-label="Par">${esc(d.par)}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty">Aucune dotation dans ce filtre.</td></tr>'}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Chaque ligne apparaît aussi dans l'onglet « Dotation » de la fiche du joueur. La distribution en masse sert la taille de chaque joueur d'après sa fiche et s'arrête proprement sur les ruptures : rien ne part en aveugle.</p>`;
+}
+
+function openDistributionMasse(packId) {
+  const choix = [...state.packs.filter(p => p.usage !== 'vente').map(p => ({ id: 'p' + p.id, nom: p.nom + ' (pack)' })),
+    ...state.stock.filter(a => a.dotation).map(a => ({ id: 'a' + a.id, nom: a.nom }))];
+  openModal('Distribuer en masse', `
+    <div class="form-grid">
+      <div class="field"><label for="dmQuoi">Quoi</label><select id="dmQuoi">${choix.map(c => `<option value="${c.id}" ${packId && c.id === 'p' + packId ? 'selected' : ''}>${esc(c.nom)}</option>`).join('')}</select></div>
+      <div class="field"><label for="dmCible">À qui</label><select id="dmCible">
+        <option value="">Tout le club (hors dirigeants)</option>
+        ${CATEGORIES.filter(c => c.code !== 'DIR').map(c => `<option value="${c.code}">${esc(c.label)}</option>`).join('')}</select></div>
+    </div>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:12px 0 0">Étape suivante : écran de contrôle joueur par joueur (taille servie, ruptures, déjà dotés) avant toute sortie de stock.</p>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="dmNext">Contrôler la distribution →</button>`);
+  $('#dmNext').onclick = () => {
+    const quoi = $('#dmQuoi').value, cible = $('#dmCible').value;
+    const items = quoi[0] === 'p' ? state.packs.find(p => p.id === Number(quoi.slice(1))).items : [{ artId: Number(quoi.slice(1)), qte: 1 }];
+    const nomQuoi = choix.find(c => c.id === quoi).nom;
+    ouvrirControleDistribution(nomQuoi, items, cible);
+  };
+}
+
+function ouvrirControleDistribution(nomQuoi, items, catCible) {
+  const joueurs = state.licencies.filter(l => l.cat !== 'DIR' && (!catCible || l.cat === catCible))
+    .sort((a, b) => (a.cat + a.nom).localeCompare(b.cat + b.nom, 'fr'));
+  // allocation simulée : copie des stocks pour détecter les ruptures ligne à ligne
+  const dispo = {};
+  for (const it of items) { const a = packArt(it); if (!a) continue; dispo[a.id] = a.dims ? { ...a.dims } : { _: a.qte }; }
+  const plan = joueurs.map(l => {
+    const dejaDote = items.every(it => { const a = packArt(it); return a && (l.dotations || []).some(d => d.article === a.nom); });
+    const lignes = items.map(it => {
+      const a = packArt(it);
+      const taille = a && a.dims ? dimPourLic(a, l) : null;
+      return { it, a, taille };
+    });
+    return { l, lignes, dejaDote, inclus: !dejaDote, rupture: false };
+  });
+  const simuler = () => {
+    for (const k of Object.keys(dispo)) for (const t of Object.keys(dispo[k])) dispo[k][t] = null; // reset
+    for (const it of items) { const a = packArt(it); if (!a) continue; dispo[a.id] = a.dims ? { ...a.dims } : { _: a.qte }; }
+    for (const p of plan) {
+      p.rupture = false;
+      if (!p.inclus) continue;
+      // vérifie puis réserve
+      const ok = p.lignes.every(({ it, a, taille }) => a && (dispo[a.id][taille || '_'] || 0) >= it.qte);
+      if (!ok) { p.rupture = true; p.servi = false; continue; }
+      for (const { it, a, taille } of p.lignes) dispo[a.id][taille || '_'] -= it.qte;
+      p.servi = true;
+    }
+  };
+  const corps = () => {
+    simuler();
+    const nIncl = plan.filter(p => p.inclus).length, nRupt = plan.filter(p => p.inclus && p.rupture).length;
+    return `
+    <p style="margin:0 0 10px"><strong>${esc(nomQuoi)}</strong> → ${catCible ? esc(catLabel(catCible)) : 'tout le club'} · <strong>${nIncl - nRupt}</strong> joueur(s) seront servis${nRupt ? ` · <span style="color:var(--critical-text);font-weight:600">${nRupt} en rupture de taille</span>` : ''}${plan.filter(p => p.dejaDote).length ? ` · ${plan.filter(p => p.dejaDote).length} déjà doté(s) (décochés)` : ''}</p>
+    <div class="table-wrap" style="max-height:46vh;overflow:auto"><table>
+      <thead><tr><th></th><th>Joueur</th>${items.map(it => { const a = packArt(it); return `<th>${a ? esc(a.nom.replace(' club', '').replace(" d'entraînement", '')) : ''}</th>`; }).join('')}<th>État</th></tr></thead>
+      <tbody>${plan.map((p, i) => `<tr style="${!p.inclus ? 'opacity:.55' : ''}">
+        <td><input type="checkbox" data-dmrow="${i}" ${p.inclus ? 'checked' : ''} aria-label="Inclure ${esc(p.l.prenom + ' ' + p.l.nom)}"></td>
+        <td><strong>${esc(p.l.prenom + ' ' + p.l.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(catLabel(p.l.cat).split(' – ')[0])}</span></td>
+        ${p.lignes.map(({ it, a, taille }) => `<td>${it.qte > 1 ? it.qte + ' × ' : ''}${taille ? `<span class="badge">${esc(taille)}</span>` : a ? a.unite : ''}</td>`).join('')}
+        <td>${p.dejaDote && !p.inclus ? '<span class="badge"><span class="dot"></span>Déjà doté</span>' : p.inclus ? (p.rupture ? '<span class="badge b-crit"><span class="dot"></span>Rupture de taille</span>' : '<span class="badge b-good"><span class="dot"></span>OK</span>') : '<span class="badge">Exclu</span>'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    ${nRupt ? '<p style="font-size:12.5px;color:var(--ink-2);margin:10px 0 0">Les joueurs en rupture ne seront pas servis : réassortis leur taille puis relance la distribution — la liste se recalcule.</p>' : ''}`;
+  };
+  openModal('Contrôle avant distribution', corps(), `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="dmGo">Distribuer</button>`);
+  const bind = () => $$('#modalRoot [data-dmrow]').forEach(c => c.onchange = () => { plan[Number(c.dataset.dmrow)].inclus = c.checked; $('#modalRoot .modal-body').innerHTML = corps(); bind(); });
+  bind();
+  $('#dmGo').onclick = () => {
+    simuler();
+    const servis = plan.filter(p => p.inclus && p.servi);
+    if (!servis.length) { toast('Personne à servir (tout est exclu ou en rupture).'); return; }
+    for (const p of servis) {
+      for (const { it, a, taille } of p.lignes) {
+        stockRetirer(a, taille, it.qte, 'Dotation (distribution groupée)');
+        p.l.dotations.push({ article: a.nom, qte: it.qte, date: TODAY, taille });
+        state.dotationsLog.unshift({ id: Date.now() + ri(1, 99999), licId: p.l.id, artId: a.id, article: a.nom, qte: it.qte, taille, date: TODAY, par: state.currentUser.nom });
+      }
+    }
+    const nRupt = plan.filter(p => p.inclus && p.rupture).length;
+    closeModal();
+    subTabs.stockSection = 'distribution';
+    render();
+    toast(`${servis.length} joueur(s) servi(s)${nRupt ? ` — ${nRupt} non servi(s) (rupture de taille)` : ''} — stock et fiches mis à jour.`);
+  };
+}
+
+/* ---- Dotation individuelle : choix de la taille ---- */
+openDotation = function (licId, onDone) {
+  const arts = state.stock.filter(a => a.dotation && a.qte > 0);
+  const lics = [...state.licencies].sort((a, b) => (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
+  const tailleOpts = () => {
+    const a = state.stock.find(x => x.id === Number($('#dtArt').value));
+    const l = state.licencies.find(x => x.id === Number($('#dtLic').value));
+    const z = $('#dtTailleZone');
+    if (!a || !a.dims) { z.innerHTML = ''; return; }
+    const sugg = l ? dimPourLic(a, l) : null;
+    z.innerHTML = `<label for="dtTaille">Taille${sugg ? ' (suggérée d\'après la fiche : ' + esc(sugg) + ')' : ''}</label>
+      <select id="dtTaille">${Object.entries(a.dims).map(([t, q]) => `<option value="${esc(t)}" ${t === sugg ? 'selected' : ''} ${q <= 0 ? 'disabled' : ''}>${esc(t)} — ${q} en stock</option>`).join('')}</select>`;
+  };
+  openModal('Nouvelle dotation', `
+    <div class="form-grid">
+      <div class="field"><label for="dtLic">Joueur</label><select id="dtLic">
+        ${lics.map(l => `<option value="${l.id}" ${licId === l.id ? 'selected' : ''}>${esc(l.nom.toUpperCase() + ' ' + l.prenom)} — ${esc(catLabel(l.cat))}</option>`).join('')}</select></div>
+      <div class="field"><label for="dtArt">Article</label><select id="dtArt">
+        ${arts.map(a => `<option value="${a.id}">${esc(a.nom)} (${a.qte} en stock)</option>`).join('')}</select></div>
+      <div class="field" id="dtTailleZone"></div>
+      <div class="field"><label for="dtQte">Quantité</label><input id="dtQte" type="number" min="1" value="1"></div>
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="dtOk">Attribuer</button>`);
+  tailleOpts();
+  $('#dtArt').onchange = tailleOpts;
+  $('#dtLic').onchange = tailleOpts;
+  $('#dtOk').onclick = () => {
+    const l = state.licencies.find(x => x.id === Number($('#dtLic').value));
+    const a = state.stock.find(x => x.id === Number($('#dtArt').value));
+    const q = Math.max(1, Number($('#dtQte').value) || 1);
+    if (!l || !a) return;
+    const taille = a.dims ? $('#dtTaille').value : null;
+    if (!stockRetirer(a, taille, q, 'Dotation joueur')) { champErreur('dtQte', `Stock insuffisant${taille ? ' en ' + taille : ''}.`); return; }
+    l.dotations.push({ article: a.nom, qte: q, date: TODAY, taille });
+    state.dotationsLog.unshift({ id: Date.now(), licId: l.id, artId: a.id, article: a.nom, qte: q, taille, date: TODAY, par: state.currentUser.nom });
+    toast(`${q} × ${a.nom}${taille ? ' (' + taille + ')' : ''} attribué(s) à ${l.prenom} ${l.nom}.`);
+    if (onDone) onDone(); else { closeModal(); render(); }
+  };
+};
+
+/* ---- Onglet 4 : Boutique (articles & packs, client, commandes) ---- */
+function viewBoutiqueV10() {
+  const arts = state.stock.filter(a => a.vente).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  const packsV = state.packs.filter(p => p.usage === 'vente');
+  const ca = state.ventes.reduce((s, v) => s + v.qte * v.pu, 0);
+  const marge = state.ventes.reduce((s, v) => { const a = state.stock.find(x => x.id === v.artId); return s + v.qte * (v.pu - (a ? a.prixAchat : 0)); }, 0);
+  const cmdsActives = state.commandes.filter(c => ['commandee', 'prete', 'notifiee'].includes(c.statut));
+  const ecrit = !window.canW || canW('stock');
+  const clientCell = v => v.licId ? `<strong>${esc((state.licencies.find(l => l.id === v.licId) || { prenom: '?', nom: '' }).prenom + ' ' + (state.licencies.find(l => l.id === v.licId) || { nom: '' }).nom)}</strong> <span class="badge b-info">adhérent</span>` : esc(v.acheteur || 'Comptoir');
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Stock</h1>
+    <p class="page-sub">Boutique — ${eur(ca)} de ventes (marge ${eur(Math.round(marge))}), reversées en recettes « Boutique »</p></div>
+    <div class="head-actions">${ecrit ? '<button class="btn btn-primary" id="btnNewCmd">+ Nouvelle commande</button>' : ''}</div>
+  </div>
+  ${stockSectionTabs('boutique')}
+  <div class="grid two-col" style="margin-top:14px">
+    <div>
+      <div class="card" style="padding:4px 8px;margin-bottom:14px">
+        <div style="padding:10px 8px 0"><h3 style="margin:0 0 6px">Articles & packs en vente</h3></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Article</th><th class="num">Prix</th><th class="num">En stock</th><th></th></tr></thead>
+          <tbody>
+          ${packsV.map(p => `<tr>
+            <td><strong>${esc(p.nom)}</strong> <span class="badge b-info">Pack</span><br><span style="color:var(--ink-3);font-size:12px">${p.items.map(it => { const a = packArt(it); return it.qte + ' × ' + (a ? a.nom : '—'); }).join(' + ')}</span></td>
+            <td class="num" style="font-weight:600">${eur(p.prixVente || packPrixVenteRef(p))}</td>
+            <td class="num">${packServables(p)}</td>
+            <td>${ecrit ? `<button class="btn btn-sm btn-primary" data-vendrepack="${p.id}" ${packServables(p) <= 0 ? 'disabled' : ''}>Vendre</button>` : ''}</td>
+          </tr>`).join('')}
+          ${arts.map(a => `<tr class="rowlink" data-artfiche="${a.id}" tabindex="0">
+            <td><strong>${esc(a.nom)}</strong>${a.dims ? ` <span class="badge" style="margin-left:4px">${Object.entries(a.dims).filter(([, q]) => q > 0).map(([t]) => t).join(' · ') || 'épuisé'}</span>` : ''}<br><span class="ean">${a.ean}</span></td>
+            <td class="num" style="font-weight:600">${eur(a.prixVente)}</td>
+            <td class="num">${a.qte}</td>
+            <td>${ecrit ? `<button class="btn btn-sm btn-primary" data-vendre="${a.id}" ${a.qte <= 0 ? 'disabled' : ''}>Vendre</button>` : ''}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+      <div class="card" style="padding:4px 8px">
+        <div style="padding:10px 8px 0"><h3 style="margin:0 0 6px">Dernières ventes</h3></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Article</th><th class="num">Qté</th><th>Client</th><th class="num">Total</th><th>Mode</th></tr></thead>
+          <tbody>${state.ventes.length ? state.ventes.slice(0, 12).map(v => `<tr>
+            <td style="white-space:nowrap">${dfrShort(v.date)}</td><td>${esc(v.article)}${v.taille ? ' <span class="badge">' + esc(v.taille) + '</span>' : ''}</td>
+            <td class="num">${v.qte}</td><td>${clientCell(v)}</td><td class="num" style="font-weight:600">${eur(Math.round(v.qte * v.pu * 100) / 100)}</td><td>${esc(v.mode)}</td>
+          </tr>`).join('') : '<tr><td colspan="6" class="empty">Aucune vente.</td></tr>'}</tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Commandes (${cmdsActives.length} en cours)</h3>
+      ${state.commandes.length ? state.commandes.filter(c => c.statut !== 'annulee').map(c => `<div style="padding:9px 0;border-bottom:1px solid var(--line)">
+        <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+          <strong style="flex:1;min-width:120px">${esc(cmdClientNom(c))}</strong>${CMD_BADGE[c.statut]}
+        </div>
+        <div class="cmd-contenu">${esc(cmdContenu(c))} · <strong>${eur(c.total)}</strong> · commandée le ${dfrShort(c.date)}</div>
+        ${ecrit && c.statut !== 'retiree' ? `<div class="evt-actions">
+          ${c.statut === 'commandee' ? `<button class="btn btn-sm btn-primary" data-cmdprete="${c.id}">Marquer prête</button>` : ''}
+          ${['prete', 'notifiee'].includes(c.statut) ? `<button class="btn btn-sm" data-cmdnotif="${c.id}">📣 Prévenir le client</button><button class="btn btn-sm btn-primary" data-cmdretrait="${c.id}">Remise & encaissement</button>` : ''}
+          <button class="btn btn-sm btn-danger" data-cmdannule="${c.id}">Annuler</button>
+        </div>` : ''}
+      </div>`).join('') : '<p class="empty" style="padding:6px 0">Aucune commande.</p>'}
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Une commande réserve le stock à la création. « Marquer prête » propose de prévenir le client (WhatsApp ou email, selon Paramètres → Alertes). L'encaissement se fait à la remise.</p>
+    </div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2)">Vente au comptoir : caisse artisanale au bord du terrain, sans TVA (association non assujettie). Chaque vente décrémente le stock (taille comprise) et crée l'écriture « Boutique ». L'acheteur adhérent est relié à sa fiche.</p>`;
+}
+viewBoutique = viewBoutiqueV10;
+
+/* Sélecteur de client commun vente/commande */
+function clientFields(prefix) {
+  const lics = [...state.licencies].sort((a, b) => (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
+  return `
+    <div class="field"><label for="${prefix}Lic">Client</label><select id="${prefix}Lic">
+      <option value="">Non-adhérent / passage</option>
+      ${lics.map(l => `<option value="${l.id}">${esc(l.nom.toUpperCase() + ' ' + l.prenom)} — ${esc(catLabel(l.cat).split(' – ')[0])}</option>`).join('')}</select></div>
+    <div class="field" id="${prefix}LibreZone"><label for="${prefix}Libre">Nom du client (non-adhérent)</label><input id="${prefix}Libre" placeholder="ex. Famille Robin"></div>`;
+}
+function bindClientFields(prefix) {
+  const sel = $('#' + prefix + 'Lic'), zone = $('#' + prefix + 'LibreZone');
+  const maj = () => { zone.style.display = sel.value ? 'none' : ''; };
+  sel.onchange = maj; maj();
+}
+const lireClient = prefix => {
+  const licId = Number($('#' + prefix + 'Lic').value) || null;
+  return { licId, client: licId ? null : ($('#' + prefix + 'Libre').value.trim() || 'Comptoir') };
+};
+
+/* Vente d'un article (taille + client) */
+function openVenteArticle(a) {
+  openModal('Vente — ' + a.nom, `
+    <div class="form-grid">
+      ${a.dims ? `<div class="field"><label for="vtTaille">Taille</label><select id="vtTaille">${Object.entries(a.dims).map(([t, q]) => `<option value="${esc(t)}" ${q <= 0 ? 'disabled' : ''}>${esc(t)} — ${q} en stock</option>`).join('')}</select></div>` : ''}
+      <div class="field"><label for="vtQte">Quantité</label><input id="vtQte" type="number" min="1" value="1"></div>
+      <div class="field"><label for="vtMode">Mode de paiement</label><select id="vtMode"><option>CB</option><option>Espèces</option><option>Chèque</option><option>Lien de paiement</option></select></div>
+      ${clientFields('vt')}
+    </div>
+    <p style="font-size:13px;margin:12px 0 0">Total : <strong id="vtTotal">${eur(a.prixVente)}</strong></p>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="vtOk">Encaisser</button>`);
+  bindClientFields('vt');
+  $('#vtQte').oninput = () => { $('#vtTotal').textContent = eur((Number($('#vtQte').value) || 1) * a.prixVente); };
+  $('#vtOk').onclick = () => {
+    const q = Math.max(1, Number($('#vtQte').value) || 1);
+    const taille = a.dims ? $('#vtTaille').value : null;
+    if (!stockRetirer(a, taille, q, 'Vente boutique')) { champErreur('vtQte', `Stock insuffisant${taille ? ' en ' + taille : ''}.`); return; }
+    const { licId, client } = lireClient('vt');
+    const total = q * a.prixVente;
+    state.ventes.unshift({ id: Date.now(), artId: a.id, article: a.nom, taille, qte: q, pu: a.prixVente, date: TODAY, mode: $('#vtMode').value, licId, acheteur: client });
+    state.ecritures.unshift({ id: Date.now() + 2, date: TODAY, sens: 'R', cat: 'Boutique', libelle: `Vente boutique — ${q} × ${a.nom}`, montant: total });
+    toast(`Vente encaissée : ${eur(total)} — stock et comptabilité mis à jour.`);
+    closeModal(); render();
+  };
+}
+
+/* Vente d'un pack (tailles par composant + client) */
+function openVentePack(p) {
+  const prix = p.prixVente || packPrixVenteRef(p);
+  openModal('Vente — ' + p.nom, `
+    <p style="margin:0 0 10px;color:var(--ink-2);font-size:13px">${p.items.map(it => { const a = packArt(it); return it.qte + ' × ' + (a ? a.nom : '—'); }).join(' + ')} — <strong style="color:var(--ink)">${eur(prix)}</strong></p>
+    <div class="form-grid">
+      ${p.items.map((it, i) => { const a = packArt(it); return a && a.dims ? `<div class="field"><label for="vp${i}">Taille — ${esc(a.nom)}</label><select id="vp${i}">${Object.entries(a.dims).map(([t, q]) => `<option value="${esc(t)}" ${q < it.qte ? 'disabled' : ''}>${esc(t)} — ${q} en stock</option>`).join('')}</select></div>` : ''; }).join('')}
+      <div class="field"><label for="vpMode">Mode de paiement</label><select id="vpMode"><option>CB</option><option>Espèces</option><option>Chèque</option></select></div>
+      ${clientFields('vp')}
+    </div>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="vpOk">Encaisser ${eur(prix)}</button>`);
+  bindClientFields('vp');
+  $('#vpOk').onclick = () => {
+    const { licId, client } = lireClient('vp');
+    // vérification complète avant toute sortie
+    const lignes = p.items.map((it, i) => { const a = packArt(it); return { it, a, taille: a && a.dims ? $('#vp' + i).value : null }; });
+    for (const { it, a, taille } of lignes) {
+      const d = a.dims && taille ? (a.dims[taille] || 0) : a.qte;
+      if (d < it.qte) { toast(`Stock insuffisant : ${a.nom}${taille ? ' (' + taille + ')' : ''}.`); return; }
+    }
+    const ref = packPrixVenteRef(p) || 1;
+    for (const { it, a, taille } of lignes) {
+      stockRetirer(a, taille, it.qte, 'Vente boutique (pack)');
+      const part = Math.round(((a.prixVente || 0) * it.qte / ref) * prix * 100) / 100; // prix du pack ventilé au prorata
+      state.ventes.unshift({ id: Date.now() + ri(1, 9999), artId: a.id, article: a.nom + ' (pack)', taille, qte: it.qte, pu: it.qte ? part / it.qte : 0, date: TODAY, mode: $('#vpMode').value, licId, acheteur: client });
+    }
+    state.ecritures.unshift({ id: Date.now() + 2, date: TODAY, sens: 'R', cat: 'Boutique', libelle: `Vente boutique — ${p.nom}`, montant: prix });
+    toast(`Pack vendu : ${eur(prix)} — stock et comptabilité mis à jour.`);
+    closeModal(); render();
+  };
+}
+
+/* Nouvelle commande */
+function openNewCommande() {
+  const arts = state.stock.filter(a => a.vente);
+  const tailleZone = () => {
+    const a = state.stock.find(x => x.id === Number($('#ncArt').value));
+    $('#ncTailleZone').innerHTML = a && a.dims ? `<label for="ncTaille">Taille</label><select id="ncTaille">${Object.keys(a.dims).map(t => `<option>${esc(t)}</option>`).join('')}</select>` : '';
+  };
+  openModal('Nouvelle commande boutique', `
+    <div class="form-grid">
+      <div class="field"><label for="ncArt">Article</label><select id="ncArt">${arts.map(a => `<option value="${a.id}">${esc(a.nom)} — ${eur(a.prixVente)}</option>`).join('')}</select></div>
+      <div class="field" id="ncTailleZone"></div>
+      <div class="field"><label for="ncQte">Quantité</label><input id="ncQte" type="number" min="1" value="1"></div>
+      ${clientFields('nc')}
+      <div class="field"><label for="ncTel">Téléphone du client (pour le prévenir)</label><input id="ncTel" placeholder="facultatif pour un adhérent"></div>
+    </div>
+    <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">La commande réserve le stock (même en rupture visible en boutique) ; une taille absente peut être commandée au fournisseur puis réassortie. Encaissement à la remise.</p>`, `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="ncOk">Enregistrer la commande</button>`);
+  bindClientFields('nc');
+  tailleZone();
+  $('#ncArt').onchange = tailleZone;
+  $('#ncOk').onclick = () => {
+    const a = state.stock.find(x => x.id === Number($('#ncArt').value));
+    const q = Math.max(1, Number($('#ncQte').value) || 1);
+    const taille = a.dims ? $('#ncTaille').value : null;
+    const { licId, client } = lireClient('nc');
+    if (!licId && (!client || client === 'Comptoir')) { champErreur('ncLibre', 'Nom du client obligatoire pour une commande.'); return; }
+    if (!stockRetirer(a, taille, q, 'Commande boutique (réservation)')) { champErreur('ncQte', `Stock insuffisant${taille ? ' en ' + taille : ''} — réassortis d'abord (entrée de stock), la commande réserve des pièces réelles.`); return; }
+    state.commandes.push({ id: Date.now(), client, licId, tel: $('#ncTel').value.trim(), email: '', items: [{ artId: a.id, qte: q, taille }], date: TODAY, statut: 'commandee', total: q * a.prixVente });
+    toast(`Commande enregistrée pour ${licId ? cmdClientNom(state.commandes[state.commandes.length - 1]) : client} — stock réservé.`);
+    closeModal(); render();
+  };
+}
+
+/* ---- Liaisons V10 stock ---- */
+const _bindExtraV94 = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV94(v);
+  const sd = $('#stDims'); if (sd) sd.onchange = e => { state.filtres.stock.dims = e.target.checked; render(); };
+  const dc = $('#distCat'); if (dc) dc.onchange = e => { subTabs.distCat = e.target.value; render(); };
+  const np = $('#btnNewPack'); if (np) np.onclick = () => openFormPack(null);
+  $$('[data-packedit]', v).forEach(b => b.onclick = () => openFormPack(Number(b.dataset.packedit)));
+  $$('[data-packdist]', v).forEach(b => b.onclick = () => openDistributionMasse(Number(b.dataset.packdist)));
+  const dm = $('#btnDistMasse'); if (dm) dm.onclick = () => openDistributionMasse(null);
+  $$('[data-vendre]', v).forEach(b => b.onclick = () => { const a = state.stock.find(x => x.id === Number(b.dataset.vendre)); if (a) openVenteArticle(a); });
+  $$('[data-vendrepack]', v).forEach(b => b.onclick = () => { const p = state.packs.find(x => x.id === Number(b.dataset.vendrepack)); if (p) openVentePack(p); });
+  const nc = $('#btnNewCmd'); if (nc) nc.onclick = openNewCommande;
+  $$('[data-cmdprete]', v).forEach(b => b.onclick = () => {
+    const c = state.commandes.find(x => x.id === Number(b.dataset.cmdprete));
+    if (!c) return;
+    c.statut = 'prete';
+    render();
+    toast('Commande prête — préviens le client.');
+    if (window.openNotifClient) openNotifClient(c);
+  });
+  $$('[data-cmdnotif]', v).forEach(b => b.onclick = () => { const c = state.commandes.find(x => x.id === Number(b.dataset.cmdnotif)); if (c && window.openNotifClient) openNotifClient(c); });
+  $$('[data-cmdretrait]', v).forEach(b => b.onclick = () => {
+    const c = state.commandes.find(x => x.id === Number(b.dataset.cmdretrait));
+    if (!c) return;
+    let modePaie = 'CB';
+    confirmer('Remise de la commande', `<p style="margin:0 0 10px"><strong>${esc(cmdClientNom(c))}</strong> — ${esc(cmdContenu(c))}</p>
+      <div class="field" style="max-width:220px"><label for="crMode">Mode de paiement</label><select id="crMode"><option>CB</option><option>Espèces</option><option>Chèque</option></select></div>`,
+      `Encaisser ${eur(c.total)}`, () => {
+        const mode = modePaie;
+        for (const it of c.items) {
+          const a = packArt(it);
+          if (a) state.ventes.unshift({ id: Date.now() + ri(1, 9999), artId: a.id, article: a.nom + ' (commande)', taille: it.taille, qte: it.qte, pu: a.prixVente, date: TODAY, mode, licId: c.licId, acheteur: c.client });
+        }
+        state.ecritures.unshift({ id: Date.now() + 2, date: TODAY, sens: 'R', cat: 'Boutique', libelle: `Commande boutique — ${cmdClientNom(c)}`, montant: c.total });
+        c.statut = 'retiree';
+        toast(`Commande remise et encaissée : ${eur(c.total)}.`);
+        render();
+      });
+    const crm = $('#crMode');
+    if (crm) crm.onchange = () => { modePaie = crm.value; };
+  });
+  $$('[data-cmdannule]', v).forEach(b => b.onclick = () => {
+    const c = state.commandes.find(x => x.id === Number(b.dataset.cmdannule));
+    if (!c) return;
+    confirmer('Annuler la commande ?', `<p style="margin:0">${esc(cmdClientNom(c))} — ${esc(cmdContenu(c))}. Le stock réservé sera remis en rayon.</p>`, 'Annuler la commande', () => {
+      for (const it of c.items) { const a = packArt(it); if (a) stockAjouter(a, it.taille, it.qte, 'Annulation de commande'); }
+      c.statut = 'annulee';
+      toast('Commande annulée — stock restitué.');
+      render();
+    }, 'Retour');
+  });
+};
+render();
+</script>
+<script>
+/* ================= V10 : EXPORTS CSV RÉELS (FILTRES RESPECTÉS) + CANAUX D'ALERTE WHATSAPP / EMAIL ================= */
+
+/* ---- Export CSV : vrai fichier téléchargé, lisible dans Excel (BOM UTF-8, séparateur ;) ---- */
+function exportCSV(nomFichier, lignes) {
+  const cel = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const csv = '﻿' + lignes.map(r => r.map(cel).join(';')).join('\r\n');
+  const okMsg = `« ${nomFichier} » téléchargé — ${lignes.length - 1} ligne(s), filtres et tri respectés.`;
+  (async () => {
+    // Sur claude.ai, le téléchargement passe par la capacité « downloads » de l'artifact
+    if (window.claude && typeof window.claude.use === 'function') {
+      let dl = null;
+      try { dl = await window.claude.use('downloads'); } catch (e) { dl = null; }
+      if (dl) {
+        try { await dl.save({ filename: nomFichier, data: csv }); toast(okMsg); }
+        catch (e) { toast(e && e.code === 'declined' ? 'Export annulé.' : 'Export indisponible dans cette vue.'); }
+        return;
+      }
+    }
+    // Page servie en direct (GitHub Pages) : téléchargement navigateur classique
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nomFichier;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    toast(okMsg);
+  })();
+}
+
+/* Mêmes filtres et tri que la liste affichée */
+function licenciesFiltresTries() {
+  const f = state.filtres.lic;
+  let rows = state.licencies;
+  if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(l => (l.prenom + ' ' + l.nom + ' ' + l.licence).toLowerCase().includes(q)); }
+  if (f.cat) rows = rows.filter(l => l.cat === f.cat);
+  if (f.cot) rows = rows.filter(l => l.cotStatut === f.cot);
+  if (f.cert === 'ko') rows = rows.filter(l => daysUntil(l.certFin) < 0);
+  if (f.cert === 'bientot') rows = rows.filter(l => { const d = daysUntil(l.certFin); return d >= 0 && d <= state.params.certJours; });
+  return trierLicencies(rows);
+}
+function exportLicencies() {
+  const rows = licenciesFiltresTries();
+  const LBL_LIC = { validee: 'Validée FFR', attente: 'En attente FFR', a_renouveler: 'À renouveler' };
+  const LBL_COT = { payee: 'Payée', partielle: 'Partielle', impayee: 'Impayée', exoneree: 'Exonérée' };
+  exportCSV('licencies.csv', [
+    ['Nom', 'Prénom', 'Catégorie', 'Naissance', 'Sexe', 'Licence FFR', 'Statut licence', 'Statut (synthèse)', 'Certificat valide jusqu\'au', 'Cotisation (€)', 'Réglé (€)', 'Statut cotisation', 'Email', 'Téléphone', 'Commune', 'Taille short', 'Taille maillot', 'Pointure', 'Référent 1', 'Email réf. 1', 'Tél. réf. 1', 'Référent 2', 'Email réf. 2', 'Tél. réf. 2'],
+    ...rows.map(l => {
+      normaliserLic(l);
+      const r1 = l.referents ? l.referents[0] : null, r2 = l.referents ? l.referents[1] : null;
+      return [l.nom, l.prenom, catLabel(l.cat), l.naissance, l.sexe, l.licence, LBL_LIC[l.licStatut] || l.licStatut, statutLic(l).label,
+        l.certFin, l.cot, l.cotPaye, LBL_COT[l.cotStatut] || l.cotStatut, l.email, l.tel, l.ville, l.tailleShort, l.tailleMaillot, l.pointure,
+        r1 ? r1.prenom + ' ' + r1.nom + ' (' + r1.lien + ')' : '', r1 ? r1.email : '', r1 ? r1.tel : '',
+        r2 ? r2.prenom + ' ' + r2.nom + ' (' + r2.lien + ')' : '', r2 ? r2.email : '', r2 ? r2.tel : ''];
+    }),
+  ]);
+}
+function exportStock() {
+  const f = state.filtres.stock;
+  const pole = ['boutique', 'dotations', 'distribution', 'packs'].includes(subTabs.stockPole) ? 'tous' : subTabs.stockPole;
+  let arts = pole === 'tous' ? state.stock : state.stock.filter(a => a.pole === pole);
+  if (f.alerte) arts = arts.filter(a => a.qte <= a.seuil || (a.peremption && daysUntil(a.peremption) <= state.params.peremptionJours));
+  arts = trierStock(arts);
+  const poleLabel = c => (POLES.find(p => p.code === c) || { label: c }).label;
+  const lignes = [['Article', 'Pôle', 'Taille', 'Quantité', 'Unité', 'Seuil', 'Prix d\'achat (€)', 'Prix de vente (€)', 'EAN', 'Emplacement', 'Péremption', 'Résultat saison (€)']];
+  for (const a of arts) {
+    const res = Math.round(resultatArticle(a).res * 100) / 100;
+    if (a.dims) for (const [t, q] of Object.entries(a.dims))
+      lignes.push([a.nom, poleLabel(a.pole), t, q, a.unite, '', a.prixAchat, a.prixVente ?? '', a.ean, a.empl, a.peremption || '', '']);
+    lignes.push([a.nom, poleLabel(a.pole), a.dims ? 'TOTAL' : '', a.qte, a.unite, a.seuil, a.prixAchat, a.prixVente ?? '', a.ean, a.empl, a.peremption || '', res]);
+  }
+  exportCSV('stock.csv', lignes);
+}
+
+/* ---- Canaux d'alerte (Paramètres → Alertes & fonctionnement) ---- */
+state.params.notifCanaux = { cmdPrete: 'whatsapp', stockSeuil: 'email', peremption: 'email' };
+const POLE_RESP = {
+  sportif: { nom: 'Pascal Gayraud', tel: '06 61 44 28 73', email: 'materiel@exemple.fr' },
+  pharmacie: { nom: 'Marie Roussel', tel: '06 52 18 90 34', email: 'secretariat@exemple.fr' },
+  administratif: { nom: 'Antoine Peyre', tel: '06 47 33 61 08', email: 'secretariat@exemple.fr' },
+  buvette: { nom: 'Sophie Vialar', tel: '06 73 29 15 46', email: 'evenements@exemple.fr' },
+};
+const CANAUX = [['aucun', 'Aucun'], ['email', 'Email'], ['whatsapp', 'WhatsApp'], ['les2', 'Email + WhatsApp']];
+const canalActif = (k, quoi) => { const c = state.params.notifCanaux[k] || 'aucun'; return c === quoi || c === 'les2'; };
+
+const _paramFonctionnementV10 = paramFonctionnement;
+paramFonctionnement = function () {
+  const nc = state.params.notifCanaux;
+  const ligne = (k, lab, dest) => `<tr><td><strong>${lab}</strong><br><span style="font-size:12px;color:var(--ink-3)">${dest}</span></td>
+    <td><select data-canal="${k}" aria-label="Canal — ${lab}">${CANAUX.map(([v, l]) => `<option value="${v}" ${nc[k] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td></tr>`;
+  return _paramFonctionnementV10() + `
+  <div class="grid two-col" style="margin-top:14px">
+    <div class="card">
+      <h3>Canaux d'alerte — WhatsApp / email</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Quand</th><th>Prévenir par</th></tr></thead>
+        <tbody>
+          ${ligne('cmdPrete', 'Commande boutique prête', 'le client (adhérent ou non)')}
+          ${ligne('stockSeuil', 'Article sous le seuil d\'alerte', 'le responsable du pôle')}
+          ${ligne('peremption', 'Péremption proche', 'le responsable du pôle')}
+        </tbody>
+      </table></div>
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Dans la maquette, l'envoi ouvre WhatsApp ou l'email pré-rempli (comme les relances V9). Dans la version réelle : envoi automatique — l'email est inclus, WhatsApp passe par l'API Business payante (~0,025 €/message utilitaire).</p>
+    </div>
+    <div class="card">
+      <h3>Responsables de pôle (destinataires des alertes stock)</h3>
+      ${POLES.map(p => { const r = POLE_RESP[p.code]; return `<div class="alert-line"><span style="min-width:0"><strong>${esc(r.nom)}</strong> — ${esc(p.label)}<br><span style="font-size:12px;color:var(--ink-2)">${esc(r.email)} · ${esc(r.tel)}</span></span></div>`; }).join('')}
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Dans la version réelle : choisis parmi les utilisateurs du club, modifiable ici.</p>
+    </div>
+  </div>`;
+};
+
+/* ---- Signaler les alertes stock au responsable de pôle ---- */
+const mailtoUrl = (a, sujet, corps) => `mailto:${encodeURIComponent(a)}?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}`;
+function openAlertesStock() {
+  const { sousSeuil, perimes } = alertesStock();
+  const parPole = {};
+  for (const a of sousSeuil) (parPole[a.pole] = parPole[a.pole] || { seuil: [], per: [] }).seuil.push(a);
+  for (const a of perimes) (parPole[a.pole] = parPole[a.pole] || { seuil: [], per: [] }).per.push(a);
+  const bloc = (code, d) => {
+    const r = POLE_RESP[code];
+    const lab = (POLES.find(p => p.code === code) || {}).label || code;
+    const lignes = [
+      ...d.seuil.map(a => `• ${a.nom} : ${a.qte} ${a.unite} (seuil ${a.seuil})${a.dims ? ' — ' + Object.entries(a.dims).filter(([, q]) => q === 0).map(([t]) => t + ' épuisé').join(', ') : ''}`),
+      ...d.per.map(a => `• ${a.nom} : ${daysUntil(a.peremption) < 0 ? 'PÉRIMÉ depuis le' : 'périme le'} ${dfrShort(a.peremption)}`),
+    ];
+    const msg = `Bonjour ${r.nom.split(' ')[0]},\nAlertes stock — ${lab} (${state.params.clubNom}) :\n${lignes.join('\n')}\nMerci de prévoir le réassort / le retrait.\n${state.currentUser.nom}`;
+    const waOk = canalActif(d.per.length && !d.seuil.length ? 'peremption' : 'stockSeuil', 'whatsapp');
+    const mailOk = canalActif(d.per.length && !d.seuil.length ? 'peremption' : 'stockSeuil', 'email');
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <strong style="flex:1;min-width:140px">${esc(lab)} — ${esc(r.nom)}</strong>
+        ${mailOk ? `<a class="btn btn-sm" href="${mailtoUrl(r.email, 'Alertes stock — ' + lab, msg)}">✉ Email</a>` : ''}
+        ${waOk ? `<a class="btn btn-sm wa-btn" target="_blank" rel="noopener" href="${waUrl(waNum(r.tel), msg)}">${WA_ICO} WhatsApp</a>` : ''}
+        ${!mailOk && !waOk ? '<span class="badge">canal « Aucun » (Paramètres)</span>' : ''}
+      </div>
+      <pre style="white-space:pre-wrap;font:12.5px/1.5 system-ui,sans-serif;color:var(--ink-2);margin:8px 0 0">${esc(lignes.join('\n'))}</pre>
+    </div>`;
+  };
+  openModal('Signaler les alertes stock', `
+    <p style="margin:0 0 12px;color:var(--ink-2);font-size:13px">Message pré-rempli par pôle, envoyé au responsable par le canal choisi dans Paramètres → Alertes & fonctionnement. Dans la version réelle, cet envoi est automatique dès le passage sous le seuil.</p>
+    ${Object.entries(parPole).map(([code, d]) => bloc(code, d)).join('') || '<p class="empty">Aucune alerte.</p>'}`,
+    `<button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+}
+
+/* ---- Prévenir le client d'une commande prête ---- */
+function openNotifClient(c) {
+  const l = c.licId ? state.licencies.find(x => x.id === c.licId) : null;
+  const nom = cmdClientNom(c);
+  const tel = (l ? l.tel : c.tel) || '';
+  const email = l ? l.email : (c.email || '');
+  const msg = `Bonjour ${nom},\nVotre commande est prête : ${cmdContenu(c)} (${eur(c.total)}).\nRetrait au club house aux heures d'entraînement — paiement à la remise.\n${state.params.clubNom}`;
+  const waOk = canalActif('cmdPrete', 'whatsapp') && waNum(tel);
+  const mailOk = canalActif('cmdPrete', 'email') && email;
+  openModal('Prévenir le client — commande prête', `
+    <p style="margin:0 0 10px"><strong>${esc(nom)}</strong> · ${esc(cmdContenu(c))} · ${eur(c.total)}</p>
+    <div class="field"><label for="ncMsg">Message</label><textarea id="ncMsg" rows="6" style="width:100%;resize:vertical">${esc(msg)}</textarea></div>
+    <div class="wa-row" style="margin-top:10px">
+      <span class="wa-sub">${tel ? esc(tel) : 'téléphone inconnu'}${email ? ' · ' + esc(email) : ''}</span>
+      <span style="display:flex;gap:8px;flex-wrap:wrap">
+        ${mailOk ? `<a class="btn btn-sm" id="ncMail" href="#">✉ Email</a>` : ''}
+        ${waOk ? `<a class="btn btn-sm wa-btn" id="ncWa" target="_blank" rel="noopener" href="#">${WA_ICO} WhatsApp</a>` : ''}
+      </span>
+    </div>
+    ${!waOk && !mailOk ? '<p class="wa-sub" style="margin:10px 0 0;color:var(--critical-text)">Aucun canal disponible : téléphone/email inconnus, ou canal « Aucun » dans Paramètres → Alertes & fonctionnement.</p>' : ''}`, `
+    <button class="btn btn-primary" onclick="closeModal()">Fermer</button>`);
+  const marquer = () => { if (c.statut === 'prete') { c.statut = 'notifiee'; render(); } toast('Client prévenu — commande marquée « client prévenu ».'); };
+  const wa = $('#ncWa');
+  if (wa) { const maj = () => { wa.href = waUrl(waNum(tel), $('#ncMsg').value); }; wa.onmouseenter = maj; wa.onfocus = maj; maj(); wa.addEventListener('click', () => { maj(); marquer(); }); }
+  const ml = $('#ncMail');
+  if (ml) { const maj = () => { ml.href = mailtoUrl(email, 'Votre commande est prête — ' + state.params.clubNom, $('#ncMsg').value); }; ml.onmouseenter = maj; ml.onfocus = maj; maj(); ml.addEventListener('click', () => { maj(); marquer(); }); }
+}
+
+/* ---- Liaisons : après les liaisons de base (pour reprendre les boutons qu'elles posent) ---- */
+const _bindViewV10 = bindView;
+bindView = function () {
+  _bindViewV10();
+  const bl = $('#btnExportLic');
+  if (bl) { bl.textContent = 'Exporter (CSV)'; bl.onclick = exportLicencies; }
+};
+const _bindExtraV10b = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV10b(v);
+  const bs = $('#btnExportStock'); if (bs) bs.onclick = exportStock;
+  const ba = $('#btnAlertesStock'); if (ba) ba.onclick = openAlertesStock;
+  $$('[data-canal]', v).forEach(s => s.onchange = () => {
+    state.params.notifCanaux[s.dataset.canal] = s.value;
+    toast('Canal d\'alerte enregistré.');
+  });
+};
+render();
+</script>
+<script>
+/* ================= V10 : ÉVÉNEMENTS CLUB (INVITATIONS CIBLÉES) + RÈGLE DE CONTACT EMAIL PARENT / JOUEUR ================= */
+
+/* ---- Modèles WhatsApp ---- */
+Object.assign(WA_MODELES_DEFAUT, {
+  invitationClub: { nom: 'Invitation événement club (individuelle)',
+    texte: 'Bonjour {destinataire},\n{club} organise : {match} 🎉\n📅 {date} à {heure}\n📍 {lieu}\n{joueur} et sa famille sont les bienvenus — merci de répondre dans l\'appli : {lienAppli}\n{expediteur}',
+    joueur: 'Salut {destinataire} 🎉\n{club} organise : {match}\n📅 {date} à {heure}\n📍 {lieu}\nRéponds présent/absent dans l\'appli : {lienAppli}\n{expediteur}' },
+  invitationClubGroupe: { nom: 'Invitation événement club (groupe)',
+    texte: '🎉 {club} — {match}\n📅 {date} à {heure}\n📍 {lieu}\nTout le monde est le bienvenu ! Réponses dans l\'appli : {lienAppli}' },
+});
+for (const k of ['invitationClub', 'invitationClubGroupe']) state.waModeles[k] = JSON.parse(JSON.stringify(WA_MODELES_DEFAUT[k]));
+
+/* ---- Un événement club = un événement du calendrier (flag club), invités choisis librement.
+   Techniquement porté par le type 'tournoi' (titre = intitulé) ; tout l'affichage passe par une carte dédiée. ---- */
+NOTIF_TYPES.invitclub = ['Invitation', 'b-info'];
+
+/* Événement club de démonstration : loto de Noël, tout le club invité */
+(function seedEvtClub() {
+  const e = EVT('tournoi', 'CLUB', '2026-12-12', '19:30', 'Salle des fêtes de Vincennes', { adversaire: 'Loto de Noël du club', domicile: true });
+  e.club = true; e.dispos = {};
+  e.convoques = state.licencies.map(l => l.id);
+  for (const l of state.licencies) { const r = rnd(); if (r < 0.3) e.reponses[l.id] = 'present'; else if (r < 0.38) e.reponses[l.id] = 'absent'; }
+  state.events.push(e);
+  state.events.sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+  // notifications de seed : seulement pour les personas joueur et parent de la démo
+  const protege = [PERSONAS.find(p => p.id === 'joueur'), PERSONAS.find(p => p.id === 'parent')].map(p => p && (p.licId || p.enfantId)).filter(Boolean);
+  for (const id of protege) { state.notifs.unshift({ id: _nid++, licId: id, date: addDaysIso(TODAY, -1), type: 'invitclub', evtId: e.id, titre: evtTitre(e), quand: quandEvt(e), lieu: e.lieu, lu: false }); e.notifies = uniq([...(e.notifies || []), id]); }
+})();
+
+/* ---- Carte dédiée ---- */
+function clubCard(e, opts = {}) {
+  const lic = monLicSportif();
+  const ecrit = !window.canW || canW('sportif');
+  const passe = e.date < TODAY;
+  const invite = lic && e.convoques.includes(lic.id);
+  const nbP = Object.values(e.reponses).filter(r => r === 'present').length;
+  const nbA = Object.values(e.reponses).filter(r => r === 'absent').length;
+  const nSR = !passe && !e.annule ? waSansRepListe(e).length : 0;
+  let joueurHtml = '';
+  if (invite && !passe && !e.annule && !opts.staffOnly) {
+    const rep = e.reponses[lic.id];
+    joueurHtml = `<div class="evt-actions"><span class="badge b-info" style="align-self:center">Invité(e)</span>
+      <button class="btn btn-sm ${rep === 'present' ? 'rsvp-ok' : ''}" data-rsvp="present" data-evt="${e.id}">✓ Présent${rep === 'present' ? ' (confirmé)' : ''}</button>
+      <button class="btn btn-sm ${rep === 'absent' ? 'rsvp-ko' : ''}" data-rsvp="absent" data-evt="${e.id}">✕ Absent</button></div>`;
+  }
+  let staffHtml = '';
+  if (ecrit && !opts.compact) {
+    const B = [];
+    if (e.annule) B.push(`<button class="btn btn-sm" data-evtrestore="${e.id}">Rétablir</button>`, `<button class="btn btn-sm btn-danger" data-evtdel="${e.id}">Supprimer</button>`);
+    else if (!passe) {
+      B.push(`<button class="btn btn-sm btn-primary" data-clubinv="${e.id}">Invités (${e.convoques.length})</button>`,
+        `<button class="btn btn-sm" data-waclub="${e.id}">${WA_ICO} Groupe</button>`);
+      if (nSR) B.push(`<button class="btn btn-sm" data-wasr="${e.id}">${WA_ICO} Relancer ${nSR} sans-réponse</button>`);
+      if (e.convoques.length) B.push(`<button class="btn btn-sm" data-feuille="${e.id}">Réponses</button>`);
+      B.push(`<button class="btn btn-sm" data-clubedit="${e.id}">Modifier</button>`);
+    } else if (e.convoques.length) B.push(`<button class="btn btn-sm" data-feuille="${e.id}">Réponses</button>`);
+    staffHtml = `<div class="evt-actions">${B.join('')}</div>`;
+  }
+  return `<div class="card evt-card${e.annule ? ' evt-annule' : ''}">
+    ${evtDateBlock(e)}
+    <div class="evt-main">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="badge b-info">Événement club</span>
+        ${e.annule ? '<span class="badge b-crit"><span class="dot"></span>Annulé</span>' : ''}
+        ${e.modifie && !e.annule ? '<span class="badge b-info">Modifié</span>' : ''}
+      </div>
+      <div class="evt-title" style="margin-top:6px">${esc(e.adversaire)}</div>
+      <div class="evt-meta">${e.heure} · ${esc(e.lieu)}${e.annule ? '' : ` · ${e.convoques.length} invité(s) · ${nbP} présent(s)${nbA ? ', ' + nbA + ' absent(s)' : ''}`}</div>
+      ${joueurHtml}${staffHtml}
+    </div>
+  </div>`;
+}
+const _evtCardV10 = evtCard;
+evtCard = function (e, opts = {}) { return e.club ? clubCard(e, opts) : _evtCardV10(e, opts); };
+
+/* ---- Choix des destinataires (catégories, dirigeants, individus) ---- */
+function openInvitesClub(e) {
+  let q = '';
+  const tous = [...state.licencies].sort((a, b) => (a.cat + a.nom).localeCompare(b.cat + b.nom, 'fr'));
+  const coches = new Set(e.convoques);
+  const corps = () => `
+    <p style="margin:0 0 10px;color:var(--ink-2);font-size:13px">${dfr(e.date)} à ${e.heure} · ${esc(e.lieu)} — coche librement : par catégorie (chips), dirigeants compris, ou personne par personne.</p>
+    <div class="filtres-chips" style="margin:0 0 10px">
+      <button data-invtous="1">Tout le club</button>
+      <button data-invaucun="1">Personne</button>
+      ${CATEGORIES.map(c => `<button data-invcat="${c.code}">+ ${esc(c.label.split(' – ')[0])} (${state.licencies.filter(l => l.cat === c.code).length})</button>`).join('')}
+    </div>
+    <input type="search" id="invQ" placeholder="Rechercher un nom…" value="${esc(q)}" style="width:100%;margin-bottom:10px" aria-label="Recherche">
+    <div class="sel-list" style="max-height:38vh;overflow:auto">
+      ${tous.filter(l => !q || (l.prenom + ' ' + l.nom).toLowerCase().includes(q)).map(l => `<label class="sel-item">
+        <input type="checkbox" data-inv="${l.id}" ${coches.has(l.id) ? 'checked' : ''}>
+        <span class="sel-nom">${esc(l.prenom + ' ' + l.nom)}</span>
+        <span class="badge">${esc(catLabel(l.cat).split(' – ')[0])}</span>
+      </label>`).join('')}
+    </div>
+    <p class="wa-sub" style="margin:10px 0 0"><strong id="invCompte">${coches.size}</strong> invité(s). Les nouveaux invités reçoivent une notification dans l'appli (et répondent présent/absent).</p>`;
+  openModal('Invités — ' + e.adversaire, corps(), `
+    <button class="btn" onclick="closeModal()">Annuler</button>
+    <button class="btn btn-primary" id="invOk">Valider les invitations</button>`);
+  const bind = () => {
+    const re = () => { $('#modalRoot .modal-body').innerHTML = corps(); bind(); };
+    $$('#modalRoot [data-inv]').forEach(c => c.onchange = () => { c.checked ? coches.add(Number(c.dataset.inv)) : coches.delete(Number(c.dataset.inv)); $('#invCompte').textContent = coches.size; });
+    $$('#modalRoot [data-invcat]').forEach(b => b.onclick = () => { for (const l of state.licencies.filter(x => x.cat === b.dataset.invcat)) coches.add(l.id); re(); });
+    const t = $('#modalRoot [data-invtous]'); if (t) t.onclick = () => { for (const l of state.licencies) coches.add(l.id); re(); };
+    const z = $('#modalRoot [data-invaucun]'); if (z) z.onclick = () => { coches.clear(); re(); };
+    const s = $('#invQ'); if (s) s.oninput = () => { q = s.value.toLowerCase(); re(); const el = $('#invQ'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); };
+  };
+  bind();
+  $('#invOk').onclick = () => {
+    const ids = [...coches];
+    if (!ids.length) { toast('Invite au moins une personne (ou annule l\'événement).'); return; }
+    const nouveaux = ids.filter(id => !e.convoques.includes(id));
+    e.convoques = ids;
+    for (const k of Object.keys(e.reponses)) if (!ids.includes(Number(k))) delete e.reponses[k];
+    const n = nouveaux.length ? notifier(e, 'invitclub', nouveaux) : 0;
+    closeModal(); render();
+    toast(`${ids.length} invité(s)${n ? ' — ' + n + ' nouvelle(s) notification(s)' : ''}.`);
+  };
+}
+
+/* ---- Modifier / annuler un événement club ---- */
+function openEditClub(e) {
+  openModal('Modifier — ' + e.adversaire, `
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1"><label for="ecTitre">Intitulé <span class="req">*</span></label><input id="ecTitre" value="${esc(e.adversaire)}"></div>
+      <div class="field"><label for="ecDate">Date <span class="req">*</span></label><input id="ecDate" type="date" value="${e.date}"></div>
+      <div class="field"><label for="ecHeure">Heure <span class="req">*</span></label><input id="ecHeure" type="time" value="${e.heure}"></div>
+      <div class="field" style="grid-column:1/-1"><label for="ecLieu">Lieu</label><input id="ecLieu" value="${esc(e.lieu)}"></div>
+    </div>
+    ${e.convoques.length ? '<p class="wa-sub" style="margin:10px 0 0">Des invitations sont parties : tout changement de date, heure ou lieu est notifié aux invités, et un message WhatsApp de changement est proposé.</p>' : ''}`, `
+    <button class="btn btn-danger" id="ecDel">Supprimer</button>
+    <button class="btn" id="ecCancel">Annuler l'événement</button>
+    <button class="btn" onclick="closeModal()">Fermer</button>
+    <button class="btn btn-primary" id="ecOk">Enregistrer</button>`);
+  $('#ecOk').onclick = () => {
+    const titre = $('#ecTitre').value.trim(), date = $('#ecDate').value, heure = $('#ecHeure').value;
+    if (!titre) { champErreur('ecTitre', 'Intitulé obligatoire'); return; }
+    if (!date) { champErreur('ecDate', 'Date obligatoire'); return; }
+    if (!heure) { champErreur('ecHeure', 'Heure obligatoire'); return; }
+    const avant = { type: e.type, cat: e.cat, date: e.date, heure: e.heure, lieu: e.lieu, adversaire: e.adversaire, domicile: e.domicile };
+    const change = date !== e.date || heure !== e.heure || $('#ecLieu').value.trim() !== e.lieu;
+    Object.assign(e, { adversaire: titre, date, heure, lieu: $('#ecLieu').value.trim() || e.lieu });
+    if (change) e.modifie = true;
+    const n = notifModif(e, avant);
+    state.events.sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+    closeModal(); render();
+    toast(n ? `Événement modifié — ${n} invité(s) prévenu(s).` : 'Événement modifié.');
+    if (change && e.convoques.length && e.date >= TODAY) waGroupeEvt(e, 'modification');
+  };
+  $('#ecCancel').onclick = () => confirmer('Annuler l\'événement ?',
+    `<p style="margin:0 0 8px"><strong>${esc(e.adversaire)}</strong> — ${dfr(e.date)} à ${e.heure}</p>
+     <p style="margin:0;font-size:13px;color:var(--ink-2)">Il restera visible avec la mention « Annulé » ; les invités sont notifiés.</p>`,
+    'Annuler l\'événement', () => { e.annule = true; const n = notifEvt(e, 'annulation'); render(); toast(n ? `Annulé — ${n} invité(s) prévenu(s).` : 'Événement annulé.'); if (e.convoques.length) waGroupeEvt(e, 'annulation'); }, 'Retour');
+  $('#ecDel').onclick = () => confirmerSuppression(e);
+}
+
+/* ---- Relance des sans-réponse d'un événement club : modèles adaptés ---- */
+const _waSansReponseV10 = waSansReponse;
+waSansReponse = function (e) {
+  if (!e.club) return _waSansReponseV10(e);
+  const lics = waSansRepListe(e);
+  if (!lics.length) { toast('Tout le monde a répondu.'); return; }
+  waOpen({ titre: `Relancer ${lics.length} sans-réponse — ${e.adversaire}`, modeles: ['relanceReponse', 'invitationClub'], licencies: lics, vars: waVarsEvt(e), modeKey: 'sport' });
+};
+
+/* ---- Création : l'événement club entre dans le formulaire « Nouvel événement » ---- */
+const _openNewEvtV93 = openNewEvt;
+openNewEvt = function () {
+  _openNewEvtV93();
+  const sel = $('#neType');
+  if (!sel || $$('#neType option').some(o => o.value === 'club')) return;
+  sel.insertAdjacentHTML('beforeend', '<option value="club">Événement club (soirée, loto, AG…)</option>');
+  const catField = $('#neCat') ? $('#neCat').closest('.field') : null;
+  const advInp = $('#neAdv'), advLab = advInp ? advInp.closest('.field').querySelector('label') : null;
+  const domField = $('#neDom') ? $('#neDom').closest('.field') : null;
+  const okBtn = $('#neOk');
+  const majClub = () => {
+    const club = sel.value === 'club';
+    if (catField) catField.hidden = club;
+    if (domField) domField.hidden = club || sel.value === 'entrainement';
+    if (advLab) advLab.innerHTML = club ? 'Intitulé <span class="req">*</span>' : 'Adversaire / intitulé';
+    if (advInp) advInp.placeholder = club ? 'ex. Soirée des partenaires, loto, repas de fin de saison' : 'ex. RC Montclar';
+    const lim = $('#neLim'); if (lim) lim.closest('.field').hidden = club;
+    if (club) {
+      $('#neAskLab').textContent = 'Inviter tout le club maintenant (notification dans l\'appli)';
+      $('#neAskNote').textContent = `${state.licencies.length} licenciés (joueurs, parents via leur enfant, dirigeants). Tu pourras affiner la liste juste après via « Invités ».`;
+    }
+  };
+  sel.addEventListener('change', majClub); majClub();
+  if (okBtn) okBtn.onclick = () => {
+    if (sel.value !== 'club') { /* comportement standard recréé */ return _recreerEvtStandard(); }
+    const titre = advInp.value.trim(), date = $('#neDate').value, heure = $('#neHeure').value;
+    if (!titre) { champErreur('neAdv', 'Intitulé obligatoire pour un événement club.'); return; }
+    if (!date) { champErreur('neDate', 'Date obligatoire'); return; }
+    if (date < TODAY) { champErreur('neDate', 'La date est déjà passée.'); return; }
+    if (!heure) { champErreur('neHeure', 'Heure obligatoire'); return; }
+    const doublon = state.events.find(x => !x.annule && x.cat === 'CLUB' && x.date === date && x.heure === heure);
+    if (doublon) { champErreur('neHeure', `Déjà pris : « ${doublon.adversaire} » à cette date et heure.`); return; }
+    const e = EVT('tournoi', 'CLUB', date, heure, $('#neLieu').value.trim() || LIEUX.dom, { adversaire: titre, domicile: true });
+    e.club = true; e.dispos = {};
+    state.events.push(e);
+    state.events.sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+    let n = 0;
+    if ($('#neAsk').checked) { e.convoques = state.licencies.map(l => l.id); n = notifier(e, 'invitclub', e.convoques); }
+    closeModal(); render();
+    toast(n ? `Événement club créé — ${n} invitation(s) envoyée(s). Affine la liste via « Invités ».` : 'Événement club créé — choisis les invités via « Invités ».');
+    if (!$('#neAsk') || !n) openInvitesClub(e);
+  };
+  function _recreerEvtStandard() {
+    const type = sel.value, cat = $('#neCat').value, date = $('#neDate').value, heure = $('#neHeure').value;
+    if (!date) { champErreur('neDate', 'Date obligatoire'); return; }
+    if (date < TODAY) { champErreur('neDate', 'La date est déjà passée.'); return; }
+    if (!heure) { champErreur('neHeure', 'Heure obligatoire'); return; }
+    const doublon = state.events.find(x => !x.annule && x.cat === cat && x.date === date && x.heure === heure);
+    if (doublon) { champErreur('neHeure', `Déjà pris : « ${evtTitre(doublon)} » à cette date et heure.`); return; }
+    const e = EVT(type, cat, date, heure, $('#neLieu').value.trim() || LIEUX.dom,
+      type !== 'entrainement' ? { adversaire: $('#neAdv').value.trim() || 'À définir', domicile: $('#neDom').value === '1' } : {});
+    e.dispos = {};
+    state.events.push(e);
+    state.events.sort((a, b) => (a.date + a.heure).localeCompare(b.date + b.heure));
+    let n = 0;
+    if ($('#neAsk').checked) {
+      if (type !== 'entrainement') { e.dispoDemandee = true; e.dispoLimite = $('#neLim').value || date; }
+      n = notifInvitation(e);
+    }
+    closeModal(); render();
+    toast(n ? `Événement créé — ${n} joueur(s) notifié(s).` : 'Événement créé, sans notification.');
+  }
+};
+
+/* ---- Notifications : type « invitation club » ---- */
+viewNotifs = function () {
+  const u = state.currentUser;
+  const lic = state.licencies.find(l => l.id === monLicNotif());
+  const pourP = ph => u.enfantId && lic ? `Pour ${esc(lic.prenom)} : ${ph.charAt(0).toLowerCase() + ph.slice(1)}` : ph;
+  const liste = mesNotifs();
+  const ligne = n => {
+    const e = state.events.find(x => x.id === n.evtId);
+    const actif = e && !e.annule && e.date >= TODAY;
+    const [lab, cls] = NOTIF_TYPES[n.type] || [n.type, ''];
+    let corps = '', actions = '';
+    if (n.type === 'invitclub') {
+      const encoreInvite = actif && e.convoques.includes(lic.id);
+      corps = `${n.quand} · ${esc(n.lieu)}<br>${u.enfantId && lic ? esc(lic.prenom) + ' et sa famille sont invités.' : 'Tu es invité(e).'} Merci de répondre.`;
+      if (encoreInvite) { const r = e.reponses[lic.id]; actions = `<button class="btn btn-sm ${r === 'present' ? 'rsvp-ok' : ''}" data-nrep="present" data-nid="${n.id}">✓ Présent</button><button class="btn btn-sm ${r === 'absent' ? 'rsvp-ko' : ''}" data-nrep="absent" data-nid="${n.id}">✕ Absent</button>`; }
+      else if (actif) corps += '<br><em>La liste des invités a été mise à jour : tu n\'es plus concerné(e).</em>';
+    } else if (n.type === 'dispo') {
+      corps = `${n.quand} · ${esc(n.lieu)}<br>${pourP('Disponible ?')}${n.limite ? ' Réponse avant le ' + dfrShort(n.limite) + '.' : ''}`;
+      if (actif && !e.convoques.length) { const d = e.dispos[lic.id]; actions = `<button class="btn btn-sm ${d === 'dispo' ? 'rsvp-ok' : ''}" data-nrep="dispo" data-nid="${n.id}">✓ Oui</button><button class="btn btn-sm ${d === 'indispo' ? 'rsvp-ko' : ''}" data-nrep="indispo" data-nid="${n.id}">✕ Non</button>`; }
+      else if (actif) corps += `<br><em>${e.convoques.includes(lic.id) ? 'Sélection publiée : convoqué(e).' : 'Sélection publiée : pas retenu(e) cette fois.'}</em>`;
+    } else if (n.type === 'presence' || n.type === 'convocation') {
+      corps = `${n.quand} · ${esc(n.lieu)}<br>${pourP(n.type === 'convocation' ? 'Convoqué(e). Merci de confirmer la présence.' : 'Présent(e) ?')}`;
+      if (actif) { const r = e.reponses[lic.id]; actions = `<button class="btn btn-sm ${r === 'present' ? 'rsvp-ok' : ''}" data-nrep="present" data-nid="${n.id}">✓ Présent</button><button class="btn btn-sm ${r === 'absent' ? 'rsvp-ko' : ''}" data-nrep="absent" data-nid="${n.id}">✕ Absent</button>`; }
+    } else if (n.type === 'modification') {
+      corps = `<ul class="notif-ch">${(n.changements || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul>${u.enfantId ? 'Pensez à vérifier la réponse de ' + esc(lic.prenom) + '.' : 'Vérifie ta réponse si besoin.'}`;
+    } else if (n.type === 'annulation') corps = `Prévu le ${n.quand}. ${pourP('Plus besoin de venir.')}`;
+    else if (n.type === 'suppression') corps = `Prévu le ${n.quand}. Retiré du calendrier par le club.`;
+    else if (n.type === 'retabli') corps = `Finalement maintenu : ${n.quand} · ${esc(n.lieu)}.`;
+    if (e && n.type !== 'suppression') actions += `<button class="btn btn-sm" data-ngo="${n.evtId}">Voir</button>`;
+    return `<div class="card notif${n.lu ? '' : ' notif-new'}">
+      <div class="notif-head"><span class="badge ${cls}"><span class="dot"></span>${lab}</span><strong>${esc(n.titre)}</strong><span class="when">${n.lu ? '' : '<span class="notif-dot" aria-label="non lue"></span>'}${dfrShort(n.date)}</span></div>
+      <div class="notif-body">${corps}</div>
+      ${actions ? `<div class="evt-actions">${actions}</div>` : ''}
+    </div>`;
+  };
+  return `
+  <div class="page-head">
+    <div><h1 class="page-title">Notifications</h1>
+    <p class="page-sub">${u.enfantId && lic ? 'Événements de ' + esc(lic.prenom + ' ' + lic.nom) : 'Mes événements'} — invitations, convocations, changements et annulations</p></div>
+  </div>
+  <div class="notif-list">${liste.length ? liste.map(ligne).join('') : '<div class="card"><p class="empty" style="padding:6px">Aucune notification.</p></div>'}</div>
+  <p style="font-size:12.5px;color:var(--ink-2);max-width:760px">Dans la version réelle : notification push sur le téléphone, et l'agenda synchronisé (Sportif → « Synchroniser mon agenda ») se met à jour tout seul.</p>`;
+};
+
+/* ---- Règle de contact email : alignée sur la règle WhatsApp ---- */
+const MAIL_CATS_COPIE = ['M16', 'M19'];
+(function seedMailCopie() {
+  for (const l of state.licencies) if (MAIL_CATS_COPIE.includes(l.cat)) l.mailJoueurCopie = rnd() < 0.55;
+})();
+function mailDestinataires(l) {
+  normaliserLic(l);
+  if (!estMineur(l)) return [{ nom: l.prenom + ' ' + l.nom, email: l.email, role: 'Joueur·se' }];
+  const refs = l.referents || [];
+  const pref = l.prefMail || 'Les deux';
+  const dest = (pref === 'Référent 1' ? [refs[0]] : pref === 'Référent 2' ? [refs[1] || refs[0]] : refs).filter(Boolean)
+    .map(r => ({ nom: r.prenom + ' ' + r.nom, email: r.email, role: r.lien + ' de ' + l.prenom }));
+  if (MAIL_CATS_COPIE.includes(l.cat) && l.mailJoueurCopie && l.email) dest.push({ nom: l.prenom + ' ' + l.nom, email: l.email, role: 'Joueur·se — en copie' });
+  return dest;
+}
+function mailRegleBloc(l, peutModifier) {
+  const dest = mailDestinataires(l);
+  const majeur = !estMineur(l);
+  return `<div class="card" style="margin-top:12px"><h3>Emails du club : qui les reçoit ?</h3>
+    <p style="margin:0 0 8px">${dest.map(d => `<span class="chip" title="${esc(d.email)}">${esc(d.nom)} — ${esc(d.role)}</span>`).join(' ') || '<em>aucun destinataire</em>'}</p>
+    <p class="wa-sub" style="margin:0 0 ${!majeur && MAIL_CATS_COPIE.includes(l.cat) ? '10px' : '0'}">Règle du club, identique à WhatsApp : majeur → le joueur ; mineur → le ou les parents selon la préférence « Contact email du parent dirigeant » de la fiche${MAIL_CATS_COPIE.includes(l.cat) ? ' ; à partir de M16, le joueur peut être mis en copie' : ''}.</p>
+    ${!majeur && MAIL_CATS_COPIE.includes(l.cat) ? `<label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:500;color:var(--ink)">
+      <input type="checkbox" id="mailCopieJoueur" ${l.mailJoueurCopie ? 'checked' : ''} ${peutModifier ? '' : 'disabled'}> ${esc(l.prenom)} reçoit les emails du club en copie des parents (${esc(l.email)})</label>` : ''}
+  </div>`;
+}
+const _ficheLicBodyV10 = ficheLicBody;
+ficheLicBody = function (l, t) {
+  const html = _ficheLicBodyV10(l, t);
+  if (t !== 'responsable') return html;
+  return html + mailRegleBloc(l, !window.canW || canW('licencies'));
+};
+
+/* La fiche de demande de paiement affiche le(s) destinataire(s) email résolus par la règle */
+const _openFichePaiementV10 = openFichePaiement;
+openFichePaiement = function (pid) {
+  _openFichePaiementV10(pid);
+  const p = state.paiements.find(x => x.id === pid);
+  const l = p && state.licencies.find(x => x.id === p.licId);
+  const body = $('#modalRoot .modal-body');
+  if (!l || !body) return;
+  body.insertAdjacentHTML('beforeend', `<p style="font-size:12.5px;color:var(--ink-2);margin:12px 0 0">✉ Destinataire(s) des emails (règle de contact) : ${mailDestinataires(l).map(d => esc(d.nom) + ' &lt;' + esc(d.email) + '&gt;').join(', ')}</p>`);
+};
+
+/* ---- Liaisons ---- */
+const _bindExtraV10c = bindExtra;
+bindExtra = function (v) {
+  _bindExtraV10c(v);
+  $$('[data-clubinv]', v).forEach(b => b.onclick = () => { const e = state.events.find(x => x.id === Number(b.dataset.clubinv)); if (e) openInvitesClub(e); });
+  $$('[data-clubedit]', v).forEach(b => b.onclick = () => { const e = state.events.find(x => x.id === Number(b.dataset.clubedit)); if (e) openEditClub(e); });
+  $$('[data-waclub]', v).forEach(b => b.onclick = () => { const e = state.events.find(x => x.id === Number(b.dataset.waclub)); if (e) waGroupeEvt(e, 'invitationClubGroupe'); });
+  const l = state.view === 'licencie' ? state.licencies.find(x => x.id === state.licFicheId) : null;
+  const mc = $('#mailCopieJoueur');
+  if (mc && l) mc.onchange = () => { l.mailJoueurCopie = mc.checked; toast(mc.checked ? `${l.prenom} recevra les emails du club en copie.` : `Les emails ne vont plus qu'aux parents.`); };
 };
 render();
 </script>
