@@ -353,7 +353,6 @@ label { font-size: 12px; font-weight: 600; color: var(--ink-2); display: block; 
 </head>
 <body>
 
-
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
@@ -6587,11 +6586,16 @@ function openFormPack(id) {
   const p = id ? state.packs.find(x => x.id === id) : null;
   const arts = state.stock.filter(a => a.dotation || a.vente);
   let items = p ? p.items.map(it => ({ ...it })) : [{ artId: arts[0] ? arts[0].id : null, qte: 1 }];
+  let usage = p ? p.usage : 'dotation';
   const corps = () => `
     <div class="form-grid">
       <div class="field" style="grid-column:1/-1"><label for="pkNom">Nom du pack <span class="req">*</span></label><input id="pkNom" value="${p ? esc(p.nom) : ''}" placeholder="ex. Pack rentrée M14"></div>
-      <div class="field"><label for="pkUsage">Usage</label><select id="pkUsage"><option value="dotation" ${!p || p.usage === 'dotation' ? 'selected' : ''}>Dotation joueurs</option><option value="vente" ${p && p.usage === 'vente' ? 'selected' : ''}>Vendu en boutique</option></select></div>
-      <div class="field"><label for="pkPV">Prix de vente du pack (€) — si vendu</label><input id="pkPV" type="number" min="0" step="0.5" value="${p && p.prixVente ? p.prixVente : ''}" placeholder="${p ? eur(packPrixVenteRef(p)) : 'somme des articles par défaut'}"></div>
+      <div class="field"><label id="pkUsageLab">Usage</label>
+        <div class="wa-seg seg-accent" role="radiogroup" aria-labelledby="pkUsageLab">
+          <button type="button" role="radio" aria-checked="${usage === 'dotation'}" class="${usage === 'dotation' ? 'on' : ''}" data-pkusage="dotation">Dotation joueurs</button>
+          <button type="button" role="radio" aria-checked="${usage === 'vente'}" class="${usage === 'vente' ? 'on' : ''}" data-pkusage="vente">Vendu en boutique</button>
+        </div></div>
+      <div class="field" id="pkPVField" ${usage === 'vente' ? '' : 'hidden'}><label for="pkPV">Prix de vente du pack (€)</label><input id="pkPV" type="number" min="0" step="0.5" value="${p && p.prixVente ? p.prixVente : ''}" placeholder="${p ? eur(packPrixVenteRef(p)) : 'somme des articles par défaut'}"></div>
     </div>
     <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:14px 0 8px">Composition</h3>
     <div id="pkItems">${items.map((it, i) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
@@ -6605,13 +6609,14 @@ function openFormPack(id) {
     <button class="btn" onclick="closeModal()">Annuler</button>
     <button class="btn btn-primary" id="pkOk">${p ? 'Enregistrer' : 'Créer le pack'}</button>`);
   const lire = () => { items = items.map((it, i) => ({ artId: Number($(`[data-pkart="${i}"]`).value), qte: Math.max(1, Number($(`[data-pkqte="${i}"]`).value) || 1) })); };
-  const rerender = () => { // conserve ce qui est déjà saisi (nom, usage, prix)
-    const garde = { nom: $('#pkNom').value, usage: $('#pkUsage').value, pv: $('#pkPV').value };
+  const rerender = () => { // conserve ce qui est déjà saisi (nom, prix) — l'usage vit dans la variable
+    const garde = { nom: $('#pkNom').value, pv: $('#pkPV').value };
     $('#modalRoot .modal-body').innerHTML = corps();
-    $('#pkNom').value = garde.nom; $('#pkUsage').value = garde.usage; $('#pkPV').value = garde.pv;
+    $('#pkNom').value = garde.nom; $('#pkPV').value = garde.pv;
     bind();
   };
   const bind = () => {
+    $$('#modalRoot [data-pkusage]').forEach(b => b.onclick = () => { usage = b.dataset.pkusage; lire(); rerender(); });
     $('#pkAdd').onclick = () => { lire(); items.push({ artId: arts[0].id, qte: 1 }); rerender(); };
     $$('#modalRoot [data-pkdel]').forEach(b => b.onclick = () => { lire(); items.splice(Number(b.dataset.pkdel), 1); rerender(); });
   };
@@ -6621,8 +6626,8 @@ function openFormPack(id) {
     if (!nom) { champErreur('pkNom', 'Donne un nom au pack.'); return; }
     lire();
     const pv = $('#pkPV').value === '' ? null : Math.max(0, Number($('#pkPV').value) || 0);
-    if (p) { Object.assign(p, { nom, usage: $('#pkUsage').value, prixVente: pv, items }); toast(`Pack « ${nom} » mis à jour.`); }
-    else { state.packs.push({ id: Date.now(), nom, usage: $('#pkUsage').value, prixVente: pv, items }); toast(`Pack « ${nom} » créé.`); }
+    if (p) { Object.assign(p, { nom, usage, prixVente: pv, items }); toast(`Pack « ${nom} » mis à jour.`); }
+    else { state.packs.push({ id: Date.now(), nom, usage, prixVente: pv, items }); toast(`Pack « ${nom} » créé.`); }
     closeModal(); render();
   };
   const del = $('#pkSuppr');
@@ -6701,70 +6706,131 @@ function openDistributionMasse(packId) {
 }
 
 function ouvrirControleDistribution(nomQuoi, items, catCible) {
-  const joueurs = state.licencies.filter(l => l.cat !== 'DIR' && (!catCible || l.cat === catCible))
-    .sort((a, b) => (a.cat + a.nom).localeCompare(b.cat + b.nom, 'fr'));
+  const joueurs = state.licencies.filter(l => l.cat !== 'DIR' && (!catCible || l.cat === catCible));
   // allocation simulée : copie des stocks pour détecter les ruptures ligne à ligne
   const dispo = {};
-  for (const it of items) { const a = packArt(it); if (!a) continue; dispo[a.id] = a.dims ? { ...a.dims } : { _: a.qte }; }
+  let tri = catCible ? 'nom' : 'cat'; // ordre d'affichage = ordre de service
   const plan = joueurs.map(l => {
     const dejaDote = items.every(it => { const a = packArt(it); return a && (l.dotations || []).some(d => d.article === a.nom); });
     const lignes = items.map(it => {
       const a = packArt(it);
       const taille = a && a.dims ? dimPourLic(a, l) : null;
-      return { it, a, taille };
+      return { it, a, taille, tailleFiche: taille, manque: false };
     });
     return { l, lignes, dejaDote, inclus: !dejaDote, rupture: false };
   });
+  const catIdx = c => CATEGORIES.findIndex(x => x.code === c);
+  const nomCle = p => (p.l.nom + ' ' + p.l.prenom).toLowerCase();
+  const trier = () => plan.sort((x, y) => (tri === 'cat' ? catIdx(x.l.cat) - catIdx(y.l.cat) : 0) || nomCle(x).localeCompare(nomCle(y), 'fr'));
+  trier();
   const simuler = () => {
-    for (const k of Object.keys(dispo)) for (const t of Object.keys(dispo[k])) dispo[k][t] = null; // reset
     for (const it of items) { const a = packArt(it); if (!a) continue; dispo[a.id] = a.dims ? { ...a.dims } : { _: a.qte }; }
     for (const p of plan) {
-      p.rupture = false;
+      p.rupture = false; p.servi = false;
+      for (const lg of p.lignes) lg.manque = false;
       if (!p.inclus) continue;
-      // vérifie puis réserve
-      const ok = p.lignes.every(({ it, a, taille }) => a && (dispo[a.id][taille || '_'] || 0) >= it.qte);
-      if (!ok) { p.rupture = true; p.servi = false; continue; }
+      // vérifie chaque article (pour marquer la taille en rupture) puis réserve tout ou rien
+      for (const lg of p.lignes) lg.manque = !lg.a || (dispo[lg.a.id][lg.taille || '_'] || 0) < lg.it.qte;
+      if (p.lignes.some(lg => lg.manque)) { p.rupture = true; continue; }
       for (const { it, a, taille } of p.lignes) dispo[a.id][taille || '_'] -= it.qte;
       p.servi = true;
     }
   };
+  // la fiche du joueur est-elle mise à jour par cette taille ? (pas pour les plages de pointures)
+  const majFichePossible = (a, t) => !!(a && a.dims && t && !t.includes('-'));
+  const cellule = (p, i, lg, j, ms) => {
+    const { it, a, taille, tailleFiche, manque } = lg;
+    if (!a) return '<td></td>';
+    const q = it.qte > 1 ? it.qte + ' × ' : '';
+    // couleur du label : rouge = pas dispo du tout (joueur non servi) · orange = dispo mais insuffisant
+    // pour toute la distribution · vert = dispo
+    const enManqueGlobal = ms.some(m => (m.taille || null) === (taille || null));
+    const cls = !p.inclus ? '' : manque ? ' dm-rouge' : enManqueGlobal ? ' dm-orange' : ' dm-vert';
+    if (!a.dims) return `<td>${q}<span class="dm-lab${cls}">${esc(a.unite)}</span></td>`;
+    return `<td>${q}<select class="dm-taille dm-lab${cls}" data-dmtaille="${i}:${j}" ${p.inclus ? '' : 'disabled'}
+        aria-label="Taille — ${esc(a.nom)} pour ${esc(p.l.prenom + ' ' + p.l.nom)}">
+        ${Object.entries(a.dims).map(([t, qs]) => `<option value="${esc(t)}" ${t === taille ? 'selected' : ''}${t !== tailleFiche ? ' class="dm-autre"' : ''}>${esc(t)} (${qs})</option>`).join('')}
+      </select></td>`;
+  };
+  const nomCourt = a => a ? a.nom.replace(' club', '').replace(" d'entraînement", '') : '';
+  // manque global par article : demande totale des joueurs inclus vs stock réel, taille par taille
+  const manquesGlobaux = () => items.map((it, j) => {
+    const a = packArt(it);
+    if (!a) return [];
+    const demande = {};
+    for (const p of plan) { if (!p.inclus) continue; const k = p.lignes[j].taille || '_'; demande[k] = (demande[k] || 0) + it.qte; }
+    const out = [];
+    for (const [k, d] of Object.entries(demande)) {
+      const st = a.dims ? (a.dims[k] || 0) : a.qte;
+      if (d > st) out.push({ taille: k === '_' ? null : k, manque: d - st });
+    }
+    return out;
+  });
   const corps = () => {
     simuler();
     const nIncl = plan.filter(p => p.inclus).length, nRupt = plan.filter(p => p.inclus && p.rupture).length;
+    const mg = manquesGlobaux();
+    const resumeMg = mg.flatMap((ms, j) => ms.length ? [`<strong>${esc(nomCourt(packArt(items[j])))}</strong> = ${ms.map(m => m.taille ? `${m.manque} : ${esc(m.taille)}` : String(m.manque)).join(', ')}`] : []);
     return `
     <p style="margin:0 0 10px"><strong>${esc(nomQuoi)}</strong> → ${catCible ? esc(catLabel(catCible)) : 'tout le club'} · <strong>${nIncl - nRupt}</strong> joueur(s) seront servis${nRupt ? ` · <span style="color:var(--critical-text);font-weight:600">${nRupt} en rupture de taille</span>` : ''}${plan.filter(p => p.dejaDote).length ? ` · ${plan.filter(p => p.dejaDote).length} déjà doté(s) (décochés)` : ''}</p>
+    ${resumeMg.length ? `<p class="dm-warn-ligne">⚠ Stock insuffisant ! ${resumeMg.join(' / ')}</p>` : ''}
+    ${catCible ? '' : `<div class="filtres-chips" style="margin:0 0 10px">
+      <span style="font-size:12px;color:var(--ink-2);align-self:center">Trier :</span>
+      <button class="${tri === 'cat' ? 'on' : ''}" data-dmtri="cat">Par catégorie, puis nom</button>
+      <button class="${tri === 'nom' ? 'on' : ''}" data-dmtri="nom">Par nom (A → Z)</button>
+    </div>`}
     <div class="table-wrap" style="max-height:46vh;overflow:auto"><table>
-      <thead><tr><th></th><th>Joueur</th>${items.map(it => { const a = packArt(it); return `<th>${a ? esc(a.nom.replace(' club', '').replace(" d'entraînement", '')) : ''}</th>`; }).join('')}<th>État</th></tr></thead>
+      <thead><tr><th></th><th>Joueur</th>${items.map((it, j) => { const a = packArt(it); return `<th class="${mg[j].length ? 'dm-warn' : ''}" ${mg[j].length ? `title="Stock insuffisant : ${esc(mg[j].map(m => 'manque ' + m.manque + (m.taille ? ' en ' + m.taille : '')).join(', '))}"` : ''}>${esc(nomCourt(a))}${mg[j].length ? ' ⚠' : ''}</th>`; }).join('')}</tr></thead>
       <tbody>${plan.map((p, i) => `<tr style="${!p.inclus ? 'opacity:.55' : ''}">
         <td><input type="checkbox" data-dmrow="${i}" ${p.inclus ? 'checked' : ''} aria-label="Inclure ${esc(p.l.prenom + ' ' + p.l.nom)}"></td>
-        <td><strong>${esc(p.l.prenom + ' ' + p.l.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(catLabel(p.l.cat).split(' – ')[0])}</span></td>
-        ${p.lignes.map(({ it, a, taille }) => `<td>${it.qte > 1 ? it.qte + ' × ' : ''}${taille ? `<span class="badge">${esc(taille)}</span>` : a ? a.unite : ''}</td>`).join('')}
-        <td>${p.dejaDote && !p.inclus ? '<span class="badge"><span class="dot"></span>Déjà doté</span>' : p.inclus ? (p.rupture ? '<span class="badge b-crit"><span class="dot"></span>Rupture de taille</span>' : '<span class="badge b-good"><span class="dot"></span>OK</span>') : '<span class="badge">Exclu</span>'}</td>
+        <td><strong>${esc(p.l.prenom + ' ' + p.l.nom)}</strong><br><span style="color:var(--ink-3);font-size:12px">${esc(catLabel(p.l.cat).split(' – ')[0])}</span>${p.dejaDote ? ' <span class="badge" style="font-size:11px">Déjà doté</span>' : ''}</td>
+        ${p.lignes.map((lg, j) => cellule(p, i, lg, j, mg[j])).join('')}
       </tr>`).join('')}</tbody>
     </table></div>
-    ${nRupt ? '<p style="font-size:12.5px;color:var(--ink-2);margin:10px 0 0">Les joueurs en rupture ne seront pas servis : réassortis leur taille puis relance la distribution — la liste se recalcule.</p>' : ''}`;
+    <p style="font-size:12.5px;color:var(--ink-2);margin:10px 0 0">Taille <span class="dm-leg dm-vert">verte</span> = dispo · <span class="dm-leg dm-orange">orange</span> = dispo mais insuffisante pour toute la distribution · <span class="dm-leg dm-rouge">rouge</span> = pas dispo (joueur non servi, selon l'ordre de la liste). Clique sur la taille pour la changer (tailles en <em>italique</em> = différentes de la fiche) : la fiche du joueur est mise à jour à la distribution — sauf chaussettes, servies par plage de pointures.</p>`;
   };
   openModal('Contrôle avant distribution', corps(), `
     <button class="btn" onclick="closeModal()">Annuler</button>
     <button class="btn btn-primary" id="dmGo">Distribuer</button>`);
-  const bind = () => $$('#modalRoot [data-dmrow]').forEach(c => c.onchange = () => { plan[Number(c.dataset.dmrow)].inclus = c.checked; $('#modalRoot .modal-body').innerHTML = corps(); bind(); });
+  const rerender = () => {
+    const tw = $('#modalRoot .table-wrap');
+    const sc = tw ? tw.scrollTop : 0;
+    $('#modalRoot .modal-body').innerHTML = corps();
+    const tw2 = $('#modalRoot .table-wrap');
+    if (tw2) tw2.scrollTop = sc;
+    bind();
+  };
+  const bind = () => {
+    $$('#modalRoot [data-dmtri]').forEach(b => b.onclick = () => { tri = b.dataset.dmtri; trier(); rerender(); });
+    $$('#modalRoot [data-dmrow]').forEach(c => c.onchange = () => { plan[Number(c.dataset.dmrow)].inclus = c.checked; rerender(); });
+    $$('#modalRoot [data-dmtaille]').forEach(s => s.onchange = () => {
+      const [i, j] = s.dataset.dmtaille.split(':').map(Number);
+      plan[i].lignes[j].taille = s.value;
+      rerender();
+    });
+  };
   bind();
   $('#dmGo').onclick = () => {
     simuler();
     const servis = plan.filter(p => p.inclus && p.servi);
     if (!servis.length) { toast('Personne à servir (tout est exclu ou en rupture).'); return; }
+    let majFiches = 0;
     for (const p of servis) {
-      for (const { it, a, taille } of p.lignes) {
+      for (const { it, a, taille, tailleFiche } of p.lignes) {
         stockRetirer(a, taille, it.qte, 'Dotation (distribution groupée)');
         p.l.dotations.push({ article: a.nom, qte: it.qte, date: TODAY, taille });
         state.dotationsLog.unshift({ id: Date.now() + ri(1, 99999), licId: p.l.id, artId: a.id, article: a.nom, qte: it.qte, taille, date: TODAY, par: state.currentUser.nom });
+        if (taille !== tailleFiche && majFichePossible(a, taille)) {
+          if (/short/i.test(a.nom)) { if (p.l.tailleShort !== taille) { p.l.tailleShort = taille; majFiches++; } }
+          else if (p.l.tailleMaillot !== taille) { p.l.tailleMaillot = taille; majFiches++; }
+        }
       }
     }
     const nRupt = plan.filter(p => p.inclus && p.rupture).length;
     closeModal();
     subTabs.stockSection = 'distribution';
     render();
-    toast(`${servis.length} joueur(s) servi(s)${nRupt ? ` — ${nRupt} non servi(s) (rupture de taille)` : ''} — stock et fiches mis à jour.`);
+    toast(`${servis.length} joueur(s) servi(s)${nRupt ? ` — ${nRupt} non servi(s) (rupture de taille)` : ''}${majFiches ? ` — ${majFiches} taille(s) corrigée(s) sur les fiches` : ''} — stock et fiches mis à jour.`);
   };
 }
 
@@ -7569,5 +7635,887 @@ bindExtra = function (v) {
 render();
 </script>
 
+<style>
+/* ================= V11 : INSCRIPTIONS EN LIGNE + PONT OVAL-E ================= */
+.lic-tabs { margin: 10px 0 4px; }
+.lic-tabs .tab-count { display:inline-block; min-width:18px; padding:1px 6px; margin-left:6px; border-radius:10px; font-size:12px; background: var(--accent); color: var(--accent-ink); }
+.insc-row td:first-child { font-weight: 600; }
+.chk-list { display:flex; flex-direction:column; gap:6px; margin:0; padding:0; list-style:none; }
+.chk-list li { display:flex; gap:8px; align-items:baseline; font-size:13.5px; }
+.chk-ok { color: var(--good-text); font-weight:700; }
+.chk-ko { color: var(--critical-text); font-weight:700; }
+.chk-warn { color: var(--warning-text); font-weight:700; }
+.kv { display:grid; grid-template-columns: 150px 1fr; gap:4px 12px; font-size:13.5px; }
+.kv dt { color: var(--ink-2); }
+.kv dd { margin:0; min-width:0; overflow-wrap:anywhere; }
+.note-box { border:1px solid var(--line-strong); border-left:4px solid var(--warning); background: var(--surface); border-radius:8px; padding:10px 14px; font-size:13px; color: var(--ink-2); }
+.note-box b { color: var(--ink); }
+.ov-steps { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:14px; margin-top:14px; }
+.ov-steps .card { display:flex; flex-direction:column; gap:8px; }
+.ov-steps .step-k { font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif; font-size:13px; letter-spacing:.8px; text-transform:uppercase; color: var(--accent); font-weight:700; }
+.copy-row { display:grid; grid-template-columns: 150px 1fr auto; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
+.copy-row:last-child { border-bottom:0; }
+.copy-row code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding:3px 7px; border-radius:6px; overflow-wrap:anywhere; }
+@media (max-width: 560px) { .copy-row { grid-template-columns: 1fr auto; } .copy-row > span:first-child { grid-column: 1 / -1; color: var(--ink-2); font-size:12px; } .kv { grid-template-columns: 1fr; } .kv dt { margin-top:6px; } }
+
+/* ---- Portail famille (vue publique) ---- */
+.portail { position: fixed; inset: 0; z-index: 70; background: var(--bg); overflow-y: auto; }
+.portail-bar { position: sticky; top: 0; z-index: 2; background: var(--side-bg); color: var(--side-ink-strong);
+  display:flex; align-items:center; gap:12px; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; }
+.portail-bar .pb-name { font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif; font-size:20px; font-weight:700; letter-spacing:.3px; line-height:1.05; }
+.portail-bar .pb-sub { font-size:12px; color: var(--side-ink); }
+.portail-bar .pb-logo { width:34px; height:34px; border-radius:50%; background: var(--accent); flex:none; overflow:hidden; display:grid; place-items:center; }
+.portail-bar .pb-logo img { width:100%; height:100%; object-fit:cover; }
+.portail-bar .pb-quit { margin-left:auto; background:none; border:1px solid rgba(255,255,255,.3); color: var(--side-ink-strong); border-radius:8px; padding:7px 10px; font:600 12.5px system-ui,sans-serif; cursor:pointer; white-space:nowrap; }
+.portail-demo { background: var(--warning); color:#221800; font-size:12.5px; font-weight:600; padding:6px 16px; }
+.portail-wrap { max-width: 600px; margin: 0 auto; padding-block: 18px 60px; padding-inline: 16px; }
+.portail h2 { font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif; font-size:28px; margin:4px 0 2px; line-height:1.05; }
+.portail .lead { color: var(--ink-2); margin:0 0 14px; font-size:13.5px; }
+.pstep-bar { display:flex; gap:4px; margin: 6px 0 16px; }
+.pstep-bar i { flex:1; height:5px; border-radius:3px; background: var(--line-strong); }
+.pstep-bar i.on { background: var(--accent); }
+.pstep-label { font-size:12px; text-transform:uppercase; letter-spacing:.8px; color: var(--ink-2); font-weight:600; }
+.portail fieldset { border:1px solid var(--line); border-radius:10px; padding:12px 14px 14px; margin:0 0 14px; background: var(--surface); }
+.portail legend { font-weight:700; font-size:13px; padding:0 6px; }
+.portail .field { margin-bottom:10px; }
+.portail input, .portail select { width:100%; }
+.portail .chk { display:flex; gap:10px; align-items:flex-start; font-size:13.5px; font-weight:500; color: var(--ink); margin:8px 0; }
+.portail .chk input { width:auto; margin-top:3px; }
+.portail .err { color: var(--critical-text); font-size:12.5px; margin:4px 0 0; }
+.portail .invalid { border-color: var(--critical); }
+.pay-opt { display:flex; gap:10px; align-items:flex-start; border:1px solid var(--line-strong); border-radius:10px; padding:10px 12px; margin-bottom:8px; cursor:pointer; background: var(--surface); font-weight:500; color: var(--ink); font-size:13.5px; }
+.pay-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.pay-opt input { width:auto; margin-top:3px; }
+.pay-opt small { display:block; color: var(--ink-2); font-size:12.5px; margin-top:2px; }
+.portail-nav { display:flex; justify-content:space-between; gap:8px; margin-top:6px; }
+.recap-total { display:flex; justify-content:space-between; align-items:baseline; font-size:15px; font-weight:700; border-top:1px solid var(--line-strong); padding-top:10px; margin-top:6px; }
+.drop { border:1.5px dashed var(--line-strong); border-radius:10px; padding:12px; font-size:13px; color: var(--ink-2); text-align:center; }
+.drop.ok { border-style:solid; border-color: var(--good); color: var(--good-text); }
+</style>
+<script>
+/* ================= V11 : INSCRIPTIONS EN LIGNE (PORTAIL FAMILLE + FILE DE VALIDATION) ET PONT OVAL-E (MODE FICHIER) ================= */
+
+const sansAccent = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '');
+const cleIdentite = (nom, prenom, naiss) => sansAccent(nom) + '|' + sansAccent(prenom) + '|' + (naiss || '');
+
+/* Catégorie déduite de l'année de naissance (saison 2026-2027) */
+function catDepuisNaissance(naiss, pratique) {
+  if (pratique === 'dirigeant') return 'DIR';
+  if (pratique === 'loisir') return 'LOI';
+  const y = Number(String(naiss).slice(0, 4));
+  if (!y) return null;
+  const c = CATEGORIES.find(c => !['LOI', 'DIR', 'SEN'].includes(c.code) && y >= c.nmin && y <= c.nmax);
+  if (c) return c.code;
+  if (y <= 2006) return 'SEN';
+  return null; // trop jeune : moins de 5 ans
+}
+const estMineurCat = code => CATS_MINEURS.includes(code);
+
+/* Correspondance avec un licencié existant (réinscription / doublon) */
+function licencieCorrespondant(ins) {
+  const k = cleIdentite(ins.joueur.nom, ins.joueur.prenom, ins.joueur.naissance);
+  return state.licencies.find(l => cleIdentite(l.nom, l.prenom, l.naissance) === k) || null;
+}
+
+const PAI_MODES = {
+  virement: { label: 'Virement instantané depuis la banque', court: 'Virement instantané' },
+  prelevement: { label: 'Prélèvement SEPA en 3 fois', court: 'Prélèvement 3×' },
+  sur_place: { label: 'Sur place (chèque, espèces, ANCV, Pass\'Sport)', court: 'Sur place' },
+};
+
+/* ---- Contrôles automatiques d'un dossier ---- */
+function controlesInscription(ins) {
+  const cat = catDepuisNaissance(ins.joueur.naissance, ins.pratique);
+  const mineur = estMineurCat(cat);
+  const dup = licencieCorrespondant(ins);
+  const out = [];
+  out.push(cat ? { ok: 'ok', txt: `Catégorie déduite de la date de naissance : ${catLabel(cat)}` } : { ok: 'ko', txt: 'Date de naissance hors des catégories du club' });
+  if (mineur) out.push(ins.referents.length ? { ok: 'ok', txt: `${ins.referents.length} responsable(s) légal(aux) renseigné(s)` } : { ok: 'ko', txt: 'Mineur sans responsable légal' });
+  out.push(ins.docs.cert ? { ok: 'ok', txt: `Certificat médical déposé (${ins.docs.cert})` } : { ok: 'ko', txt: 'Certificat médical manquant — la licence FFR ne pourra pas être validée' });
+  if (mineur) out.push(ins.docs.autoParent ? { ok: 'ok', txt: 'Autorisation parentale signée' } : { ok: 'ko', txt: 'Autorisation parentale non signée' });
+  if (ins.deja && ins.ancienClub && sansAccent(ins.ancienClub) !== sansAccent(state.params.clubNom))
+    out.push({ ok: 'warn', txt: `Vient de ${ins.ancienClub} : dossier de mutation FFR à ouvrir dans Oval-e` });
+  if (dup) out.push({ ok: 'warn', txt: `Déjà dans le fichier : ${dup.prenom} ${dup.nom} (${catLabel(dup.cat)}) — la validation mettra sa fiche à jour au lieu d'en créer une seconde` });
+  const p = ins.paiement;
+  if (p.montant === 0) out.push({ ok: 'ok', txt: 'Aucune cotisation due' });
+  else if (p.paye >= p.montant) out.push({ ok: 'ok', txt: `Cotisation réglée : ${eur(p.paye)} (${PAI_MODES[p.mode].court})` });
+  else if (p.paye > 0) out.push({ ok: 'warn', txt: `Cotisation : ${eur(p.paye)} réglés sur ${eur(p.montant)} (${PAI_MODES[p.mode].court}, échéances suivantes programmées)` });
+  else out.push({ ok: 'warn', txt: `Cotisation de ${eur(p.montant)} à encaisser ${p.mode === 'sur_place' ? 'à la permanence' : ''}` });
+  return { cat, mineur, dup, liste: out, bloquant: out.some(c => c.ok === 'ko') };
+}
+
+/* ---- Données de démo : dossiers reçus ces derniers jours ---- */
+(function seedInscriptions() {
+  const exist = state.licencies.find(l => l.cat === 'M12' && l.referents && l.referents.length) || state.licencies.find(l => l.cat === 'M12');
+  state.inscriptions = [
+    { id: 1, recu: '2026-09-16', canal: 'Formulaire en ligne', pratique: 'competition', statut: 'a_valider',
+      joueur: { prenom: 'Lina', nom: 'Benhamou', sexe: 'F', naissance: '2016-04-12', nationalite: 'Française', villeN: 'Montreuil', paysN: 'France', ville: 'Vincennes', email: '', tel: '' },
+      referents: [{ prenom: 'Karim', nom: 'Benhamou', lien: 'Père', email: 'karim.benhamou@exemple.fr', tel: '06 12 34 56 78', metier: 'Infirmier' },
+                  { prenom: 'Sophie', nom: 'Benhamou', lien: 'Mère', email: 'sophie.benhamou@exemple.fr', tel: '06 87 65 43 21', metier: 'Comptable' }],
+      tailles: { short: '10 ans', maillot: '10 ans', pointure: 33, tailleCm: 138, poids: 31 },
+      deja: false, ancienClub: '', saisons: 0,
+      docs: { cert: 'certificat-lina-2026.jpg', autoParent: true, droitImage: true },
+      consent: { rgpd: true, wa: true }, prefContact: 'Les deux',
+      paiement: { mode: 'virement', montant: 140, paye: 140 }, messages: [] },
+    { id: 2, recu: '2026-09-17', canal: 'Formulaire en ligne', pratique: 'competition', statut: 'a_valider',
+      joueur: { prenom: 'Hugo', nom: 'Ferrand', sexe: 'M', naissance: '1999-11-03', nationalite: 'Française', villeN: 'Créteil', paysN: 'France', ville: 'Saint-Mandé', email: 'hugo.ferrand@exemple.fr', tel: '06 45 22 18 90' },
+      referents: [], tailles: { short: 'L', maillot: 'XL', pointure: 44, tailleCm: 183, poids: 94 },
+      deja: true, ancienClub: 'RC Fontenay-sous-Bois', saisons: 6,
+      docs: { cert: '', autoParent: false, droitImage: true },
+      consent: { rgpd: true, wa: true }, prefContact: 'Joueur',
+      paiement: { mode: 'prelevement', montant: 220, paye: 74 }, messages: [] },
+    exist ? { id: 3, recu: '2026-09-17', canal: 'Formulaire en ligne', pratique: 'competition', statut: 'a_valider',
+      joueur: { prenom: exist.prenom, nom: exist.nom, sexe: exist.sexe, naissance: exist.naissance, nationalite: exist.nationalite || 'Française', villeN: exist.villeNaissance || exist.ville, paysN: 'France', ville: exist.ville, email: '', tel: '' },
+      referents: exist.referents && exist.referents.length ? exist.referents.map(r => ({ ...r })) : [{ prenom: 'Claire', nom: exist.nom, lien: 'Mère', email: 'claire.' + sansAccent(exist.nom) + '@exemple.fr', tel: '06 22 33 44 55', metier: '' }],
+      tailles: { short: '12 ans', maillot: '14 ans', pointure: 37, tailleCm: 152, poids: 41 },
+      deja: true, ancienClub: state.params.clubNom, saisons: 3,
+      docs: { cert: 'certificat-2026.pdf', autoParent: true, droitImage: false },
+      consent: { rgpd: true, wa: false }, prefContact: 'Référent 1',
+      paiement: { mode: 'sur_place', montant: 150, paye: 0 }, messages: [] } : null,
+    { id: 4, recu: '2026-09-12', canal: 'Formulaire en ligne', pratique: 'competition', statut: 'complement',
+      joueur: { prenom: 'Noé', nom: 'Garnier', sexe: 'M', naissance: '2019-02-21', nationalite: 'Française', villeN: 'Paris', paysN: 'France', ville: 'Fontenay-sous-Bois', email: '', tel: '' },
+      referents: [{ prenom: 'Julie', nom: 'Garnier', lien: 'Mère', email: 'julie.garnier@exemple.fr', tel: '06 71 20 30 40', metier: 'Architecte' }],
+      tailles: { short: '8 ans', maillot: '8 ans', pointure: 29, tailleCm: 122, poids: 23 },
+      deja: false, ancienClub: '', saisons: 0,
+      docs: { cert: 'photo-certificat.jpg', autoParent: true, droitImage: true },
+      consent: { rgpd: true, wa: true }, prefContact: 'Référent 1',
+      paiement: { mode: 'virement', montant: 140, paye: 140 },
+      messages: [{ date: '2026-09-14', txt: 'Bonjour, la photo du certificat est illisible (date et cachet du médecin). Pouvez-vous en déposer une nouvelle ? Merci, le secrétariat.' }] },
+  ].filter(Boolean);
+  state.ovale = { journal: [], arbitrage: [], dernierImport: null };
+})();
+
+/* ---- Validation : crée (ou met à jour) la fiche licencié, statut « En attente FFR » ---- */
+function validerInscription(ins, silencieux) {
+  const ctl = controlesInscription(ins);
+  const cat = CATEGORIES.find(c => c.code === ctl.cat);
+  const j = ins.joueur, p = ins.paiement;
+  const certFin = ins.docs.cert ? addDaysIso(TODAY, 365) : addDaysIso(TODAY, -1);
+  const cotStatut = p.montant === 0 ? 'exoneree' : p.paye >= p.montant ? 'payee' : p.paye > 0 ? 'partielle' : 'impayee';
+  const commun = {
+    sexe: j.sexe, nationalite: j.nationalite, villeNaissance: j.villeN, paysNaissance: j.paysN, ville: j.ville,
+    tailleShort: ins.tailles.short, tailleMaillot: ins.tailles.maillot, pointure: ins.tailles.pointure, tailleCm: ins.tailles.tailleCm, poids: ins.tailles.poids,
+    referents: ins.referents.length ? ins.referents.map(r => ({ ...r })) : null,
+    prefMail: ins.prefContact, prefWhatsapp: ins.prefContact,
+    dejaLicencie: ins.deja, ancienClub: ins.deja ? ins.ancienClub : null, anneesLicence: ins.saisons,
+    mutation: !!(ins.deja && ins.ancienClub && sansAccent(ins.ancienClub) !== sansAccent(state.params.clubNom)),
+    certFin, licStatut: 'attente',
+  };
+  let l = ctl.dup;
+  if (l) {
+    Object.assign(l, commun);
+    l.cat = cat.code;
+    if (j.email) l.email = j.email;
+    if (j.tel) l.tel = j.tel;
+    normaliserLic(l);
+  } else {
+    l = normaliserLic({
+      id: Date.now() + ins.id, prenom: j.prenom, nom: j.nom, naissance: j.naissance, cat: cat.code,
+      email: j.email || (ins.referents[0] ? ins.referents[0].email : ''), tel: j.tel || (ins.referents[0] ? ins.referents[0].tel : ''),
+      licence: 'à attribuer', inscrit: 2026, cot: p.montant, cotPaye: p.paye, cotStatut,
+      modePaiement: p.montant ? PAI_MODES[p.mode].court : '—', ...commun,
+    });
+    state.licencies.push(l);
+  }
+  l.cot = p.montant; l.cotPaye = p.paye; l.cotStatut = cotStatut;
+  l.modePaiement = p.montant ? PAI_MODES[p.mode].court : '—';
+  if (p.montant) {
+    l.echeances = p.mode === 'prelevement'
+      ? [0, 1, 2].map(k => ({ date: addDaysIso(ins.recu, 30 * k), montant: k < 2 ? Math.round(p.montant / 3) : p.montant - 2 * Math.round(p.montant / 3), statut: k === 0 && p.paye > 0 ? 'reglee' : 'a_venir' }))
+      : [{ date: p.paye >= p.montant ? ins.recu : addDaysIso(TODAY, 15), montant: p.montant, statut: p.paye >= p.montant ? 'reglee' : 'a_venir' }];
+  }
+  l.docsLic = l.docsLic || [];
+  if (ins.docs.cert) l.docsLic.push({ nom: `Certificat médical ${j.nom} 2026.${ins.docs.cert.split('.').pop()}`, type: 'Certificat médical', date: ins.recu });
+  if (ins.docs.autoParent) l.docsLic.push({ nom: 'Autorisation parentale 2026-2027.pdf', type: 'Autorisation', date: ins.recu });
+  l.ovaleExporte = null;
+  l.origineInscription = ins.id;
+  // Encaissement en ligne → écriture comptable + transaction bancaire rapprochée
+  if (p.paye > 0 && p.mode !== 'sur_place') {
+    const ec = { id: Date.now() + 1000 + ins.id, date: ins.recu, sens: 'R', cat: 'Cotisations', libelle: `Cotisation ${j.prenom} ${j.nom} (inscription en ligne)`, montant: p.paye };
+    state.ecritures.unshift(ec);
+    state.ecritures.sort((a, b) => b.date.localeCompare(a.date));
+    state.bank.unshift({ id: Date.now() + 2000 + ins.id, date: ins.recu, libelle: (p.mode === 'virement' ? 'VIR INST ' : 'PRLV SEPA ') + `COTIS ${j.nom.toUpperCase()} ${j.prenom.toUpperCase()}`, montant: p.paye, statut: 'rapprochee', ecritureId: ec.id, catProposee: 'Cotisations' });
+    state.bank.sort((a, b) => b.date.localeCompare(a.date));
+  }
+  ins.statut = 'validee'; ins.licId = l.id; ins.valideLe = TODAY; ins.fusion = !!ctl.dup;
+  if (!silencieux) toast(ctl.dup ? `Dossier validé — fiche de ${j.prenom} ${j.nom} mise à jour, licence à saisir dans Oval-e.` : `Dossier validé — ${j.prenom} ${j.nom} créé(e), licence à saisir dans Oval-e.`);
+  return l;
+}
+
+/* Un dossier déjà validé dans la démo, pour que l'onglet Oval-e ait du contenu dès l'ouverture */
+(function seedValidee() {
+  const ins = { id: 5, recu: '2026-09-10', canal: 'Formulaire en ligne', pratique: 'competition', statut: 'a_valider',
+    joueur: { prenom: 'Clara', nom: 'Vidal', sexe: 'F', naissance: '2013-06-08', nationalite: 'Française', villeN: 'Vincennes', paysN: 'France', ville: 'Vincennes', email: '', tel: '' },
+    referents: [{ prenom: 'Marc', nom: 'Vidal', lien: 'Père', email: 'marc.vidal@exemple.fr', tel: '06 30 40 50 60', metier: 'Professeur' }],
+    tailles: { short: '14 ans', maillot: 'S', pointure: 38, tailleCm: 158, poids: 46 },
+    deja: false, ancienClub: '', saisons: 0, docs: { cert: 'certificat-clara.pdf', autoParent: true, droitImage: true },
+    consent: { rgpd: true, wa: true }, prefContact: 'Référent 1', paiement: { mode: 'virement', montant: 160, paye: 160 }, messages: [] };
+  state.inscriptions.push(ins);
+  validerInscription(ins, true);
+  ins.valideLe = '2026-09-11';
+})();
+
+/* ================= ONGLETS DU MODULE LICENCIÉS ================= */
+subTabs.licTab = subTabs.licTab || 'liste';
+subTabs.inscOpen = null;
+
+function aSaisirOvale() { return state.licencies.filter(l => l.licStatut === 'attente'); }
+function inscAValider() { return (state.inscriptions || []).filter(i => i.statut === 'a_valider'); }
+
+function licTabsHtml() {
+  const n1 = inscAValider().length, n2 = aSaisirOvale().length, n3 = state.ovale.arbitrage.length;
+  const t = subTabs.licTab;
+  const b = (id, label, n) => `<button class="${t === id ? 'active' : ''}" data-lictab="${id}">${label}${n ? `<span class="tab-count">${n}</span>` : ''}</button>`;
+  return `<div class="tabs lic-tabs" role="tablist">
+    ${b('liste', 'Liste des licenciés', 0)}${b('inscriptions', 'Inscriptions en ligne', n1)}${b('ovale', 'Oval-e (FFR)', n2 + n3)}
+  </div>`;
+}
+
+const _viewLicenciesV11 = viewLicencies;
+viewLicencies = function () {
+  const t = subTabs.licTab;
+  if (t === 'liste') return _viewLicenciesV11().replace('<div class="toolbar">', licTabsHtml() + '<div class="toolbar">');
+  const head = `<div class="page-head">
+    <div><h1 class="page-title">Licenciés</h1>
+    <p class="page-sub">${t === 'inscriptions' ? 'Dossiers déposés par les familles en ligne — contrôle et validation par le secrétariat' : 'Licences fédérales — préparation de la saisie et retour des statuts depuis Oval-e'}</p></div>
+    <div class="head-actions">${t === 'inscriptions' ? '<button class="btn" id="btnLienInsc">Copier le lien d\'inscription</button><button class="btn btn-primary" id="btnPortail">Ouvrir le formulaire famille</button>' : ''}</div>
+  </div>`;
+  return head + licTabsHtml() + (t === 'inscriptions' ? (subTabs.inscOpen ? viewDossierInsc() : viewInscriptions()) : viewOvale());
+};
+
+/* ---- Liste des dossiers ---- */
+const INSC_BADGE = {
+  a_valider: '<span class="badge b-info"><span class="dot"></span>À valider</span>',
+  complement: '<span class="badge b-warn"><span class="dot"></span>Complément demandé</span>',
+  validee: '<span class="badge b-good"><span class="dot"></span>Validé</span>',
+  refusee: '<span class="badge"><span class="dot"></span>Refusé</span>',
+};
+function viewInscriptions() {
+  const rows = [...state.inscriptions].sort((a, b) => {
+    const o = { a_valider: 0, complement: 1, validee: 2, refusee: 3 };
+    return (o[a.statut] - o[b.statut]) || b.recu.localeCompare(a.recu);
+  });
+  const nA = inscAValider().length;
+  const encaisse = state.inscriptions.filter(i => i.statut !== 'refusee').reduce((s, i) => s + i.paiement.paye, 0);
+  return `
+  <div class="grid kpis">
+    <div class="card"><h3>À valider</h3><div class="kpi-value">${nA}</div><div class="kpi-note">dossiers complets ou à contrôler</div></div>
+    <div class="card"><h3>En attente des familles</h3><div class="kpi-value">${state.inscriptions.filter(i => i.statut === 'complement').length}</div><div class="kpi-note">complément demandé</div></div>
+    <div class="card"><h3>Encaissé en ligne</h3><div class="kpi-value">${eur(encaisse)}</div><div class="kpi-note">déjà rapproché en comptabilité</div></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="table-wrap m-cards"><table>
+      <thead><tr><th>Joueur / joueuse</th><th>Catégorie</th><th>Reçu le</th><th>Contrôles</th><th>Paiement</th><th>Statut</th></tr></thead>
+      <tbody>${rows.map(i => {
+        const c = controlesInscription(i);
+        const nKo = c.liste.filter(x => x.ok === 'ko').length, nW = c.liste.filter(x => x.ok === 'warn').length;
+        const ctlTxt = i.statut === 'validee' ? '—' : nKo ? `<span class="chk-ko">${nKo} bloquant(s)</span>` : nW ? `<span class="chk-warn">${nW} point(s) à vérifier</span>` : '<span class="chk-ok">Complet</span>';
+        const p = i.paiement;
+        return `<tr class="rowlink insc-row" tabindex="0" data-insc="${i.id}">
+          <td>${esc(i.joueur.prenom + ' ' + i.joueur.nom)}${c.dup && i.statut !== 'validee' ? ' <span class="badge b-warn">Réinscription</span>' : ''}</td>
+          <td data-label="Catégorie">${c.cat ? esc(c.cat) : '—'}</td>
+          <td data-label="Reçu le">${dfrShort(i.recu)}</td>
+          <td data-label="Contrôles">${ctlTxt}</td>
+          <td data-label="Paiement">${p.montant ? `${eur(p.paye)} / ${eur(p.montant)} · ${PAI_MODES[p.mode].court}` : 'Exonéré'}</td>
+          <td data-label="Statut">${INSC_BADGE[i.statut]}</td></tr>`;
+      }).join('')}</tbody>
+    </table></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-2);max-width:780px">Le formulaire famille crée un dossier ici. Rien n'entre dans le fichier des licenciés tant que le secrétariat n'a pas validé : la validation crée la fiche (ou met à jour celle d'un joueur qui se réinscrit), passe la licence en « En attente FFR » et l'ajoute à la liste à saisir dans Oval-e.</p>`;
+}
+
+/* ---- Dossier détaillé (page) ---- */
+function viewDossierInsc() {
+  const i = state.inscriptions.find(x => x.id === subTabs.inscOpen);
+  if (!i) { subTabs.inscOpen = null; return viewInscriptions(); }
+  const c = controlesInscription(i), j = i.joueur, p = i.paiement;
+  const ico = { ok: '<span class="chk-ok">✓</span>', ko: '<span class="chk-ko">✕</span>', warn: '<span class="chk-warn">!</span>' };
+  const ouvert = i.statut === 'a_valider' || i.statut === 'complement';
+  return `
+  <p style="margin:14px 0 6px"><button class="btn btn-sm" id="inscBack">← Dossiers d'inscription</button></p>
+  <div class="page-head" style="padding-top:4px">
+    <div><h2 class="page-title" style="font-size:26px">${esc(j.prenom + ' ' + j.nom)}</h2>
+    <p class="page-sub">${c.cat ? esc(catLabel(c.cat)) : 'Catégorie inconnue'} · reçu le ${dfr(i.recu)} · ${esc(i.canal)} &nbsp;${INSC_BADGE[i.statut]}</p></div>
+    <div class="head-actions">
+      ${ouvert ? `<button class="btn" id="inscCompl">Demander un complément</button>
+      <button class="btn btn-danger" id="inscRefus">Refuser</button>
+      <button class="btn btn-primary" id="inscValider" ${c.cat ? '' : 'disabled'}>${c.dup ? 'Valider et mettre à jour la fiche' : 'Valider le dossier'}</button>` : ''}
+      ${i.statut === 'validee' && i.licId ? '<button class="btn btn-primary" id="inscFiche">Ouvrir la fiche licencié</button>' : ''}
+    </div>
+  </div>
+  <div class="grid two-col">
+    <div class="grid" style="gap:14px">
+      <div class="card"><h3>Joueur / joueuse</h3>
+        <dl class="kv">
+          <dt>Né(e) le</dt><dd>${dfr(j.naissance)} à ${esc(j.villeN)} (${esc(j.paysN)})</dd>
+          <dt>Sexe · nationalité</dt><dd>${j.sexe === 'F' ? 'Féminin' : 'Masculin'} · ${esc(j.nationalite)}</dd>
+          <dt>Ville</dt><dd>${esc(j.ville)}</dd>
+          ${j.email ? `<dt>Contact</dt><dd>${esc(j.email)} · ${esc(j.tel)}</dd>` : ''}
+          <dt>Pratique</dt><dd>${{ competition: 'Compétition', loisir: 'Loisir / touch', dirigeant: 'Dirigeant / éducateur' }[i.pratique]}</dd>
+          <dt>Licencié(e) avant</dt><dd>${i.deja ? `Oui — ${esc(i.ancienClub)}, ${i.saisons} saison(s)` : 'Non, première licence'}</dd>
+          <dt>Tailles</dt><dd>Short ${esc(i.tailles.short)} · maillot ${esc(i.tailles.maillot)} · pointure ${i.tailles.pointure} · ${i.tailles.tailleCm} cm · ${i.tailles.poids} kg</dd>
+        </dl>
+      </div>
+      ${i.referents.length ? `<div class="card"><h3>Responsables légaux</h3>
+        ${i.referents.map((r, k) => `<dl class="kv" style="${k ? 'margin-top:10px;padding-top:10px;border-top:1px solid var(--line)' : ''}">
+          <dt>Référent ${k + 1}</dt><dd>${esc(r.prenom + ' ' + r.nom)} (${esc(r.lien)})</dd>
+          <dt>Contact</dt><dd>${esc(r.email)} · ${esc(r.tel)}</dd></dl>`).join('')}
+        <p style="font-size:12.5px;color:var(--ink-2);margin:10px 0 0">Préférence de contact : ${esc(i.prefContact)}</p></div>` : ''}
+      <div class="card"><h3>Pièces et consentements</h3>
+        <dl class="kv">
+          <dt>Certificat médical</dt><dd>${i.docs.cert ? esc(i.docs.cert) : '<span class="chk-ko">non fourni</span>'}</dd>
+          ${c.mineur ? `<dt>Autorisation parentale</dt><dd>${i.docs.autoParent ? 'Signée en ligne' : '<span class="chk-ko">non signée</span>'}</dd>` : ''}
+          <dt>Droit à l'image</dt><dd>${i.docs.droitImage ? 'Accepté' : 'Refusé — ne pas publier de photo'}</dd>
+          <dt>Données personnelles</dt><dd>${i.consent.rgpd ? 'Information RGPD acceptée' : 'Non acceptée'}</dd>
+          <dt>WhatsApp</dt><dd>${i.consent.wa ? 'Accepte d\'être contacté(e)' : 'Refuse — email uniquement'}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="grid" style="gap:14px">
+      <div class="card"><h3>Contrôles automatiques</h3>
+        <ul class="chk-list">${c.liste.map(x => `<li>${ico[x.ok]}<span>${esc(x.txt)}</span></li>`).join('')}</ul>
+        ${c.bloquant && ouvert ? '<p style="font-size:12.5px;color:var(--ink-2);margin:10px 0 0">Vous pouvez valider malgré un point bloquant (par exemple un certificat promis à la permanence) : la fiche portera l\'alerte correspondante.</p>' : ''}
+      </div>
+      <div class="card"><h3>Cotisation</h3>
+        <dl class="kv">
+          <dt>Montant</dt><dd>${p.montant ? eur(p.montant) : 'Exonéré'}</dd>
+          <dt>Réglé</dt><dd>${eur(p.paye)}</dd>
+          <dt>Moyen</dt><dd>${esc(PAI_MODES[p.mode].label)}</dd>
+        </dl>
+        ${p.mode === 'sur_place' && p.paye < p.montant && ouvert ? '<p style="margin:10px 0 0"><button class="btn btn-sm" id="inscEncaisser">Enregistrer le paiement reçu à la permanence</button></p>' : ''}
+      </div>
+      <div class="card"><h3>Échanges avec la famille</h3>
+        ${i.messages.length ? i.messages.map(m => `<div class="alert-line"><span>${esc(m.txt)}</span><span class="when">${dfrShort(m.date)}</span></div>`).join('') : '<p class="empty" style="padding:4px 0">Aucun message.</p>'}
+      </div>
+      ${i.statut === 'validee' ? `<div class="card"><h3>Suite</h3><p style="margin:0;font-size:13.5px">Validé le ${dfr(i.valideLe)}${i.fusion ? ' (fiche existante mise à jour)' : ''}. La licence est dans <b>Oval-e (FFR) → À saisir</b>.</p></div>` : ''}
+    </div>
+  </div>`;
+}
+
+/* ================= PORTAIL FAMILLE (vue publique du formulaire) ================= */
+let portail = null;
+function nouveauBrouillon() {
+  return { etape: 0, pratique: 'competition', joueur: { prenom: '', nom: '', sexe: 'M', naissance: '', nationalite: 'Française', villeN: '', paysN: 'France', ville: '', email: '', tel: '' },
+    referents: [{ prenom: '', nom: '', lien: 'Mère', email: '', tel: '', metier: '' }, { prenom: '', nom: '', lien: 'Père', email: '', tel: '', metier: '' }],
+    tailles: { short: 'M', maillot: 'M', pointure: '', tailleCm: '', poids: '' }, deja: false, ancienClub: '', saisons: 1,
+    docs: { cert: '', autoParent: false, droitImage: true }, consent: { rgpd: false, wa: true }, prefContact: 'Les deux',
+    paiement: { mode: 'virement', montant: 0, paye: 0 } };
+}
+const ETAPES = ['Joueur', 'Famille', 'Tailles', 'Documents', 'Paiement', 'Récapitulatif'];
+function etapesActives(b) {
+  const cat = catDepuisNaissance(b.joueur.naissance, b.pratique);
+  return ETAPES.filter(e => e !== 'Famille' || !cat || estMineurCat(cat));
+}
+
+function ouvrirPortail() {
+  portail = nouveauBrouillon();
+  let el = $('#portailRoot');
+  if (!el) { el = document.createElement('div'); el.id = 'portailRoot'; document.body.appendChild(el); }
+  dessinerPortail();
+}
+function fermerPortail() { const el = $('#portailRoot'); if (el) el.innerHTML = ''; portail = null; render(); }
+
+function dessinerPortail(erreurs) {
+  const b = portail, etapes = etapesActives(b);
+  b.etape = Math.min(b.etape, etapes.length - 1);
+  const nom = etapes[b.etape];
+  const cat = catDepuisNaissance(b.joueur.naissance, b.pratique);
+  const mineur = estMineurCat(cat);
+  const e = erreurs || {};
+  const F = (id, label, html, req) => `<div class="field"><label for="${id}">${label}${req ? ' *' : ''}</label>${html}${e[id] ? `<p class="err">${esc(e[id])}</p>` : ''}</div>`;
+  const inp = (id, val, type, extra) => `<input id="${id}" type="${type || 'text'}" value="${esc(val ?? '')}" ${extra || ''} class="${e[id] ? 'invalid' : ''}">`;
+  const sel = (id, opts, val) => `<select id="${id}">${opts.map(o => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  const TA = ['6 ans', '8 ans', '10 ans', '12 ans', '14 ans', 'XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  let corps = '';
+  if (nom === 'Joueur') corps = `
+    <fieldset><legend>Qui inscrivez-vous ?</legend>
+      <div class="form-grid">
+        ${F('pPrenom', 'Prénom', inp('pPrenom', b.joueur.prenom, 'text', 'autocomplete="off"'), 1)}
+        ${F('pNom', 'Nom', inp('pNom', b.joueur.nom), 1)}
+        ${F('pNaiss', 'Date de naissance', inp('pNaiss', b.joueur.naissance, 'date'), 1)}
+        ${F('pSexe', 'Sexe', `<select id="pSexe"><option value="M" ${b.joueur.sexe === 'M' ? 'selected' : ''}>Masculin</option><option value="F" ${b.joueur.sexe === 'F' ? 'selected' : ''}>Féminin</option></select>`)}
+        ${F('pNat', 'Nationalité', inp('pNat', b.joueur.nationalite))}
+        ${F('pVilleN', 'Ville de naissance', inp('pVilleN', b.joueur.villeN), 1)}
+        ${F('pVille', 'Ville de résidence', inp('pVille', b.joueur.ville), 1)}
+        ${F('pPratique', 'Pratique', `<select id="pPratique"><option value="competition" ${b.pratique === 'competition' ? 'selected' : ''}>Rugby (compétition / école de rugby)</option><option value="loisir" ${b.pratique === 'loisir' ? 'selected' : ''}>Rugby loisir / touch (adultes)</option></select>`)}
+      </div>
+      <p id="pCatInfo" style="font-size:13px;margin:4px 0 0;color:var(--ink-2)">${cat ? `Catégorie : <b>${esc(catLabel(cat))}</b> — cotisation ${eur(CATEGORIES.find(c => c.code === cat).cot)}` : 'La catégorie et le tarif s\'affichent dès la date de naissance saisie.'}</p>
+    </fieldset>
+    <fieldset id="pAdulteBloc" ${mineur ? 'hidden' : ''}><legend>Coordonnées du joueur majeur</legend>
+      <div class="form-grid">
+        ${F('pEmail', 'Email', inp('pEmail', b.joueur.email, 'email'), !mineur)}
+        ${F('pTel', 'Téléphone', inp('pTel', b.joueur.tel, 'tel'), !mineur)}
+      </div>
+    </fieldset>
+    <fieldset><legend>Licence l'an dernier</legend>
+      <label class="chk"><input type="checkbox" id="pDeja" ${b.deja ? 'checked' : ''}> Licencié(e) dans un club de rugby la saison passée</label>
+      <div class="form-grid" id="pDejaBloc" ${b.deja ? '' : 'hidden'}>
+        ${F('pAncien', 'Club de la saison passée', inp('pAncien', b.ancienClub, 'text', 'placeholder="' + esc(state.params.clubNom) + ' si vous restez au club"'))}
+        ${F('pSaisons', 'Nombre de saisons de licence', inp('pSaisons', b.saisons, 'number', 'min="1" max="40"'))}
+      </div>
+    </fieldset>`;
+  else if (nom === 'Famille') corps = `
+    <p class="lead">Pour un joueur mineur, au moins un responsable légal est obligatoire. Le club écrit aux parents ; le joueur n'est contacté directement qu'avec votre autorisation.</p>
+    ${[0, 1].map(k => `<fieldset><legend>Responsable légal ${k + 1}${k ? ' (facultatif)' : ''}</legend>
+      <div class="form-grid">
+        ${F('r' + k + 'Prenom', 'Prénom', inp('r' + k + 'Prenom', b.referents[k].prenom), !k)}
+        ${F('r' + k + 'Nom', 'Nom', inp('r' + k + 'Nom', b.referents[k].nom), !k)}
+        ${F('r' + k + 'Lien', 'Lien de parenté', sel('r' + k + 'Lien', ['Mère', 'Père', 'Tuteur / tutrice', 'Autre'], b.referents[k].lien))}
+        ${F('r' + k + 'Tel', 'Téléphone', inp('r' + k + 'Tel', b.referents[k].tel, 'tel'), !k)}
+        ${F('r' + k + 'Email', 'Email', inp('r' + k + 'Email', b.referents[k].email, 'email'), !k)}
+        ${F('r' + k + 'Metier', 'Métier (facultatif)', inp('r' + k + 'Metier', b.referents[k].metier))}
+      </div></fieldset>`).join('')}
+    <fieldset><legend>Qui reçoit les messages du club ?</legend>
+      ${F('pPref', 'Emails et WhatsApp', sel('pPref', ['Référent 1', 'Référent 2', 'Les deux'], b.prefContact))}
+    </fieldset>`;
+  else if (nom === 'Tailles') corps = `
+    <p class="lead">Ces tailles servent à préparer la dotation (maillot, short, chaussettes). Vous pourrez les modifier depuis l'espace famille.</p>
+    <fieldset><legend>Mensurations</legend>
+      <div class="form-grid">
+        ${F('tShort', 'Taille de short', sel('tShort', TA, b.tailles.short))}
+        ${F('tMaillot', 'Taille de maillot', sel('tMaillot', TA, b.tailles.maillot))}
+        ${F('tPointure', 'Pointure', inp('tPointure', b.tailles.pointure, 'number', 'min="20" max="50"'))}
+        ${F('tTaille', 'Taille (cm)', inp('tTaille', b.tailles.tailleCm, 'number', 'min="80" max="220"'))}
+        ${F('tPoids', 'Poids (kg)', inp('tPoids', b.tailles.poids, 'number', 'min="10" max="160"'))}
+      </div></fieldset>`;
+  else if (nom === 'Documents') corps = `
+    <fieldset><legend>Certificat médical</legend>
+      <p class="lead" style="margin-bottom:8px">Photo ou PDF du certificat de non contre-indication au rugby. Sans certificat, la licence FFR ne peut pas être validée.</p>
+      <label class="drop ${b.docs.cert ? 'ok' : ''}" for="dCert" style="display:block;cursor:pointer">${b.docs.cert ? '✓ ' + esc(b.docs.cert) + ' — toucher pour remplacer' : 'Toucher pour prendre une photo ou choisir un fichier'}</label>
+      <input type="file" id="dCert" accept="image/*,application/pdf" hidden>
+      <p style="font-size:12px;color:var(--ink-3);margin:6px 0 0">Maquette : le fichier reste sur votre appareil, seul son nom est repris.</p>
+      ${e.dCert ? `<p class="err">${esc(e.dCert)}</p>` : ''}
+    </fieldset>
+    ${mineur ? `<fieldset><legend>Autorisation parentale</legend>
+      <label class="chk"><input type="checkbox" id="dAuto" ${b.docs.autoParent ? 'checked' : ''}> J'autorise mon enfant à pratiquer le rugby au ${esc(state.params.clubNom)}, à être transporté(e) pour les rencontres et à recevoir les soins d'urgence nécessaires. *</label>
+      ${e.dAuto ? `<p class="err">${esc(e.dAuto)}</p>` : ''}
+    </fieldset>` : ''}
+    <fieldset><legend>Droit à l'image et données personnelles</legend>
+      <label class="chk"><input type="checkbox" id="dImage" ${b.docs.droitImage ? 'checked' : ''}> J'accepte que des photos prises lors des activités du club soient publiées (site, réseaux du club).</label>
+      <label class="chk"><input type="checkbox" id="dWa" ${b.consent.wa ? 'checked' : ''}> J'accepte d'être contacté(e) par WhatsApp en plus de l'email.</label>
+      <label class="chk"><input type="checkbox" id="dRgpd" ${b.consent.rgpd ? 'checked' : ''}> J'ai lu comment le club utilise ces données (gestion sportive et administrative uniquement, conservation jusqu'à la fin de la saison suivante, droit d'accès et d'effacement auprès du secrétariat). *</label>
+      ${e.dRgpd ? `<p class="err">${esc(e.dRgpd)}</p>` : ''}
+    </fieldset>`;
+  else if (nom === 'Paiement') {
+    const mt = CATEGORIES.find(c => c.code === cat).cot;
+    corps = mt === 0 ? '<p class="lead">Aucune cotisation n\'est due pour cette catégorie.</p>' : `
+    <p class="lead">Cotisation ${esc(catLabel(cat))} : <b>${eur(mt)}</b> pour la saison 2026-2027, licence FFR et assurance comprises.</p>
+    <fieldset><legend>Comment souhaitez-vous payer ?</legend>
+      <label class="pay-opt"><input type="radio" name="pMode" value="virement" ${b.paiement.mode === 'virement' ? 'checked' : ''}><span>${PAI_MODES.virement.label}<small>Vous validez le paiement dans votre application bancaire. Sans frais pour vous.</small></span></label>
+      <label class="pay-opt"><input type="radio" name="pMode" value="prelevement" ${b.paiement.mode === 'prelevement' ? 'checked' : ''}><span>${PAI_MODES.prelevement.label}<small>3 prélèvements de ${eur(Math.round(mt / 3))} environ, un par mois. Mandat SEPA signé en ligne.</small></span></label>
+      <label class="pay-opt"><input type="radio" name="pMode" value="sur_place" ${b.paiement.mode === 'sur_place' ? 'checked' : ''}><span>${PAI_MODES.sur_place.label}<small>Votre dossier est enregistré ; la licence est demandée à réception du paiement à la permanence.</small></span></label>
+    </fieldset>
+    <p style="font-size:12px;color:var(--ink-3)">Maquette : aucun paiement réel. Le prestataire de paiement n'est pas encore choisi.</p>`;
+  } else {
+    const mt = CATEGORIES.find(c => c.code === cat).cot;
+    corps = `
+    <fieldset><legend>Récapitulatif</legend>
+      <dl class="kv">
+        <dt>Joueur / joueuse</dt><dd>${esc(b.joueur.prenom + ' ' + b.joueur.nom)}, né(e) le ${b.joueur.naissance ? dfr(b.joueur.naissance) : '—'}</dd>
+        <dt>Catégorie</dt><dd>${esc(catLabel(cat))}</dd>
+        ${mineur ? `<dt>Responsable(s)</dt><dd>${b.referents.filter(r => r.prenom || r.nom).map(r => esc(r.prenom + ' ' + r.nom)).join(', ')}</dd>` : `<dt>Contact</dt><dd>${esc(b.joueur.email)}</dd>`}
+        <dt>Certificat</dt><dd>${b.docs.cert ? esc(b.docs.cert) : 'à fournir'}</dd>
+        <dt>Paiement</dt><dd>${mt ? esc(PAI_MODES[b.paiement.mode].label) : 'Exonéré'}</dd>
+      </dl>
+      <div class="recap-total"><span>Total saison 2026-2027</span><span>${eur(mt)}</span></div>
+    </fieldset>
+    <p class="lead">En envoyant, votre dossier part au secrétariat du club, qui le vérifie puis demande la licence à la Fédération. Vous recevez un email à chaque étape.</p>`;
+  }
+  const dernier = b.etape === etapes.length - 1;
+  const logo = (state.params.logo || (typeof LOGO_CLUB !== 'undefined' ? LOGO_CLUB : ''));
+  $('#portailRoot').innerHTML = `<div class="portail" role="dialog" aria-modal="true" aria-label="Formulaire d'inscription">
+    <div class="portail-bar"><div class="pb-logo">${logo ? `<img src="${logo}" alt="">` : ''}</div>
+      <div><div class="pb-name">${esc(state.params.clubNom)}</div><div class="pb-sub">Inscription saison 2026-2027</div></div>
+      <button class="pb-quit" id="pQuit">Quitter l'aperçu</button></div>
+    <div class="portail-demo">Aperçu de ce que voit une famille via le lien d'inscription — maquette, aucun envoi réel</div>
+    <div class="portail-wrap">
+      <div class="pstep-label">Étape ${b.etape + 1} sur ${etapes.length} · ${esc(nom)}</div>
+      <div class="pstep-bar">${etapes.map((x, k) => `<i class="${k <= b.etape ? 'on' : ''}"></i>`).join('')}</div>
+      <h2>${{ Joueur: 'Le joueur ou la joueuse', Famille: 'Responsables légaux', Tailles: 'Tailles pour la dotation', Documents: 'Documents et autorisations', Paiement: 'Cotisation', 'Récapitulatif': 'Vérifier et envoyer' }[nom]}</h2>
+      <form id="pForm" novalidate>${corps}
+        <div class="portail-nav">
+          ${b.etape ? '<button type="button" class="btn" id="pPrev">← Retour</button>' : '<span></span>'}
+          <button type="submit" class="btn btn-primary">${dernier ? 'Envoyer mon dossier' : 'Continuer →'}</button>
+        </div>
+      </form>
+    </div></div>`;
+  lierPortail(nom);
+  const first = $('#portailRoot .invalid') || $('#portailRoot input, #portailRoot select');
+  if (erreurs && first) first.focus();
+  $('#portailRoot .portail').scrollTop = 0;
+}
+
+function lirePortail(nom) {
+  const b = portail, v = id => { const el = $('#' + id); return el ? el.value.trim() : ''; };
+  if (nom === 'Joueur') {
+    Object.assign(b.joueur, { prenom: v('pPrenom'), nom: v('pNom'), naissance: v('pNaiss'), sexe: v('pSexe'), nationalite: v('pNat') || 'Française', villeN: v('pVilleN'), ville: v('pVille'), email: v('pEmail'), tel: v('pTel') });
+    b.pratique = v('pPratique');
+    b.deja = $('#pDeja').checked; b.ancienClub = v('pAncien') || (b.deja ? state.params.clubNom : ''); b.saisons = Math.max(1, Number(v('pSaisons')) || 1);
+  } else if (nom === 'Famille') {
+    b.referents = [0, 1].map(k => ({ prenom: v('r' + k + 'Prenom'), nom: v('r' + k + 'Nom'), lien: v('r' + k + 'Lien'), tel: v('r' + k + 'Tel'), email: v('r' + k + 'Email'), metier: v('r' + k + 'Metier') }));
+    b.prefContact = v('pPref');
+  } else if (nom === 'Tailles') {
+    Object.assign(b.tailles, { short: v('tShort'), maillot: v('tMaillot'), pointure: Number(v('tPointure')) || 0, tailleCm: Number(v('tTaille')) || 0, poids: Number(v('tPoids')) || 0 });
+  } else if (nom === 'Documents') {
+    b.docs.autoParent = $('#dAuto') ? $('#dAuto').checked : false;
+    b.docs.droitImage = $('#dImage').checked; b.consent.wa = $('#dWa').checked; b.consent.rgpd = $('#dRgpd').checked;
+  } else if (nom === 'Paiement') {
+    const r = $('input[name="pMode"]:checked'); if (r) b.paiement.mode = r.value;
+  }
+}
+function verifierPortail(nom) {
+  const b = portail, e = {};
+  const cat = catDepuisNaissance(b.joueur.naissance, b.pratique), mineur = estMineurCat(cat);
+  const mailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+  if (nom === 'Joueur') {
+    if (!b.joueur.prenom) e.pPrenom = 'Indiquez le prénom.';
+    if (!b.joueur.nom) e.pNom = 'Indiquez le nom.';
+    if (!b.joueur.naissance) e.pNaiss = 'Indiquez la date de naissance.';
+    else if (!cat) e.pNaiss = b.pratique === 'loisir' ? 'Le rugby loisir est réservé aux adultes.' : 'Le club accueille les enfants à partir de 5 ans (nés en 2021 au plus tard).';
+    else if (b.pratique === 'loisir' && Number(b.joueur.naissance.slice(0, 4)) > 2008) e.pPratique = 'Le rugby loisir est réservé aux adultes.';
+    if (!b.joueur.villeN) e.pVilleN = 'Indiquez la ville de naissance (demandée par la Fédération).';
+    if (!b.joueur.ville) e.pVille = 'Indiquez la ville de résidence.';
+    if (cat && !mineur) {
+      if (!mailOk(b.joueur.email)) e.pEmail = 'Indiquez un email valide : le club vous écrit à cette adresse.';
+      if (!b.joueur.tel) e.pTel = 'Indiquez un numéro de téléphone.';
+    }
+  } else if (nom === 'Famille') {
+    const r = b.referents[0];
+    if (!r.prenom) e.r0Prenom = 'Indiquez le prénom.';
+    if (!r.nom) e.r0Nom = 'Indiquez le nom.';
+    if (!r.tel) e.r0Tel = 'Indiquez un numéro de téléphone.';
+    if (!mailOk(r.email)) e.r0Email = 'Indiquez un email valide.';
+    const r2 = b.referents[1];
+    if ((r2.prenom || r2.nom || r2.email) && r2.email && !mailOk(r2.email)) e.r1Email = 'Cet email n\'est pas valide.';
+  } else if (nom === 'Documents') {
+    if (mineur && !b.docs.autoParent) e.dAuto = 'L\'autorisation parentale est nécessaire pour un mineur.';
+    if (!b.consent.rgpd) e.dRgpd = 'Cochez cette case pour envoyer le dossier.';
+  }
+  return e;
+}
+function lierPortail(nom) {
+  $('#pQuit').onclick = fermerPortail;
+  const prev = $('#pPrev');
+  if (prev) prev.onclick = () => { lirePortail(nom); portail.etape--; dessinerPortail(); };
+  if (nom === 'Joueur') {
+    $('#pDeja').onchange = () => { $('#pDejaBloc').hidden = !$('#pDeja').checked; };
+    const maj = () => {
+      const cat = catDepuisNaissance($('#pNaiss').value, $('#pPratique').value);
+      $('#pCatInfo').innerHTML = cat ? `Catégorie : <b>${esc(catLabel(cat))}</b> — cotisation ${eur(CATEGORIES.find(c => c.code === cat).cot)}` : 'La catégorie et le tarif s\'affichent dès la date de naissance saisie.';
+      $('#pAdulteBloc').hidden = !cat || estMineurCat(cat);
+    };
+    $('#pNaiss').onchange = maj; $('#pPratique').onchange = maj;
+  }
+  if (nom === 'Documents') {
+    $('#dCert').onchange = ev => { const f = ev.target.files[0]; if (f) { lirePortail(nom); portail.docs.cert = f.name; dessinerPortail(); } };
+  }
+  $('#pForm').onsubmit = ev => {
+    ev.preventDefault();
+    lirePortail(nom);
+    const err = verifierPortail(nom);
+    if (Object.keys(err).length) { dessinerPortail(err); return; }
+    const etapes = etapesActives(portail);
+    if (portail.etape < etapes.length - 1) { portail.etape++; dessinerPortail(); return; }
+    envoyerPortail();
+  };
+}
+function envoyerPortail() {
+  const b = portail;
+  const cat = catDepuisNaissance(b.joueur.naissance, b.pratique), mineur = estMineurCat(cat);
+  const mt = CATEGORIES.find(c => c.code === cat).cot;
+  const paye = !mt ? 0 : b.paiement.mode === 'virement' ? mt : b.paiement.mode === 'prelevement' ? Math.round(mt / 3) : 0;
+  const ins = { id: Math.max(0, ...state.inscriptions.map(i => i.id)) + 1, recu: TODAY, canal: 'Formulaire en ligne', pratique: b.pratique, statut: 'a_valider',
+    joueur: { ...b.joueur }, referents: mineur ? b.referents.filter(r => r.prenom || r.nom).map(r => ({ ...r })) : [],
+    tailles: { ...b.tailles }, deja: b.deja, ancienClub: b.deja ? b.ancienClub : '', saisons: b.deja ? b.saisons : 0,
+    docs: { ...b.docs, autoParent: mineur ? b.docs.autoParent : false }, consent: { ...b.consent }, prefContact: mineur ? b.prefContact : 'Joueur',
+    paiement: { mode: b.paiement.mode, montant: mt, paye }, messages: [] };
+  state.inscriptions.push(ins);
+  $('#portailRoot .portail-wrap').innerHTML = `
+    <div class="pstep-label">Dossier envoyé</div>
+    <h2>Merci, c'est reçu.</h2>
+    <p class="lead">Le dossier de ${esc(ins.joueur.prenom)} est entre les mains du secrétariat du ${esc(state.params.clubNom)}. ${paye ? `Paiement de ${eur(paye)} enregistré.` : mt ? 'Le paiement sera fait à la permanence.' : ''} Un email de confirmation part ${mineur ? 'aux responsables légaux' : 'à ' + esc(ins.joueur.email)} (simulé).</p>
+    <div class="card"><h3>Et ensuite ?</h3><ul class="chk-list">
+      <li><span class="chk-ok">1</span><span>Le secrétariat vérifie le dossier, sous quelques jours.</span></li>
+      <li><span class="chk-ok">2</span><span>Le club demande la licence à la Fédération française de rugby.</span></li>
+      <li><span class="chk-ok">3</span><span>La licence validée apparaît dans votre espace famille.</span></li></ul></div>
+    <div class="portail-nav" style="margin-top:16px"><button class="btn" id="pAutre">Inscrire une autre personne</button>
+      <button class="btn btn-primary" id="pVoir">Voir le dossier côté secrétariat</button></div>`;
+  $('#pAutre').onclick = () => { portail = nouveauBrouillon(); dessinerPortail(); };
+  $('#pVoir').onclick = () => { subTabs.licTab = 'inscriptions'; subTabs.inscOpen = ins.id; state.view = 'licencies'; fermerPortail(); };
+}
+
+/* ================= PONT OVAL-E (MODE FICHIER) ================= */
+const OVALE_COLONNES = ['Nom', 'Prénom', 'Sexe', 'Date de naissance', 'Nationalité', 'Ville de naissance', 'Pays de naissance', 'Ville de résidence', 'Email', 'Téléphone', 'Catégorie', 'Type de licence', 'Mutation', 'Club précédent'];
+function ligneOvale(l) {
+  const ref = l.referents && l.referents[0];
+  return [l.nom.toUpperCase(), l.prenom, l.sexe, dfrShort(l.naissance), l.nationalite, l.villeNaissance, l.paysNaissance, l.ville,
+    l.email || (ref ? ref.email : ''), l.tel || (ref ? ref.tel : ''), l.cat,
+    l.cat === 'DIR' ? 'Dirigeant' : l.cat === 'LOI' ? 'Loisir' : 'Joueur', l.mutation ? 'Oui' : 'Non', l.mutation ? (l.ancienClub || '') : ''];
+}
+
+function viewOvale() {
+  const aSaisir = aSaisirOvale().sort((a, b) => (a.ovaleExporte ? 1 : 0) - (b.ovaleExporte ? 1 : 0) || (a.nom + a.prenom).localeCompare(b.nom + b.prenom, 'fr'));
+  const nonExp = aSaisir.filter(l => !l.ovaleExporte).length;
+  const arb = state.ovale.arbitrage;
+  return `
+  <div class="note-box" style="margin-top:14px">
+    <b>Ce que fait ce pont, et ce qu'il ne fait pas.</b> Oval-e reste l'outil officiel : aucune licence n'y est créée automatiquement, car la FFR n'ouvre pas d'interface aux logiciels de clubs.
+    Le club prépare ici la liste à saisir (fichier ou fiche à recopier), puis réimporte l'extraction Oval-e pour récupérer les numéros de licence et les statuts sans ressaisie.
+    Le format exact du fichier d'import et de l'extraction est à confirmer avec la FFR ou la ligue.
+  </div>
+  <div class="ov-steps">
+    <div class="card"><span class="step-k">1 · Préparer</span>
+      <div class="kpi-value">${aSaisir.length}</div>
+      <div class="kpi-note">licence(s) « En attente FFR », dont ${nonExp} jamais exportée(s)</div>
+      <div style="margin-top:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" id="ovExport" ${aSaisir.length ? '' : 'disabled'}>Exporter pour Oval-e (CSV)</button></div></div>
+    <div class="card"><span class="step-k">2 · Saisir dans Oval-e</span>
+      <p style="margin:0;font-size:13.5px">Dans Oval-e, créer ou renouveler chaque licence. Pour aller vite sans fichier, ouvrez la fiche de saisie d'un licencié : chaque champ se copie en un clic, dans l'ordre d'Oval-e.</p></div>
+    <div class="card"><span class="step-k">3 · Réimporter le retour</span>
+      <p style="margin:0;font-size:13.5px">Extraction des licenciés depuis Oval-e (CSV), puis rapprochement automatique par n° de licence, ou nom + prénom + date de naissance.</p>
+      <div style="margin-top:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <label class="btn btn-primary" for="ovFile" style="cursor:pointer">Importer l'extraction…</label><input type="file" id="ovFile" accept=".csv,text/csv" hidden>
+        <button class="btn" id="ovDemo">Extraction d'exemple</button></div>
+      ${state.ovale.dernierImport ? `<p style="font-size:12.5px;color:var(--ink-2);margin:0">Dernier import : ${esc(state.ovale.dernierImport)}</p>` : ''}</div>
+  </div>
+  ${arb.length ? `<div class="card" style="margin-top:14px"><h3>À arbitrer (${arb.length})</h3>
+    <p style="font-size:13px;color:var(--ink-2);margin:0 0 8px">Lignes de l'extraction que le rapprochement automatique n'a pas su attribuer avec certitude. Rien n'est modifié tant que vous n'avez pas choisi.</p>
+    <div class="table-wrap m-cards"><table><thead><tr><th>Ligne Oval-e</th><th>Raison</th><th>Rattacher à</th><th></th></tr></thead><tbody>
+    ${arb.map(a => `<tr><td>${esc(a.prenom + ' ' + a.nom)} · ${dfrShort(a.naissance)}<br><span style="font-size:12px;color:var(--ink-3)">Licence ${esc(a.licence)} · ${esc(a.statutTxt)}</span></td>
+      <td data-label="Raison">${esc(a.raison)}</td>
+      <td data-label="Rattacher à"><select data-arbsel="${a.id}" aria-label="Licencié à rattacher"><option value="">— aucun —</option>
+        ${state.licencies.filter(l => l.naissance && l.naissance.slice(0, 4) === a.naissance.slice(0, 4)).sort((x, y) => x.nom.localeCompare(y.nom, 'fr')).map(l => `<option value="${l.id}" ${a.candidat === l.id ? 'selected' : ''}>${esc(l.nom + ' ' + l.prenom)} (${dfrShort(l.naissance)})</option>`).join('')}
+      </select></td>
+      <td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-primary" data-arbok="${a.id}">Rattacher</button><button class="btn btn-sm" data-arbskip="${a.id}">Ignorer</button></div></td></tr>`).join('')}
+    </tbody></table></div></div>` : ''}
+  <div class="card" style="margin-top:14px"><h3>Licences à saisir dans Oval-e</h3>
+    ${aSaisir.length ? `<div class="table-wrap m-cards"><table><thead><tr><th>Licencié</th><th>Catégorie</th><th>Particularité</th><th>Export</th><th></th></tr></thead><tbody>
+      ${aSaisir.map(l => `<tr><td>${esc(l.prenom + ' ' + l.nom)}</td><td data-label="Catégorie">${esc(l.cat)}</td>
+        <td data-label="Particularité">${l.mutation ? '<span class="badge b-warn">Mutation FFR</span>' : l.origineInscription ? '<span class="badge b-info">Inscrit en ligne</span>' : '—'}</td>
+        <td data-label="Export">${l.ovaleExporte ? 'Exporté le ' + dfrShort(l.ovaleExporte) : '<span class="chk-warn">Pas encore</span>'}</td>
+        <td><button class="btn btn-sm" data-ovsaisie="${l.id}">Fiche de saisie</button></td></tr>`).join('')}
+    </tbody></table></div>` : '<p class="empty">Toutes les licences sont validées par la FFR.</p>'}
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Historique des échanges avec Oval-e</h3>
+    ${state.ovale.journal.length ? state.ovale.journal.map(j => `<div class="alert-line"><span class="badge ${j.type === 'Export' ? 'b-info' : 'b-good'}">${j.type}</span><span>${esc(j.txt)}</span><span class="when">${esc(j.quand)}</span></div>`).join('') : '<p class="empty" style="padding:4px 0">Aucun export ni import pour l\'instant.</p>'}
+  </div>`;
+}
+
+function exporterOvale() {
+  const rows = aSaisirOvale();
+  if (!rows.length) return;
+  exportCSV(`oval-e_licences_a_saisir_${TODAY}.csv`, [OVALE_COLONNES, ...rows.map(ligneOvale)]);
+  for (const l of rows) l.ovaleExporte = TODAY;
+  state.ovale.journal.unshift({ type: 'Export', txt: `${rows.length} licence(s) exportée(s) pour saisie dans Oval-e`, quand: dfrShort(TODAY) });
+  render();
+}
+
+function ouvrirSaisieOvale(id) {
+  const l = state.licencies.find(x => x.id === id); if (!l) return;
+  const vals = ligneOvale(l);
+  openModal('Fiche de saisie Oval-e', `
+    <p style="margin:0 0 10px;font-size:13px;color:var(--ink-2)">${esc(l.prenom + ' ' + l.nom)} — copiez chaque champ dans le formulaire de licence d'Oval-e.${l.mutation ? ' <b>Mutation</b> : ouvrir aussi le dossier de mutation depuis ' + esc(l.ancienClub || 'l\'ancien club') + '.' : ''}</p>
+    ${OVALE_COLONNES.map((c, k) => vals[k] ? `<div class="copy-row"><span>${esc(c)}</span><code id="ovv${k}">${esc(vals[k])}</code><button class="btn btn-sm" data-copy="ovv${k}">Copier</button></div>` : '').join('')}
+    ${l.referents && l.referents.length ? `<p style="margin:12px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--ink-3);font-weight:600">Représentant légal</p>
+      <div class="copy-row"><span>Nom</span><code id="ovr1">${esc(l.referents[0].prenom + ' ' + l.referents[0].nom)}</code><button class="btn btn-sm" data-copy="ovr1">Copier</button></div>
+      <div class="copy-row"><span>Email</span><code id="ovr2">${esc(l.referents[0].email)}</code><button class="btn btn-sm" data-copy="ovr2">Copier</button></div>` : ''}`,
+    `<button class="btn" onclick="closeModal()">Fermer</button><button class="btn btn-primary" id="ovSaisi">Marquer « saisi dans Oval-e »</button>`);
+  $$('#modalRoot [data-copy]').forEach(b => b.onclick = () => {
+    const el = $('#' + b.dataset.copy), txt = el.textContent;
+    const ok = () => { b.textContent = 'Copié ✓'; setTimeout(() => { b.textContent = 'Copier'; }, 1400); };
+    try {
+      navigator.clipboard.writeText(txt).then(ok, () => { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Texte sélectionné : copiez-le avec Ctrl+C.'); });
+    } catch (e) { toast('Copie indisponible : sélectionnez le texte.'); }
+  });
+  $('#ovSaisi').onclick = () => { l.ovaleExporte = l.ovaleExporte || TODAY; l.ovaleSaisi = TODAY; closeModal(); toast(`${l.prenom} ${l.nom} : saisie Oval-e notée. Le statut passera à « Validée » au prochain import de l'extraction.`); render(); };
+}
+
+/* ---- Import de l'extraction Oval-e ---- */
+function parserCsv(txt) {
+  txt = txt.replace(/^﻿/, '');
+  const lignes = txt.split(/\r?\n/).filter(x => x.trim());
+  if (!lignes.length) return [];
+  const sep = (lignes[0].match(/;/g) || []).length >= (lignes[0].match(/,/g) || []).length ? ';' : ',';
+  const split = s => { const out = []; let cur = '', q = false; for (const ch of s) { if (ch === '"') q = !q; else if (ch === sep && !q) { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out.map(x => x.trim()); };
+  const tete = split(lignes[0]).map(h => sansAccent(h));
+  const idx = mots => tete.findIndex(h => mots.some(m => h.includes(m)));
+  const iNom = idx(['nom']) , iPre = idx(['prenom']), iNai = idx(['naissance', 'datenai', 'ddn']), iLic = idx(['licence', 'numero']), iSta = idx(['statut', 'etat', 'qualif']);
+  const iNomStrict = tete.findIndex(h => h === 'nom' || h === 'nomdusage' || h === 'nomdenaissance');
+  const toIso = s => { const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : String(s).slice(0, 10); };
+  return lignes.slice(1).map(s => { const c = split(s); return {
+    nom: c[iNomStrict >= 0 ? iNomStrict : iNom] || '', prenom: c[iPre] || '', naissance: toIso(c[iNai] || ''),
+    licence: iLic >= 0 ? (c[iLic] || '') : '', statutTxt: iSta >= 0 ? (c[iSta] || '') : 'Qualifié' }; }).filter(r => r.nom && r.prenom);
+}
+
+function extractionExemple() {
+  const att = aSaisirOvale().sort((a, b) => (b.ovaleExporte ? 1 : 0) - (a.ovaleExporte ? 1 : 0));
+  const rows = [];
+  let n = 0;
+  for (const l of att) {
+    if (n >= 4) break;
+    rows.push({ nom: l.nom.toUpperCase(), prenom: l.prenom, naissance: l.naissance, licence: /^\d+$/.test(l.licence) ? l.licence : ('2026' + String(700000 + l.id % 100000)), statutTxt: 'Qualifié' });
+    n++;
+  }
+  // Une faute de frappe côté fédération : même date de naissance, prénom mal orthographié
+  const t = att[n];
+  if (t) rows.push({ nom: t.nom.toUpperCase(), prenom: t.prenom.slice(0, 3) + t.prenom.charAt(2) + t.prenom.slice(3), naissance: t.naissance, licence: '2026' + String(800000 + t.id % 100000), statutTxt: 'Qualifié' });
+  // Une licence qui n'est pas dans le fichier du club
+  rows.push({ nom: 'MOREAU', prenom: 'Théo', naissance: '2011-03-14', licence: '2026881234', statutTxt: 'Qualifié' });
+  // Un licencié déjà validé (aucun changement attendu)
+  const v = state.licencies.find(l => l.licStatut === 'validee');
+  if (v) rows.push({ nom: v.nom.toUpperCase(), prenom: v.prenom, naissance: v.naissance, licence: v.licence, statutTxt: 'Qualifié' });
+  return rows;
+}
+
+function importerOvale(rows, source) {
+  let valides = 0, deja = 0;
+  const arb = [];
+  let aid = Math.max(0, ...state.ovale.arbitrage.map(a => a.id)) + 1;
+  for (const r of rows) {
+    const qualif = /qualif|valid|active/i.test(r.statutTxt);
+    let l = /^\d+$/.test(r.licence) ? state.licencies.find(x => x.licence === r.licence) : null;
+    if (!l) l = state.licencies.find(x => cleIdentite(x.nom, x.prenom, x.naissance) === cleIdentite(r.nom, r.prenom, r.naissance));
+    if (l) {
+      if (l.licStatut === 'validee' && l.licence === r.licence) { deja++; continue; }
+      if (qualif) { l.licStatut = 'validee'; l.licence = r.licence || l.licence; l.ovaleValide = TODAY; valides++; }
+      continue;
+    }
+    const proches = state.licencies.filter(x => x.naissance === r.naissance && (sansAccent(x.nom) === sansAccent(r.nom) || sansAccent(x.prenom) === sansAccent(r.prenom)));
+    arb.push({ id: aid++, ...r, candidat: proches.length === 1 ? proches[0].id : null,
+      raison: proches.length ? 'Nom ou prénom différent, même date de naissance' : 'Inconnu du fichier du club' });
+  }
+  state.ovale.arbitrage.push(...arb);
+  state.ovale.dernierImport = `${dfrShort(TODAY)} — ${source}`;
+  state.ovale.journal.unshift({ type: 'Import', txt: `${rows.length} ligne(s) lue(s) : ${valides} licence(s) passée(s) « Validée FFR », ${deja} déjà à jour, ${arb.length} à arbitrer`, quand: dfrShort(TODAY) });
+  toast(`Extraction importée : ${valides} licence(s) validée(s)${arb.length ? `, ${arb.length} ligne(s) à arbitrer` : ''}.`);
+  render();
+}
+
+/* ================= LIAISONS ================= */
+const _bindViewV11 = bindView;
+bindView = function () {
+  _bindViewV11();
+  const v = $('#view');
+  if (state.view !== 'licencies') return;
+  $$('[data-lictab]', v).forEach(b => b.onclick = () => { subTabs.licTab = b.dataset.lictab; subTabs.inscOpen = null; render(); });
+  const bp = $('#btnPortail'); if (bp) bp.onclick = ouvrirPortail;
+  const bl = $('#btnLienInsc');
+  if (bl) bl.onclick = () => {
+    const lien = 'https://inscription.ovalie.app/' + sansAccent(state.params.clubNom) + '/2026-2027';
+    try { navigator.clipboard.writeText(lien).then(() => toast('Lien copié (fictif) : ' + lien), () => toast('Lien (fictif) : ' + lien)); } catch (e) { toast('Lien (fictif) : ' + lien); }
+  };
+  $$('[data-insc]', v).forEach(tr => {
+    const open = () => { subTabs.inscOpen = Number(tr.dataset.insc); render(); };
+    tr.onclick = open; tr.onkeydown = e => { if (e.key === 'Enter') open(); };
+  });
+  const ins = subTabs.inscOpen ? state.inscriptions.find(x => x.id === subTabs.inscOpen) : null;
+  const back = $('#inscBack'); if (back) back.onclick = () => { subTabs.inscOpen = null; render(); };
+  if (ins) {
+    const bv = $('#inscValider');
+    if (bv) bv.onclick = () => {
+      const c = controlesInscription(ins);
+      if (c.bloquant) {
+        openModal('Valider malgré un point bloquant ?', `<p style="margin:0 0 8px">Ce dossier a ${c.liste.filter(x => x.ok === 'ko').length} point(s) bloquant(s) :</p>
+          <ul class="chk-list">${c.liste.filter(x => x.ok === 'ko').map(x => `<li><span class="chk-ko">✕</span><span>${esc(x.txt)}</span></li>`).join('')}</ul>
+          <p style="margin:10px 0 0;font-size:13px;color:var(--ink-2)">La fiche sera créée avec l'alerte correspondante.</p>`,
+          `<button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="inscForce">Valider quand même</button>`);
+        $('#inscForce').onclick = () => { closeModal(); validerInscription(ins); render(); };
+      } else { validerInscription(ins); render(); }
+    };
+    const bc = $('#inscCompl');
+    if (bc) bc.onclick = () => {
+      const manque = controlesInscription(ins).liste.filter(x => x.ok === 'ko').map(x => '- ' + x.txt).join('\n');
+      openModal('Demander un complément', `<div class="field"><label for="complMsg">Message à la famille (email)</label>
+        <textarea id="complMsg" rows="6" style="width:100%">Bonjour,\n\nPour finaliser l'inscription de ${ins.joueur.prenom}, il nous manque :\n${manque || '- (précisez)'}\n\nVous pouvez compléter le dossier depuis le lien reçu par email.\nMerci, le secrétariat du ${state.params.clubNom}</textarea></div>`,
+        `<button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-primary" id="complSend">Envoyer (simulé)</button>`);
+      $('#complSend').onclick = () => { ins.messages.push({ date: TODAY, txt: $('#complMsg').value.trim() }); ins.statut = 'complement'; closeModal(); toast('Demande envoyée à la famille (simulé) — dossier en attente de complément.'); render(); };
+    };
+    const br = $('#inscRefus');
+    if (br) br.onclick = () => {
+      openModal('Refuser ce dossier ?', `<p style="margin:0 0 8px">Le dossier de ${esc(ins.joueur.prenom + ' ' + ins.joueur.nom)} sera classé « Refusé ». ${ins.paiement.paye ? `<b>${eur(ins.paiement.paye)}</b> déjà payés devront être remboursés.` : ''}</p>
+        <div class="field"><label for="refusMotif">Motif communiqué à la famille</label><input id="refusMotif" value="Catégorie complète cette saison" style="width:100%"></div>`,
+        `<button class="btn" onclick="closeModal()">Annuler</button><button class="btn btn-danger" id="refusOk">Refuser le dossier</button>`);
+      $('#refusOk').onclick = () => { ins.statut = 'refusee'; ins.messages.push({ date: TODAY, txt: 'Dossier refusé : ' + $('#refusMotif').value.trim() }); closeModal(); toast('Dossier refusé — la famille est prévenue (simulé).'); render(); };
+    };
+    const be = $('#inscEncaisser');
+    if (be) be.onclick = () => { ins.paiement.paye = ins.paiement.montant; ins.paiement.mode = 'sur_place'; toast(`Paiement de ${eur(ins.paiement.montant)} enregistré.`); render(); };
+    const bf = $('#inscFiche'); if (bf) bf.onclick = () => openFicheLic(ins.licId);
+  }
+  // Oval-e
+  const be2 = $('#ovExport'); if (be2) be2.onclick = exporterOvale;
+  $$('[data-ovsaisie]', v).forEach(b => b.onclick = () => ouvrirSaisieOvale(Number(b.dataset.ovsaisie)));
+  const bd = $('#ovDemo'); if (bd) bd.onclick = () => importerOvale(extractionExemple(), 'extraction d\'exemple');
+  const fi = $('#ovFile');
+  if (fi) fi.onchange = ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { const rows = parserCsv(String(rd.result)); if (!rows.length) { toast('Fichier non reconnu : il faut au moins les colonnes Nom, Prénom et Date de naissance.'); return; } importerOvale(rows, f.name); };
+    rd.readAsText(f, 'utf-8');
+  };
+  $$('[data-arbok]', v).forEach(b => b.onclick = () => {
+    const a = state.ovale.arbitrage.find(x => x.id === Number(b.dataset.arbok));
+    const lid = Number($(`[data-arbsel="${a.id}"]`).value);
+    const l = state.licencies.find(x => x.id === lid);
+    if (!l) { toast('Choisissez le licencié à rattacher, ou ignorez la ligne.'); return; }
+    l.licence = a.licence; if (/qualif|valid|active/i.test(a.statutTxt)) { l.licStatut = 'validee'; l.ovaleValide = TODAY; }
+    state.ovale.arbitrage = state.ovale.arbitrage.filter(x => x !== a);
+    state.ovale.journal.unshift({ type: 'Import', txt: `Ligne ${a.prenom} ${a.nom} rattachée à ${l.prenom} ${l.nom} (licence ${a.licence})`, quand: dfrShort(TODAY) });
+    toast(`Rattaché : ${l.prenom} ${l.nom} a maintenant la licence ${a.licence}.`); render();
+  });
+  $$('[data-arbskip]', v).forEach(b => b.onclick = () => {
+    const a = state.ovale.arbitrage.find(x => x.id === Number(b.dataset.arbskip));
+    state.ovale.arbitrage = state.ovale.arbitrage.filter(x => x !== a);
+    toast(`Ligne ${a.prenom} ${a.nom} ignorée.`); render();
+  });
+};
+
+/* Le tableau de bord signale les dossiers à valider et les arbitrages Oval-e */
+const _alertesSponsorsV11 = window.alertesSponsors;
+window.alertesSponsors = alertesSponsors = function (alertes) {
+  if (_alertesSponsorsV11) _alertesSponsorsV11(alertes);
+  const n = inscAValider().length;
+  if (n) alertes.push({ badge: '<span class="badge b-info"><span class="dot"></span>Inscriptions</span>', txt: `${n} dossier(s) d'inscription en ligne à valider`, go: 'licencies' });
+  const a = state.ovale.arbitrage.length;
+  if (a) alertes.push({ badge: '<span class="badge b-warn"><span class="dot"></span>Oval-e</span>', txt: `${a} ligne(s) de l'extraction Oval-e à arbitrer`, go: 'licencies' });
+};
+/* « Voir » depuis le tableau de bord ouvre le bon onglet */
+const _bindViewV11b = bindView;
+bindView = function () {
+  _bindViewV11b();
+  if (state.view !== 'dashboard') return;
+  $$('[data-goto="licencies"]', $('#view')).forEach(b => {
+    const t = b.closest('.alert-line'); if (!t) return;
+    const txt = t.textContent;
+    if (/inscription en ligne/.test(txt)) b.onclick = () => { subTabs.licTab = 'inscriptions'; subTabs.inscOpen = null; state.view = 'licencies'; render(); };
+    else if (/Oval-e/.test(txt)) b.onclick = () => { subTabs.licTab = 'ovale'; state.view = 'licencies'; render(); };
+    else b.onclick = () => { subTabs.licTab = 'liste'; state.view = 'licencies'; render(); };
+  });
+};
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && portail && !$('#modalRoot .modal')) fermerPortail(); });
+render();
+</script>
+
+<style>
+/* V11.1 : usage du pack en deux boutons visibles (au lieu d'un menu déroulant à 2 choix) */
+.seg-accent { display: flex; width: 100%; flex-wrap: nowrap; }
+.seg-accent button { flex: 1; white-space: nowrap; }
+.seg-accent button.on { background: var(--accent); color: var(--accent-ink); }
+#pkPVField[hidden] { display: none; }
+/* V11.2-V11.4 : contrôle avant distribution — taille modifiable en label coloré, manque global, tri */
+.dm-taille { padding: 4px 7px; font-size: 12.5px; max-width: 140px; display: inline-block; }
+.dm-lab { font-weight: 600; border-radius: 8px; }
+.dm-lab.dm-vert { color: var(--good-text); border-color: color-mix(in srgb, var(--good) 45%, var(--line-strong)); background: color-mix(in srgb, var(--good) 8%, var(--surface)); }
+.dm-lab.dm-orange { color: var(--warning-text); border-color: color-mix(in srgb, var(--warning) 55%, var(--line-strong)); background: color-mix(in srgb, var(--warning) 12%, var(--surface)); }
+.dm-lab.dm-rouge { color: var(--critical-text); border-color: color-mix(in srgb, var(--critical) 50%, var(--line-strong)); background: color-mix(in srgb, var(--critical) 9%, var(--surface)); }
+span.dm-lab { border: 1px solid var(--line-strong); padding: 4px 9px; font-size: 12.5px; display: inline-block; }
+option.dm-autre { font-style: italic; }
+select.dm-taille option { color: var(--ink); font-style: normal; }
+select.dm-taille option.dm-autre { font-style: italic; }
+.dm-leg { font-weight: 700; }
+.dm-leg.dm-vert { color: var(--good-text); }
+.dm-leg.dm-orange { color: var(--warning-text); }
+.dm-leg.dm-rouge { color: var(--critical-text); }
+th.dm-warn { color: var(--warning-text); }
+.dm-warn-ligne { margin: 0 0 10px; font-size: 13px; font-weight: 500; color: var(--warning-text); background: color-mix(in srgb, var(--warning) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--line)); border-radius: 8px; padding: 8px 12px; }
+</style>
 </body>
 </html>
